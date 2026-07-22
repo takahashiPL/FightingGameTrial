@@ -1,63 +1,72 @@
 # スプライト素材の状態
 
-## 結論
+## 結論（現状）
 
-`art/fighter_motion_reference_sheet.png` は、`docs/reference_infographic.png` に登場する白い道着・赤い鉢巻の格闘家を基準にした**モーション方向性の参考画像**です。
+**本番スプライトは未完成である。**  
+完成したスプライトシートはリポジトリに存在しない。
 
-これは次の用途に使います。
+`art/fighter_motion_reference_sheet.png` および `docs/reference_infographic.png` は、白い道着・赤い鉢巻の格闘家を基準にした**デザイン／モーション方向性の参考画像**である。
+
+用途:
 
 - キャラクターデザインの統一
 - 必要なポーズの検討
 - モーションの見た目比較
-- 本番スプライト制作時の参照
+- 本番制作時の参照
 
-ただし、現時点では次の理由により、Unityへそのまま取り込む完成スプライトシートではありません。
+Unity へそのまま取り込む完成スプライトシートではない。理由の例:
 
-- セル寸法が128×128へ厳密に揃っていない
+- セル寸法が 128×128 へ厳密に揃っていない
 - 透明背景ではない
 - 足元原点が完全には統一されていない
 - 必要フレームIDとの1対1対応が未確定
 - 一部ポーズは参考用で、実装仕様と厳密に一致しない
 
-**本番スプライトPNGは未完成**（全フレーム `asset_status=required`）。
+全フレーム `asset_status=required`（本番素材未作成）。
+
+## 素材ステージの現状
+
+| ステージ | 現状 |
+|---|---|
+| 骨格 | 未整備（制作工程の正本は `production_spritesheet_spec.md`） |
+| シルエット | 未整備 |
+| 仮ドット絵 | 未整備 |
+| 動作確認用素材 | 未整備（実装はプレースホルダ矩形で可） |
+| 本番清書素材 | **未作成** |
+| 参考PNG | 参考のみ。完成扱いしない |
+
+## 制作方針（要約）
+
+専任デザイナー不在のため、ChatGPT 支援の段階制作を正とする。
+
+1. 骨格 → シルエット → 仮ドット絵 → 前後比較 → Unity連続再生 → 修正 → 清書  
+2. いきなり完成ドット絵をフレーム単位で一発生成しない  
+3. 最初の試験は Idle と StandPunch のみ  
+4. 詳細正本は `docs/production_spritesheet_spec.md`
+
+ChatGPT 生成物は無条件に完成素材としない。人間が採用可否・連続再生・判定対応を確認する。
 
 ## 配置の正本
 
-セル配置の正本は次の1ファイル。
-
-- `data/sprite_frame_requirements.csv`
-
-これに同期する。
-
+- `data/sprite_frame_requirements.csv`（セル配置の正本）
 - `art/spritesheet_layout.csv`（展開表）
 - `data/frames.csv` の `sheet_x` / `sheet_y`（初期サンプル行のみ）
 
-## 実装用として使用するもの
+## 実装との関係
 
-実装時の切り出し仕様は、次を正本とします。
-
-- `data/sprite_frame_requirements.csv`（配置正本）
-- `art/spritesheet_grid_template.png`
-- `art/spritesheet_layout.csv`（正本の展開）
-- `data/frames.csv`（初期検証用サンプル。Idle + StandPunch のみ）
-- `docs/production_spritesheet_spec.md`
-- ゲーム挙動は `docs/rules.md`（参考画像は仕様正本ではない）
-
-これらに従い、右向き・透明背景・固定セル・統一ピボットで本番スプライトを作成します。  
-初期実装ではプレースホルダ矩形でよい。
-
-## 実装スコープ
+- ゲーム挙動の正本は `docs/rules.md`
+- 初期実装はプレースホルダ矩形でよい
+- **仮素材のまま判定実装を進めてよい**。見た目完成待ちで止めない
+- 切り出し仕様・工程は `docs/production_spritesheet_spec.md`
 
 | scope | 意味 |
 |---|---|
-| `initial` | 最初の実装対象（Idle / StandPunch） |
-| `planned` | 配置予約・将来実装。実装済みではない |
+| `initial` | 最初の対象（Idle / StandPunch） |
+| `planned` | 配置予約。実装済み・素材完成ではない |
 
 ## 削除した旧ファイル
 
-v2に含まれていた次のファイルは、参考画像と大きく異なる簡易図形だったため削除しました。
+v2 の簡易図形スプライトは削除済み。実装素材として使用しない。
 
 - `art/fighter_spritesheet_v1.png`
 - `art/fighter_spritesheet_v1_boxes_preview.png`
-
-これらは実装素材として使用しないでください。

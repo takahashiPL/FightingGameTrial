@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## v3.4（スプライト段階制作方針）
+
+- 専任デザイナー不在・ChatGPT支援前提の制作工程を `docs/production_spritesheet_spec.md` に正本として追加
+- 工程: 骨格 → シルエット → 仮ドット絵 → 前後比較 → Unity連続再生 → 修正 → 清書
+- 骨格基準点、身体固定項目、ChatGPT/人間の担当分離、Idle+StandPunch試験、代替方針を明記
+- 128×128は素材セルサイズであり画面等倍表示ではないこと、表示パラメータは未確定と明記
+- `docs/sprite_art_status.md` で現状が未完成であること・ステージ区分を更新
+- README に制作方針の短い要約を追加
+- `docs/learning_and_readability.md` にアートも段階工程を優先する旨を追記
+
 ## v3.3（曖昧点の追加確定）
 
 - Down+Back をその場しゃがみ（水平移動なし）に確定。「しゃがみ後退」表現を削除

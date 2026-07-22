@@ -77,11 +77,24 @@ Git 管理外: `Game/Library`、`Temp`、`Logs`、`UserSettings`、`obj` など
 
 処理順の正本は `docs/rules.md` §10 です。
 
+## スプライト制作方針（要約）
+
+専任デザイナーは不在。ChatGPT 支援を前提に、段階工程で作る。
+
+1. 骨格ポーズ → 単色シルエット → 仮ドット絵 → 前後比較 → Unity連続再生 → 修正 → 本番清書  
+2. いきなり各フレームを独立した完成ドット絵として生成しない  
+3. 最初の試験対象は **Idle** と **StandPunch** のみ  
+4. 現在の参考画像は**完成素材ではない**  
+5. 詳細正本は **`docs/production_spritesheet_spec.md`**（状態は `docs/sprite_art_status.md`）
+
+仮素材のまま判定実装を進めてよい。
+
 ## スプライト画像について
 
 - `art/fighter_motion_reference_sheet.png` … デザイン参考。**完成スプライトではない**
-- `art/spritesheet_grid_template.png` … 128×128、8×8台紙
-- `docs/production_spritesheet_spec.md` … 本番制作条件
+- `art/spritesheet_grid_template.png` … 128×128、8×8台紙（セルサイズ。画面等倍表示の意味ではない）
+- `docs/production_spritesheet_spec.md` … 制作工程とセル仕様の正本
+- `docs/sprite_art_status.md` … 現在の素材は未完成であること
 
 ## ディレクトリ構成
 
