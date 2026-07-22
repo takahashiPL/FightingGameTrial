@@ -1,36 +1,124 @@
 {
-  "version": "1.2",
+  "version": "1.4",
+  "purpose": "learning_oriented_2d_fighting_trial",
+  "spec_authority": [
+    "docs/rules.md",
+    "data/*.csv",
+    "schemas/data_dictionary.md"
+  ],
+  "readability_guide": "docs/learning_and_readability.md",
+  "time_model": {
+    "simulation_tick": {
+      "hz": 60,
+      "advances_during_hitstop": true,
+      "use": "input_history_and_buffer"
+    },
+    "combat_frame": {
+      "advances_during_hitstop": false,
+      "use": "combat_progression"
+    },
+    "action_frame": {
+      "advances_during_hitstop": false,
+      "on_state_enter": 0,
+      "duration_consumed_at": "end_of_combat_frame",
+      "note": "duration_game_frames=N means N combat frames of that pose"
+    },
+    "avoid_ambiguous_term": "GameFrame_alone"
+  },
   "coordinate_system": {
     "origin": "center_between_feet",
     "x_positive": "right_when_facing_right",
     "y_positive": "up",
     "mirror_left_facing": "negate_offset_x"
   },
+  "facing": {
+    "input_interpretation": "facing_locked_at_end_of_previous_combat_frame",
+    "final_facing": "once_after_movement_and_push_separation",
+    "no_retroactive_input_flip_same_frame": true
+  },
+  "guard_model": {
+    "contact_time_input": true,
+    "back_only": "walk_back",
+    "down_plus_back": "crouch_in_place_no_horizontal_move",
+    "combat_state_owns_stun": "BlockStun",
+    "guard_posture": "Stand_or_Crouch_property",
+    "display_animation": "StandGuard_or_CrouchGuard_not_combat_state"
+  },
+  "just_guard": {
+    "style": "parry_like",
+    "edge": "new_back_press",
+    "down_then_back": "crouch_just_guard_eligible",
+    "back_then_down_only": "not_just_guard",
+    "window_ticks_provisional": 3
+  },
+  "clash": {
+    "primary_classification": true,
+    "recoil": "symmetric_ClashRecoil",
+    "wall_unspent_recoil_initial": "discard_no_transfer",
+    "wall_transfer_future_candidate": true
+  },
+  "trade": {
+    "primary_classification": false,
+    "type": "aggregate_composite_result",
+    "rule": "only_when_both_directions_classify_as_Hit_after_clash_exclusion",
+    "not_if_either_side_is": [
+      "Guard",
+      "JustGuard",
+      "IgnoredByInvulnerability",
+      "Miss",
+      "InvalidTarget"
+    ],
+    "not_a_hit_resolution_priority_row": true
+  },
   "simulation": {
     "fixed_hz": 60,
-    "seconds_per_game_frame": 0.016666666666666666
+    "authority": "logical_ticks_not_engine_update",
+    "pipeline_doc": "docs/rules.md section 10"
   },
-  "box_types": [
-    "push",
-    "hurt",
-    "hit"
-  ],
-  "result_types": [
+  "simulation_tick_pipeline": {
+    "every_simulation_tick_steps_1_to_3": [
+      "sample_input_using_facing_for_input",
+      "update_input_history_and_advance_simulation_tick",
+      "if_hitstop_decrement_and_skip_combat_steps_4_to_18"
+    ],
+    "combat_frame_only_steps_4_to_18": [
+      "decide_state_transition_requests",
+      "enter_state_with_action_frame_0_if_new",
+      "apply_movement",
+      "resolve_pushboxes",
+      "finalize_facing_once",
+      "update_combat_boxes",
+      "collect_all_contact_candidates",
+      "resolve_clash",
+      "classify_each_direction_invuln_miss_jg_guard_hit",
+      "aggregate_trade_if_both_hit_then_apply_all_results",
+      "consume_attack_instances",
+      "decrement_pose_duration_at_end",
+      "update_debug_info",
+      "increment_combat_frame_number"
+    ],
+    "combat_frame_advance_rule": "completing_steps_4_through_18_advances_combat_frame_by_1"
+  },
+  "box_types": ["push", "hurt", "hit"],
+  "result_types_primary": [
+    "NoContact",
     "Miss",
+    "InvalidTarget",
     "Hit",
     "Guard",
     "JustGuard",
     "Clash",
     "IgnoredByInvulnerability"
   ],
-  "debug_ui_groups": [
-    "P1",
-    "P2",
-    "Contact",
-    "Physics",
-    "Playback",
-    "UI"
+  "result_types_aggregate": [
+    "Trade",
+    "Whiff"
   ],
+  "attack_category": {
+    "values": ["Punch", "Kick"],
+    "role": "label_only"
+  },
+  "debug_ui_groups": ["P1", "P2", "Contact", "Physics", "Playback", "UI"],
   "art_assets": [
     "spritesheet_grid_template.png",
     "fighter_motion_reference_sheet.png"
@@ -39,12 +127,15 @@
     "debug_screen_mockup.png",
     "debug_screen_spec.md",
     "debug_screen_wireframe.png",
+    "learning_and_readability.md",
     "production_spritesheet_spec.md",
     "reference_infographic.png",
+    "rules.md",
     "sprite_art_status.md"
   ],
   "sprite_asset_status": {
     "fighter_motion_reference_sheet.png": "visual_reference_only",
     "production_spritesheet": "not_yet_created"
-  }
+  },
+  "state_transitions_csv": "draft_reference_not_executable_state_machine"
 }

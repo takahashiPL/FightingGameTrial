@@ -1,115 +1,82 @@
 # デバッグ画面仕様
 
-この資料は、`reference_infographic.png` で示した「格闘ゲーム判定を観察するための実行画面」を、実装向けに文章で具体化したものです。
+この資料は、判定観察用の実行画面を実装向けに具体化したものです。
 
-表示項目の正本は `data/debug_ui_fields.csv` とする。  
-本資料と CSV で差がある場合は CSV の `implementation_phase` を優先する。
+- 表示項目の正本: `data/debug_ui_fields.csv`
+- ゲーム仕様の正本: `docs/rules.md`
+- 可読性方針: `docs/learning_and_readability.md`
+
+CSV の `implementation_phase` を優先する。
 
 ## 1. 目的
 
-デバッグ画面の目的は、次を同時に観察できるようにすることです。
+- CombatState / Move / ActionFrame
+- SimulationTick（入力用）と、必要なら CombatFrame（戦闘用）
+- 判定箱の有効状態
+- 方向別の接触結果、および Trade 集約の有無
+- Pause / 1フレーム送り
 
-- P1 / P2 の現在状態
-- 現在アクションのどのフレームにいるか
-- どの Pushbox / Hurtbox / Hitbox が有効か
-- Hit / Guard / Just Guard / Clash のどれが発生したか（段階的に）
-- 一時停止 / 1フレーム送り / 低速再生の状態
+学習者が「今どの時計が進んでいるか」を誤解しない表示を優先する。
 
-初期実装では、判定ループが動いていることを確認できる最小HUDに限定する。
+## 2. 時間表示（重要）
 
-## 2. 実装フェーズ
+| HUD項目 | 日本語の意味 | HitStop中 |
+|---|---|---|
+| **SimulationTick** | 入力記録用の60Hzカウンタ | **進む** |
+| **CombatFrame** | 戦闘進行カウンタ（将来表示） | 止まる |
+| **ActionFrame** | 技・ポーズ番号（入場時0） | 止まる |
 
-### 初期必須（最初の実装対象）
+旧称「GameFrame」だけでは不十分。初期必須は SimulationTick。ラベル近くに日本語説明を置く。
 
-`debug_ui_fields.csv` で `implementation_phase=initial` の項目。
+## 3. 実装フェーズ
 
-- P1 / P2: State, MoveId, ActionFrame
-- Playback: GameFrame, Pause
+### 初期必須
+
+- P1/P2: CombatState, Move, ActionFrame
+- Playback: SimulationTick, Pause
 - Contact: Result, AttackInstanceId
-- UI: Boxes表示状態
+- UI: Boxes
 
-初期実装対象モーションは **Idle + StandPunch** のみ。  
-Pushback詳細、JustGuard/Clash専用フラグ、ジャンプ状態などは初期必須に含めない。
+対象モーションは Idle + StandPunch。
 
 ### 将来候補
 
-`implementation_phase=future` の項目。例:
+- CombatFrame、GuardPosture、DisplayAnimation
+- FacingForInput / FacingFinal
+- IsJustGuard / IsClash / IsTrade
+- Pushback、Whiff、入力履歴など
 
-- JumpState / AirActionUsed
-- Pushback詳細（Requested / Applied）
-- IsJustGuard / IsClash
-- 入力履歴詳細
-- 座標・Facing・Invulnerable など
+## 4. 接触結果の表示
 
-将来項目はモックアップにあっても、初期実装で必須ではない。
+| 結果 | 注意 |
+|---|---|
+| NoContact | 毎tick出さない |
+| Miss / InvalidTarget | 方向ごとの一次分類 |
+| Clash | 一次分類 |
+| Trade | **複合結果**。双方向とも Hit のときだけ集約表示 |
+| JustGuard | 攻撃弾き型 |
+| Whiff | 技終了時のデバッグ表現 |
 
-## 3. 推奨レイアウト
+片方が Guard などで、もう片方が Hit のときは Trade と書かない。
 
-### 上段
-- P1 State / Move / ActionFrame
-- P2 State / Move / ActionFrame
-- Game Frame Counter
-- Pause 状態
-- （将来）Playback Speed
+## 5. ガード表示
 
-### 中央
-- 対戦キャラクターの表示領域
-- 任意で背景を簡素化
-- Pushbox / Hurtbox / Hitbox を色分け表示（Boxes ON時）
-- （将来）キャラクター原点、向き、移動量ベクトル
+- CombatState = BlockStun のとき、硬直の所有者は BlockStun
+- StandGuard / CrouchGuard は DisplayAnimation 名として出してよいが、CombatState と混同しない
+- GuardPosture（Stand/Crouch）を別表示できると学習に良い
 
-### 下段左
-- Contact Result パネル
-- 初期: `Hit` / `Miss` など実際に実装した結果 + AttackInstanceId
-- （将来）`Guard` / `JustGuard` / `Clash`、Damage / HitStop / Knockback / Pushback
+## 6. 推奨レイアウト・操作
 
-### 下段中央
-- 操作ボタン群
-- Pause
-- 1 Frame Step
-- （将来）Slow 0.25x
-- Play
-- Reset
+上段: CombatState / Move / ActionFrame / SimulationTick / Pause  
+中央: キャラ＋箱  
+下段: Contact Result、操作ボタン、Boxes ON/OFF  
 
-### 下段右
-- 表示切替
-- Boxes ON/OFF（初期必須）
-- （将来）Sprites ON/OFF
-- （将来）P2 Dummy ON/OFF
-- （将来）Input Display ON/OFF
+キー割り当てはアダプタ層（Space=Pause、.=1フレーム送り、F1=箱 など）。
 
-## 4. 色の推奨
+## 7. 実装メモ
 
-- Pushbox: 青
-- Hurtbox: 緑
-- Hitbox: 赤
-- Character Pivot: 白
-- Guard 成立時表示: 黄（将来）
-- Just Guard 成立時表示: 水色（将来）
-- Clash 成立時表示: 紫（将来）
-
-## 5. 操作の想定
-
-- `Space`: Pause / Resume
-- `.` : 1フレーム送り
-- `,` : 低速再生切替（将来）
-- `R` : Round / State Reset
-- `F1`: 判定箱表示切替
-- `F2`: スプライト表示切替（将来）
-- `F3`: 入力表示切替（将来）
-
-## 6. 実装メモ
-
-- 内部シミュレーションは 60Hz 固定
-- Pause 中は時間進行を止めるが、明示的な 1フレーム送りのみ許可
-- HitStop 中もログ記録は継続し、キャラクター進行・判定更新は停止（HitStop自体は将来でも可）
-- 描画FPSと無関係に、表示項目はゲームフレーム番号を正本とする
-- 本番スプライト未作成のため、初期は矩形プレースホルダでよい
-- 参考PNGを完成スプライトとして Import しない
-
-## 7. モックアップ画像との関係
-
-- `debug_screen_wireframe.png`: ブロック配置の最小構成
-- `debug_screen_mockup.png`: 実行イメージのサンプル（将来項目を含む場合あり）
-- 実装時の細かいUIスキンは変更してよい
-- **初期実装はモックアップの全項目を再現しなくてよい**。`implementation_phase=initial` を満たせばよい
+- Unity Update/FixedUpdate を仕様正本にしない
+- HitStop中は SimulationTick と入力のみ進み、戦闘は停止
+- 本番スプライト未作成。プレースホルダ可
+- 参考PNGを完成スプライトにしない
+- モックアップの全項目再現は初期必須ではない

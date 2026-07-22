@@ -1,15 +1,24 @@
-﻿from_state,input,condition,to_state,priority,notes
-Neutral,A,grounded && can_control,StandPunch,50,
-Neutral,B,grounded && can_control,StandKick,50,
-Neutral,Down+A,grounded && can_control,CrouchPunch,60,
-Neutral,Down+B,grounded && can_control,CrouchKick,60,
-Neutral,X,grounded && no_direction,JumpNeutral,70,
-Neutral,X+Forward,grounded,JumpForward,75,直前2ゲームフレームの方向入力も参照
-Neutral,X+Back,grounded,JumpBackward,75,直前2ゲームフレームの方向入力も参照
-Airborne,A,air_attack_unused,AirPunch,50,1ジャンプ1回
-Airborne,B,air_attack_unused,AirKick,50,1ジャンプ1回
-GroundCancelable,Back,guard_allowed,StandGuard,80,
-GroundCancelable,Down+Back,guard_allowed,CrouchGuard,85,
-BlockStun,Any,blockstun_remaining > 0,BlockStun,100,操作不可
-WakeUp,Any,wakeup_remaining > 0,WakeUp,100,無敵・操作不可
-WakeUp,None,wakeup_remaining == 0,Neutral,100,無敵解除と操作復帰を同時
+﻿from_state,input,condition,to_state,priority,data_status,notes
+Neutral,A,grounded && can_control,StandPunch,50,draft,草案。実行用完全SMではない
+Neutral,B,grounded && can_control,StandKick,50,draft,草案
+Neutral,Down+A,grounded && can_control,CrouchPunch,60,draft,草案
+Neutral,Down+B,grounded && can_control,CrouchKick,60,draft,草案
+Neutral,X,grounded && no_direction,JumpNeutral,70,draft,直前2 SimulationTickの方向も参照
+Neutral,X+Forward,grounded,JumpForward,75,draft,草案
+Neutral,X+Back,grounded,JumpBackward,75,draft,草案
+Neutral,Back,grounded && can_control,Neutral,40,draft,後ろ単独は後退移動。StandGuardへは遷移しない
+Neutral,Down,grounded && can_control,Crouch,42,draft,その場しゃがみ
+Neutral,Down+Back,grounded && can_control,Crouch,45,draft,その場しゃがみ。水平移動なし。接触時はしゃがみガード。しゃがみ後退ではない
+Airborne,A,air_attack_unused,AirPunch,50,draft,1ジャンプ1回
+Airborne,B,air_attack_unused,AirKick,50,draft,1ジャンプ1回
+AirAttack,OnLand,airborne_attack_active_or_recovering,LandingRecovery,90,draft,着地CFで空中攻撃強制終了
+LandingRecovery,None,landing_recovery_remaining > 0,LandingRecovery,100,draft,フレーム数は暫定・未決定。再ジャンプ不可
+LandingRecovery,None,landing_recovery_remaining == 0,Neutral,100,draft,草案
+BlockStun,None,blockstun_remaining > 0,BlockStun,100,draft,CombatState=BlockStunが硬直を所有。GuardPosture/DisplayAnimationは別プロパティ。後続は姿勢維持ガード。新規JGなし
+BlockStun,None,blockstun_remaining == 0 && (guard_posture==Crouch || holding_down),Crouch,100,draft,BlockStun終了。しゃがみ姿勢またはDown保持ならCrouchへ
+BlockStun,None,blockstun_remaining == 0 && otherwise,Neutral,100,draft,BlockStun終了。それ以外はNeutralへ
+KnockdownStart,None,knockdown_flow,Down,100,draft,KnockdownStart→Down→WakeUp→Neutral
+Down,None,down_remaining > 0,Down,100,draft,ダウン追撃なし
+Down,None,down_remaining == 0,WakeUp,100,draft,WakeUpへ
+WakeUp,Any,wakeup_remaining > 0,WakeUp,100,draft,無敵はCombatState==WakeUpの間のみ
+WakeUp,None,wakeup_remaining == 0,Neutral,100,draft,Neutral第1CFから被弾可能

@@ -1,5 +1,5 @@
 ﻿frame_id,move_id,frame_index,sheet_x,sheet_y,width,height,pivot_x,pivot_y,duration_game_frames,move_x,move_y,can_accept_input,can_guard,invulnerable,airborne,data_scope,notes
-IDLE_00,IDLE,0,0,0,128,128,64,112,6,0,0,1,1,0,0,initial_sample,初期検証用サンプル。duration等は仮値。本番スプライト未作成
-STAND_PUNCH_00,STAND_PUNCH,0,0,128,128,128,64,112,3,0,0,0,0,0,0,initial_sample,初期検証用サンプル。Startup。duration等は仮値
-STAND_PUNCH_01,STAND_PUNCH,1,128,128,128,128,64,112,2,1,0,0,0,0,0,initial_sample,初期検証用サンプル。Active。move_xは仮値
-STAND_PUNCH_02,STAND_PUNCH,2,256,128,128,128,64,112,7,0,0,0,0,0,0,initial_sample,初期検証用サンプル。Recovery。duration等は仮値
+IDLE_00,IDLE,0,0,0,128,128,64,112,6,0,0,1,1,0,0,initial_sample,初期検証用サンプル。can_guard=1はそのフレームでガード成立可能を示す。duration等は仮値
+STAND_PUNCH_00,STAND_PUNCH,0,0,128,128,128,64,112,3,0,0,0,0,0,0,initial_sample,初期検証用サンプル。Startup。can_guard=0。duration等は仮値
+STAND_PUNCH_01,STAND_PUNCH,1,128,128,128,128,64,112,2,1,0,0,0,0,0,initial_sample,初期検証用サンプル。Active。move_xは仮値。can_guard=0
+STAND_PUNCH_02,STAND_PUNCH,2,256,128,128,128,64,112,7,0,0,0,0,0,0,initial_sample,初期検証用サンプル。Recovery。duration等は仮値。can_guard=0

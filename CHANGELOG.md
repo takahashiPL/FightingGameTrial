@@ -1,32 +1,36 @@
 # CHANGELOG
 
+## v3.3（曖昧点の追加確定）
+
+- Down+Back をその場しゃがみ（水平移動なし）に確定。「しゃがみ後退」表現を削除
+- JustGuard: Down保持後の Back 新規エッジは対象。Back保持後の Down のみでは対象外
+- Trade を一次分類から外し、双方向とも Hit のときの複合集約と明記。hit_resolution から Trade 行を削除
+- SimulationTick / CombatFrame / ActionFrame を区別。HitStop中は入力tickのみ進行
+- ActionFrame 入場時0・末尾で duration 減算（オフバイワン対策）を明記
+- 入力解釈用 Facing（前CF終了時）と最終 Facing（Push後）を分離
+- BlockStun（CombatState）と GuardPosture / DisplayAnimation の責務分離。state_transitions から StandGuard 遷移を除去
+- Clash 壁際の未消化反動は初期版で破棄（転送しない）。通常 Pushback 転送とは別処理
+- README: `1f294cc` を「Unity追加時の基準コミット」と表現。未コミット資料更新を明記
+- debug_ui_fields: SimulationTick を初期必須に。CombatFrame / GuardPosture 等を追加
+
+## v3.2（仕様レビュー反映・ルール確定）
+
+- ガード接触時判定、JustGuard（攻撃弾き型）、Clash/Trade、1GF処理順、着地分離などを確定
+- 学習・可読性方針ドキュメントを追加
+- CSVとコードの責務分離を明記
+
 ## v3.1（資料・CSV整合）
 
-- スプライト配置の正本を `data/sprite_frame_requirements.csv` に一本化
-- `art/spritesheet_layout.csv` と `data/frames.csv` の `sheet_x` / `sheet_y` を正本へ同期
-- `frames.csv` / `boxes.csv` を Idle + StandPunch のみの初期検証用サンプルへ整理
-- `implementation_scope`（initial / planned）と `data_scope` / `value_status` で完成状態を明示
-- `schemas/data_dictionary.md` に `hit_resolution` / `state_transitions` / `sprite_frame_requirements` の列説明を追加
-- `debug_ui_fields.csv` と `docs/debug_screen_spec.md` を初期必須 / 将来候補で整合
-- JustGuardWindow・Damage・硬直・Pushback・Jump移動量を仮値として明記
-- 空中パンチのガード仕様を未確定として明記（moves.csv のフラグは暫定値）
-- README を現状に更新（Game/ は Universal 2D 作成済み、unity `1f294cc`、Git管理範囲の訂正）
+- スプライト配置正本の一本化、Idle+StandPunch サンプル整理
+- README を Game/ 作成済みに更新（基準コミット `1f294cc`）
 
 ## v3
 
-- 参考画像と大きく異なる簡易図形スプライト2枚を削除
-- 白い道着・赤い鉢巻の格闘家を基準にした `fighter_motion_reference_sheet.png` を追加
-- 参考画像と本番実装素材の違いを `sprite_art_status.md` で明記
-- 本番スプライトの制作条件を `production_spritesheet_spec.md` に追加
-- 必須フレーム一覧 `sprite_frame_requirements.csv` を追加
-- READMEを全面改訂し、実装素材の完成状態について誤解が生じないよう修正
-- Gameフォルダ内の仮ファイルを削除し、空フォルダとして扱う構成へ変更
-  - 注: その後 unity ブランチ `1f294cc` で Universal 2D プロジェクトを追加済み
+- 参考画像と本番素材の区別を明確化
 
 ## v2
 
-- Unity選定理由をREADMEへ追加
-- デバッグ画面ワイヤーフレーム、モックアップ、仕様書、UI項目CSVを追加
+- Unity選定理由、デバッグ画面資料を追加
 
 ## v1
 

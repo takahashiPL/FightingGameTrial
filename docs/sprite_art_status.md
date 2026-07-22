@@ -41,6 +41,7 @@
 - `art/spritesheet_layout.csv`（正本の展開）
 - `data/frames.csv`（初期検証用サンプル。Idle + StandPunch のみ）
 - `docs/production_spritesheet_spec.md`
+- ゲーム挙動は `docs/rules.md`（参考画像は仕様正本ではない）
 
 これらに従い、右向き・透明背景・固定セル・統一ピボットで本番スプライトを作成します。  
 初期実装ではプレースホルダ矩形でよい。

@@ -1,7 +1,7 @@
 ﻿priority,contact_type,condition,result,attacker_state,defender_state,damage,notes
-1,Hitbox_vs_Hitbox,both_active && both_clash_enabled,Clash,ClashRecoil,ClashRecoil,0,双方攻撃無効。本体Hitより先
-2,Hitbox_vs_Hurtbox,target_invulnerable,IgnoredByInvulnerability,Continue,Unchanged,0,
-3,Hitbox_vs_Hurtbox,spatially_not_overlapping,Miss,Continue,Unchanged,0,例: 立ちパンチ対しゃがみ
-4,Hitbox_vs_Hurtbox,grounded && just_guard_input,JustGuard,Stagger_or_AirDeflected,ShortBlockStun,0,入力開始が接触直前3ゲームフレーム以内
-5,Hitbox_vs_Hurtbox,grounded && valid_guard_input,Guard,Recovery,BlockStun,0,処理済み攻撃は再判定しない
-6,Hitbox_vs_Hurtbox,otherwise,Hit,Recovery,MoveDefinedHitResult,move.damage,
+1,Hitbox_vs_Hitbox,both_active && clash_eligible,Clash,ClashRecoil,ClashRecoil,0,一次分類。関与AttackInstanceのHurt攻撃は破棄し双方Instance消費。ClashRecoilは双方へ。壁際の未消化反動は初期版では転送せず破棄。攻撃側/防御側という一方向表現は使わない
+2,Hitbox_vs_Hurtbox,target_invulnerable,IgnoredByInvulnerability,Continue,Unchanged,0,方向ごとの個別分類。ログ可。AttackInstanceは消費しない。Tradeの一次分類ではない
+3,Hitbox_vs_Hurtbox,spatially_overlapping && attribute_or_target_invalid,Miss_or_InvalidTarget,Continue,Unchanged,0,方向ごとの個別分類。幾何重なりありだがcan_hit_*等で無効。NoContactとは別
+4,Hitbox_vs_Hurtbox,grounded && just_guard_back_press_edge_in_window && not_in_blockstun,JustGuard,Stagger_or_AirDeflected,ShortBlockStun,0,方向ごとの個別分類。Backの新規押下エッジ（Down保持後にBack追加も可）。Back保持後にDownのみではJGにならない。窓はSimulationTick上の暫定3
+5,Hitbox_vs_Hurtbox,grounded && valid_guard_input_or_blockstun_hold,Guard,Recovery,BlockStun,0,方向ごとの個別分類。接触時入力。BlockStun中はGuardPosture維持・新規JGなし
+6,Hitbox_vs_Hurtbox,otherwise_valid,Hit,Recovery,MoveDefinedHitResult,move.damage,方向ごとの個別分類。属性と幾何の両方。双方向ともHitのときのみ後段でTradeへ集約
