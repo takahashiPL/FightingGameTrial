@@ -1,7 +1,7 @@
-﻿move_id,display_name,total_frames,startup_frames,active_frames,recovery_frames,attack_category,damage,on_hit_result,can_stand_guard,can_crouch_guard,can_hit_crouch,can_hit_air,causes_knockdown,blockstun_frames,hitstun_frames,guard_pushback_px,attacker_recoil_px,clash_enabled,air_action_once_per_jump,notes
-STAND_PUNCH,立ちパンチ,12,3,2,7,Punch,10,HitStun,1,0,0,0,0,6,9,8,2,1,0,しゃがみにはMiss
-STAND_KICK,立ちキック,16,5,3,8,Kick,16,Knockdown,1,1,1,0,1,9,0,12,3,1,0,立ち・しゃがみに当たる
-CROUCH_PUNCH,しゃがみパンチ,11,3,2,6,Punch,8,ShortHitStun,1,1,1,0,0,5,6,6,2,1,0,低姿勢近距離
-CROUCH_KICK,しゃがみキック,14,4,2,8,Kick,7,ShortHitStun,1,1,1,0,0,5,6,7,2,1,0,攻撃相殺向け
-AIR_PUNCH,空中パンチ,15,4,3,8,Punch,11,AirHitStun,1,0,0,1,0,7,8,9,3,1,1,ジャンプ中ガード不可
-AIR_KICK,空中キック,18,5,3,10,Kick,15,LandingKnockdown,1,1,1,1,1,10,0,16,6,1,1,壁際ガード時は攻撃側を空中反発
+﻿move_id,display_name,total_frames,startup_frames,active_frames,recovery_frames,attack_category,damage,on_hit_result,can_stand_guard,can_crouch_guard,can_hit_crouch,can_hit_air,causes_knockdown,blockstun_frames,hitstun_frames,guard_pushback_px,attacker_recoil_px,clash_enabled,air_action_once_per_jump,value_status,notes
+STAND_PUNCH,立ちパンチ,12,3,2,7,Punch,10,HitStun,1,0,0,0,0,6,9,8,2,1,0,provisional,初期実装対象。数値は仮値。しゃがみにはMiss
+STAND_KICK,立ちキック,16,5,3,8,Kick,16,Knockdown,1,1,1,0,1,9,0,12,3,1,0,provisional,planned。数値は仮値。立ち・しゃがみに当たる
+CROUCH_PUNCH,しゃがみパンチ,11,3,2,6,Punch,8,ShortHitStun,1,1,1,0,0,5,6,6,2,1,0,provisional,planned。数値は仮値。低姿勢近距離
+CROUCH_KICK,しゃがみキック,14,4,2,8,Kick,7,ShortHitStun,1,1,1,0,0,5,6,7,2,1,0,provisional,planned。数値は仮値。攻撃相殺向け
+AIR_PUNCH,空中パンチ,15,4,3,8,Punch,11,AirHitStun,1,0,0,1,0,7,8,9,3,1,1,provisional,planned。数値は仮値。ガード可否（特にしゃがみガード）は未確定。can_stand_guard/can_crouch_guardは暫定値であり仕様確定ではない
+AIR_KICK,空中キック,18,5,3,10,Kick,15,LandingKnockdown,1,1,1,1,1,10,0,16,6,1,1,provisional,planned。数値は仮値。壁際ガード時の空中反発はrules参照

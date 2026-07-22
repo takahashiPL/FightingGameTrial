@@ -34,9 +34,13 @@ Unityからピクセル矩形またはUVで安全に切り出せる、固定セ�
 
 ## 5. 必要フレーム
 
-必要なフレームIDと配置先は、`data/sprite_frame_requirements.csv` と `art/spritesheet_layout.csv` を参照する。
+必要なフレームIDと配置先の**正本**は `data/sprite_frame_requirements.csv` とする。  
+`art/spritesheet_layout.csv` は正本の展開表であり、正本と矛盾する場合は正本を優先して同期する。
 
-最低限、次を用意する。
+`implementation_scope=initial`（Idle / StandPunch）でも、`asset_status=required` の間は本番素材未作成として扱う。  
+`planned` のフレームは配置予約であり、実装済み・素材完成を意味しない。
+
+最低限、次を用意する（制作計画。初期実装は Idle + StandPunch のプレースホルダで開始してよい）。
 
 - 待機
 - 前進・後退

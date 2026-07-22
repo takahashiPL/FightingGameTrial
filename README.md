@@ -2,6 +2,32 @@
 
 このパッケージは、フレーム単位の2D格闘ゲーム判定を試作・学習するための実装用ひな形です。
 
+## ブランチ構成
+
+| ブランチ | 内容 |
+|---|---|
+| `main` | 共通資料（docs / data / schemas / art の仕様・CSV・参考画像） |
+| `unity` | 共通資料 + Unity プロジェクト（`Game/`） |
+
+現在の Unity 初期コミットは `1f294cc`（Add initial Unity 2D project）です。  
+Universal 2D テンプレートで作成済みです。
+
+### Git 管理について
+
+`Game/` 配下のうち、次は Git 管理対象です。
+
+- `Game/Assets`
+- `Game/Packages`
+- `Game/ProjectSettings`
+
+次は Git 管理外です（編集・コミットしない）。
+
+- `Game/Library`
+- `Game/Temp`
+- `Game/Logs`
+- `Game/UserSettings`
+- `Game/obj` など自動生成物
+
 ## 今回Unityを選定した理由
 
 本プロジェクトでUnityを使用するのは、特定のエンジンだけを継続して学習するためではありません。今回の中心課題である2D座標、固定ゲームフレーム、入力バッファ、状態遷移、判定箱、CSV駆動を、小規模かつ明示的に実装・可視化しやすいためです。
@@ -17,6 +43,39 @@ UEでもPaper 2D、DataTable、Enhanced Inputなどで実装できます。将�
 5. `docs/debug_screen_spec.md`
 6. 各種PNG参考画像
 
+### スプライト配置の正本
+
+セル配置の正本は **`data/sprite_frame_requirements.csv`** です。
+
+- `art/spritesheet_layout.csv` は正本の展開表（同期する）
+- `data/frames.csv` の `sheet_x` / `sheet_y` も正本と一致させる
+- 参考PNGは配置正本ではない
+
+## データの完成状態
+
+| データ | 状態 |
+|---|---|
+| `frames.csv` / `boxes.csv` | **初期検証用サンプル**（Idle + StandPunch のみ） |
+| `sprite_frame_requirements.csv` | 配置計画の正本。`initial` / `planned` を区別 |
+| `moves.csv` | 技設計あり。数値はすべて `provisional`（仮値） |
+| 本番スプライトPNG | **未完成**。`asset_status=required` |
+
+詳細は `schemas/data_dictionary.md` を参照。
+
+## 最初の実装対象
+
+次の最小単位から始める。
+
+1. 60Hz固定進行（Pause / 1フレーム送り）
+2. Idle
+3. StandPunch（Startup / Active / Recovery）
+4. Pushbox / Hurtbox / Hitbox の表示
+5. デバッグHUDの初期必須項目（`debug_ui_fields.csv` の `implementation_phase=initial`）
+
+他モーション（キック、ジャンプ、ガード、Clash など）は `planned` / `not_implemented` とし、存在しない数値を推測で埋めない。
+
+必殺技は初期版では未実装・非表示。
+
 ## スプライト画像について
 
 - `art/fighter_motion_reference_sheet.png`
@@ -26,9 +85,9 @@ UEでもPaper 2D、DataTable、Enhanced Inputなどで実装できます。将�
 - `art/spritesheet_grid_template.png`
   - 128×128セル、8列×8行の本番配置台紙
 - `art/spritesheet_layout.csv`
-  - セル配置案
+  - `sprite_frame_requirements.csv` に同期したセル配置表
 - `data/sprite_frame_requirements.csv`
-  - 必須フレーム一覧と制作状況
+  - 必須フレーム一覧・配置正本・制作状況
 - `docs/production_spritesheet_spec.md`
   - 本番スプライトの透明背景、固定セル、ピボットなどの制作条件
 
@@ -41,7 +100,7 @@ v2に入っていた簡易図形の `fighter_spritesheet_v1.png` と `fighter_sp
 - `docs/debug_screen_spec.md`
 - `data/debug_ui_fields.csv`
 
-以前の参考画像右下にあった画面予想図に相当する内容を、上記4ファイルで補っています。
+モックアップは将来項目を含みうる。初期実装は CSV の `implementation_phase=initial` を満たせばよい。
 
 ## ディレクトリ構成
 
@@ -73,9 +132,24 @@ Unity_FightingGameTrial
 │  ├─ data_dictionary.md
 │  └─ schema_summary.json
 └─ Game
+   ├─ Assets          ← Git管理
+   ├─ Packages        ← Git管理
+   ├─ ProjectSettings ← Git管理
+   └─ Library 等      ← Git管理外
 ```
 
-`Game`は空フォルダです。Unity Hubから、この場所へUnityプロジェクト本体を作成してください。
+`Game/` には Universal 2D の Unity プロジェクトを作成済みです（unity ブランチ、コミット `1f294cc`）。
+
+## 仮値・未確定
+
+次はすべて初期検証用の仮値。
+
+- JustGuardWindow = 3
+- Damage / HitStun / BlockStun / Pushback
+- Jump 移動量（現状は frames 未収録）
+- 判定箱サイズ
+
+**空中パンチのガード可否は未確定。** `moves.csv` の該当フラグは暫定値であり、仕様確定ではない。
 
 ## 固定ゲームフレーム
 

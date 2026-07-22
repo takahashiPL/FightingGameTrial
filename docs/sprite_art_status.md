@@ -19,17 +19,38 @@
 - 必要フレームIDとの1対1対応が未確定
 - 一部ポーズは参考用で、実装仕様と厳密に一致しない
 
+**本番スプライトPNGは未完成**（全フレーム `asset_status=required`）。
+
+## 配置の正本
+
+セル配置の正本は次の1ファイル。
+
+- `data/sprite_frame_requirements.csv`
+
+これに同期する。
+
+- `art/spritesheet_layout.csv`（展開表）
+- `data/frames.csv` の `sheet_x` / `sheet_y`（初期サンプル行のみ）
+
 ## 実装用として使用するもの
 
 実装時の切り出し仕様は、次を正本とします。
 
+- `data/sprite_frame_requirements.csv`（配置正本）
 - `art/spritesheet_grid_template.png`
-- `art/spritesheet_layout.csv`
-- `data/frames.csv`
-- `data/sprite_frame_requirements.csv`
+- `art/spritesheet_layout.csv`（正本の展開）
+- `data/frames.csv`（初期検証用サンプル。Idle + StandPunch のみ）
 - `docs/production_spritesheet_spec.md`
 
-これらに従い、右向き・透明背景・固定セル・統一ピボットで本番スプライトを作成します。
+これらに従い、右向き・透明背景・固定セル・統一ピボットで本番スプライトを作成します。  
+初期実装ではプレースホルダ矩形でよい。
+
+## 実装スコープ
+
+| scope | 意味 |
+|---|---|
+| `initial` | 最初の実装対象（Idle / StandPunch） |
+| `planned` | 配置予約・将来実装。実装済みではない |
 
 ## 削除した旧ファイル
 
