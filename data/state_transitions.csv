@@ -1,0 +1,15 @@
+﻿from_state,input,condition,to_state,priority,notes
+Neutral,A,grounded && can_control,StandPunch,50,
+Neutral,B,grounded && can_control,StandKick,50,
+Neutral,Down+A,grounded && can_control,CrouchPunch,60,
+Neutral,Down+B,grounded && can_control,CrouchKick,60,
+Neutral,X,grounded && no_direction,JumpNeutral,70,
+Neutral,X+Forward,grounded,JumpForward,75,直前2ゲームフレームの方向入力も参照
+Neutral,X+Back,grounded,JumpBackward,75,直前2ゲームフレームの方向入力も参照
+Airborne,A,air_attack_unused,AirPunch,50,1ジャンプ1回
+Airborne,B,air_attack_unused,AirKick,50,1ジャンプ1回
+GroundCancelable,Back,guard_allowed,StandGuard,80,
+GroundCancelable,Down+Back,guard_allowed,CrouchGuard,85,
+BlockStun,Any,blockstun_remaining > 0,BlockStun,100,操作不可
+WakeUp,Any,wakeup_remaining > 0,WakeUp,100,無敵・操作不可
+WakeUp,None,wakeup_remaining == 0,Neutral,100,無敵解除と操作復帰を同時

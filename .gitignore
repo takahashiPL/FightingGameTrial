@@ -1,0 +1,33 @@
+# Unity generated
+Game/[Ll]ibrary/
+Game/[Tt]emp/
+Game/[Oo]bj/
+Game/[Bb]uild/
+Game/[Bb]uilds/
+Game/[Ll]ogs/
+Game/[Uu]ser[Ss]ettings/
+Game/MemoryCaptures/
+Game/Recordings/
+
+# IDE generated
+Game/.vs/
+Game/.vscode/
+Game/*.csproj
+Game/*.sln
+Game/*.slnx
+Game/*.user
+Game/*.pidb
+Game/*.booproj
+Game/*.svd
+Game/*.pdb
+Game/*.mdb
+Game/*.opendb
+Game/*.VC.db
+
+# OS generated
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local project tree dumps
+tree*.txt

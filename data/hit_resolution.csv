@@ -1,0 +1,7 @@
+﻿priority,contact_type,condition,result,attacker_state,defender_state,damage,notes
+1,Hitbox_vs_Hitbox,both_active && both_clash_enabled,Clash,ClashRecoil,ClashRecoil,0,双方攻撃無効。本体Hitより先
+2,Hitbox_vs_Hurtbox,target_invulnerable,IgnoredByInvulnerability,Continue,Unchanged,0,
+3,Hitbox_vs_Hurtbox,spatially_not_overlapping,Miss,Continue,Unchanged,0,例: 立ちパンチ対しゃがみ
+4,Hitbox_vs_Hurtbox,grounded && just_guard_input,JustGuard,Stagger_or_AirDeflected,ShortBlockStun,0,入力開始が接触直前3ゲームフレーム以内
+5,Hitbox_vs_Hurtbox,grounded && valid_guard_input,Guard,Recovery,BlockStun,0,処理済み攻撃は再判定しない
+6,Hitbox_vs_Hurtbox,otherwise,Hit,Recovery,MoveDefinedHitResult,move.damage,

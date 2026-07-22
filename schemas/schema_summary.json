@@ -1,0 +1,50 @@
+{
+  "version": "1.2",
+  "coordinate_system": {
+    "origin": "center_between_feet",
+    "x_positive": "right_when_facing_right",
+    "y_positive": "up",
+    "mirror_left_facing": "negate_offset_x"
+  },
+  "simulation": {
+    "fixed_hz": 60,
+    "seconds_per_game_frame": 0.016666666666666666
+  },
+  "box_types": [
+    "push",
+    "hurt",
+    "hit"
+  ],
+  "result_types": [
+    "Miss",
+    "Hit",
+    "Guard",
+    "JustGuard",
+    "Clash",
+    "IgnoredByInvulnerability"
+  ],
+  "debug_ui_groups": [
+    "P1",
+    "P2",
+    "Contact",
+    "Physics",
+    "Playback",
+    "UI"
+  ],
+  "art_assets": [
+    "spritesheet_grid_template.png",
+    "fighter_motion_reference_sheet.png"
+  ],
+  "doc_assets": [
+    "debug_screen_mockup.png",
+    "debug_screen_spec.md",
+    "debug_screen_wireframe.png",
+    "production_spritesheet_spec.md",
+    "reference_infographic.png",
+    "sprite_art_status.md"
+  ],
+  "sprite_asset_status": {
+    "fighter_motion_reference_sheet.png": "visual_reference_only",
+    "production_spritesheet": "not_yet_created"
+  }
+}

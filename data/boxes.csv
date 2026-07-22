@@ -1,0 +1,17 @@
+﻿frame_id,box_id,box_type,offset_x,offset_y,width,height,enabled,hit_group_id,notes
+IDLE_00,PUSH_BODY,push,-16,0,32,88,1,,地上のみ
+IDLE_00,HURT_BODY,hurt,-18,8,36,96,1,,全身
+STAND_PUNCH_01,PUSH_BODY,push,-16,0,32,88,1,,
+STAND_PUNCH_01,HURT_BODY,hurt,-18,8,36,96,1,,
+STAND_PUNCH_01,HIT_FIST,hit,18,58,34,18,1,1,しゃがみHurtboxには届かない高さ
+STAND_KICK_01,PUSH_BODY,push,-16,0,32,88,1,,
+STAND_KICK_01,HURT_BODY,hurt,-20,8,40,92,1,,
+STAND_KICK_01,HIT_LEG,hit,16,24,56,24,1,1,立ち・しゃがみに当たる
+CROUCH_KICK_01,PUSH_BODY,push,-18,0,36,46,1,,低姿勢
+CROUCH_KICK_01,HURT_BODY,hurt,-24,4,48,46,1,,低姿勢
+CROUCH_KICK_01,HIT_LOW_KICK,hit,14,8,52,16,1,1,攻撃相殺向け
+JUMP_FORWARD_00,PUSH_BODY,push,0,0,0,0,0,,空中Pushbox無効
+JUMP_FORWARD_00,HURT_BODY,hurt,-18,18,36,76,1,,空中Hurtbox
+AIR_KICK_01,PUSH_BODY,push,0,0,0,0,0,,空中Pushbox無効
+AIR_KICK_01,HURT_BODY,hurt,-20,18,40,74,1,,
+AIR_KICK_01,HIT_AIR_KICK,hit,18,26,50,22,1,1,ガード時強押し戻し
