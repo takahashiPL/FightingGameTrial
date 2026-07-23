@@ -8,15 +8,6 @@ namespace FightingGameTrial.DebugTools
 {
     /// <summary>
     /// デバッグ用の画面表示だけを担当します。
-    ///
-    /// 責務:
-    /// - SimulationSession 経由で SimulationTimeState / DebugFighterMotor を読む
-    /// - TextMeshProUGUI に日本語ラベル付きの文字列を設定する
-    ///
-    /// やらないこと:
-    /// - Pause / Step / Tick / Action / 移動の制御
-    /// - キー入力の読み取り
-    /// - GameObject.Find や Singleton による参照取得
     /// </summary>
     public class DebugHudView : MonoBehaviour
     {
@@ -63,7 +54,7 @@ namespace FightingGameTrial.DebugTools
 
         /// <summary>
         /// 画面に出す全文を組み立てます。
-        /// 縦幅節約のため、入力行は詰めています（操作説明は増やしません）。
+        /// 縦幅節約のため、入力・Fighter行を詰めています（操作説明は増やしません）。
         /// </summary>
         private string BuildHudText(SimulationTimeState timeState)
         {
@@ -94,9 +85,9 @@ namespace FightingGameTrial.DebugTools
             string rightLabel = input.Right ? "1" : "0";
             string upLabel = input.Up ? "1" : "0";
             string downLabel = input.Down ? "1" : "0";
-            string attackLabel = input.Attack ? "1" : "0";
+            string attackHeldLabel = input.Attack ? "1" : "0";
+            string attackPressedLabel = simulationSession.AttackPressedThisTick ? "1" : "0";
 
-            // Fighter 表示（Session経由。無ければ仮表示）
             string fighterXLabel = "-";
             string fighterFacingLabel = "-";
             DebugFighterMotor motor = simulationSession.DebugFighterMotor;
@@ -106,27 +97,33 @@ namespace FightingGameTrial.DebugTools
                 fighterFacingLabel = motor.FacingRight ? "右" : "左";
             }
 
+            string visualLabel = "Idle";
+            DebugFighterVisual visual = simulationSession.DebugFighterVisual;
+            if (visual != null)
+            {
+                visualLabel = visual.CurrentVisualLabel;
+            }
+
             string text = "";
             text = text + "SimulationTick : " + timeState.SimulationTick + "\n";
             text = text + "CombatFrame    : " + timeState.CombatFrame + "\n";
             text = text + "ActionFrame    : " + timeState.ActionFrame + "\n";
             text = text + "Action再生中   : " + actionPlayingLabel + "\n";
-            text = text + "Pause中        : " + pauseLabel + "\n";
-            text = text + "直近Step       : " + stepLabel + "\n";
-            text = text + "HitStop残り    : " + hitStopLabel + "\n";
-            // 入力行を詰めて縦幅を確保（Fighter表示追加のため）
-            text = text + "入力Sample/Tick: " + input.SampleSequence
-                + " / " + input.SampledAtSimulationTick + "\n";
-            text = text + "方向/Attack    : L=" + leftLabel
-                + " R=" + rightLabel
-                + " U=" + upLabel
-                + " D=" + downLabel
-                + " A=" + attackLabel + "\n";
-            text = text + "Fighter X      : " + fighterXLabel + "\n";
-            text = text + "Fighter向き    : " + fighterFacingLabel + "\n";
+            text = text + "Pause/Step/HS  : " + pauseLabel
+                + " / " + stepLabel
+                + " / " + hitStopLabel + "\n";
+            text = text + "入力 L R U D   : " + leftLabel
+                + " " + rightLabel
+                + " " + upLabel
+                + " " + downLabel + "\n";
+            text = text + "AtkHeld/Pressed: " + attackHeldLabel
+                + " / " + attackPressedLabel + "\n";
+            text = text + "Fighter X/向き : " + fighterXLabel
+                + " / " + fighterFacingLabel + "\n";
+            text = text + "現在Sprite     : " + visualLabel + "\n";
             text = text + "状態           : " + statusLabel + "\n";
             text = text + "\n";
-            // 操作説明のみ短縮（縦幅節約）。増やさない。
+            // 操作説明は増やさない（縦幅節約）
             text = text + "操作:\n";
             text = text + "Space=Pause切替      .=1Tick送り\n";
             text = text + "H=HitStop            A=Action開始\n";

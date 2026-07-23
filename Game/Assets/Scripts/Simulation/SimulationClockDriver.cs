@@ -247,14 +247,15 @@ namespace FightingGameTrial.Simulation
             if (testHitStopFrames <= 0)
             {
                 timeState.LastStatusMessage =
-                    "testHitStopFrames が0以下のため、テスト用HitStopを発生させませんでした";
+                    "HitStop skipped: frames<=0";
                 return;
             }
 
             // 単純上書き（加算しない）
             timeState.HitStopRemaining = testHitStopFrames;
+            // HUD用文言は TMP 既存グリフのみ（欠落回避のため ASCII）
             timeState.LastStatusMessage =
-                "テスト用HitStopを" + testHitStopFrames + "フレーム発生しました";
+                "HitStop start: " + testHitStopFrames;
             Debug.Log("[FightDebug] Test HitStop started: " + testHitStopFrames);
         }
 
@@ -264,29 +265,45 @@ namespace FightingGameTrial.Simulation
         ///
         /// 再生中に再度Aを押した場合:
         /// ActionFrameを0へ戻し、IsActionPlayingはtrueのまま先頭から再開始します。
-        /// 加算や多重Actionは実装しません。
+        ///
+        /// Jパンチとの区別:
+        /// IsJPunchAttack を false にし、12フレーム自動終了の対象外にします。
+        /// 見た目は DebugFighterVisual を即時再描画します（Aは攻撃ポーズへ切り替えません）。
         /// </summary>
         private void ApplyTestActionStart(SimulationTimeState timeState)
         {
             timeState.ActionFrame = 0;
             timeState.IsActionPlaying = true;
+            timeState.IsJPunchAttack = false;
             timeState.LastStatusMessage = "テスト用Actionを開始しました";
             Debug.Log("[FightDebug] Test Action started");
+
+            if (simulationSession != null)
+            {
+                simulationSession.RefreshFighterVisual();
+            }
         }
 
         /// <summary>
         /// Rキーによるテスト用 Action 停止・リセットです。
         /// SimulationTickは進めません。
         /// ActionFrame=0 / 再生中=false にするだけです。
-        /// 自動終了フレームはまだありません（Rを押すまで再生状態を維持します）。
+        /// AキーのデバッグActionには自動終了がありません（Rで止める）。
+        /// Jパンチ進行中にRを押した場合も停止します。
         /// </summary>
         private void ApplyTestActionReset(SimulationTimeState timeState)
         {
             timeState.ActionFrame = 0;
             timeState.IsActionPlaying = false;
+            timeState.IsJPunchAttack = false;
             timeState.LastStatusMessage =
                 "テスト用Actionを停止し、ActionFrameを0へ戻しました";
             Debug.Log("[FightDebug] Test Action reset");
+
+            if (simulationSession != null)
+            {
+                simulationSession.RefreshFighterVisual();
+            }
         }
 
         /// <summary>

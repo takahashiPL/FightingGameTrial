@@ -39,9 +39,16 @@ namespace FightingGameTrial.Simulation
         [Tooltip(
             "テスト用Actionが進行中かどうかです。"
             + " trueのあいだだけ、HitStopではないCombat処理tickで ActionFrame が進みます。"
-            + " 本番のキャラクターステートや技ステートではありません（段階5の最小確認用）。"
+            + " AキーのデバッグActionと、Jキーの時限パンチの両方で使います。"
         )]
         public bool IsActionPlaying;
+
+        [Tooltip(
+            "Jキーの時限パンチ攻撃中かどうかです。"
+            + " true のときだけ ActionFrame が終了フレームに達したら自動停止します。"
+            + " AキーのデバッグAction（自動終了なし）と区別するための旗です。"
+        )]
+        public bool IsJPunchAttack;
 
         [Tooltip("自動の論理進行を止めているか。初期は false（Pause解除）です。Time.timeScale とは別物です。")]
         public bool IsPaused;
@@ -81,6 +88,7 @@ namespace FightingGameTrial.Simulation
             CombatFrame = 0;
             ActionFrame = 0;
             IsActionPlaying = false;
+            IsJPunchAttack = false;
             IsPaused = false;
             HitStopRemaining = 0;
             LastStepResult = "未実行";

@@ -249,11 +249,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: FightingGameTrial.Simulation::FightingGameTrial.Simulation.SimulationSession
   debugGameplayInput: {fileID: 600000003}
   debugFighterMotor: {fileID: 700000014}
+  debugFighterVisual: {fileID: 700000015}
   timeState:
     SimulationTick: 0
     CombatFrame: 0
     ActionFrame: 0
     IsActionPlaying: 0
+    IsJPunchAttack: 0
     IsPaused: 0
     HitStopRemaining: 0
     LastStepResult: "\u672A\u5B9F\u884C"
@@ -944,6 +946,7 @@ GameObject:
   - component: {fileID: 700000012}
   - component: {fileID: 700000013}
   - component: {fileID: 700000014}
+  - component: {fileID: 700000015}
   m_Layer: 0
   m_Name: DebugPlayer
   m_TagString: Untagged
@@ -1042,6 +1045,23 @@ MonoBehaviour:
   maxX: 7
   spriteRenderer: {fileID: 700000013}
   facesRightByDefault: 1
+--- !u!114 &700000015
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 700000011}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a1c3e5f7b9d24e8a0c2f4d6e8b0a1c56, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: FightingGameTrial.Fighter::FightingGameTrial.Fighter.DebugFighterVisual
+  spriteRenderer: {fileID: 700000013}
+  idleSprite: {fileID: 21300000, guid: 9dee2e8501eada14687cb116bef21376, type: 3}
+  attackSprite: {fileID: 21300000, guid: 4aa3699e577e44147b96f91c02003530, type: 3}
+  attackPoseEndFrame: 6
+  actionEndFrame: 12
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
