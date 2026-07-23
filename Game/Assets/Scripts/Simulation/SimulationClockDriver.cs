@@ -10,11 +10,15 @@ namespace FightingGameTrial.Simulation
     /// - Unity の Update / FixedUpdate はゲーム仕様の正本ではありません。
     /// - 正本は docs/rules.md の 60Hz 論理 SimulationTick です。
     ///
-    /// 段階4の責務:
-    /// - Pause / Step / テスト用HitStop要求を SimulationTick の外側で消化する
-    /// - Hキーは HitStopRemaining を設定するだけで、追加の SimulationTick は進めない
-    /// - Pause中でも H / Space / . を受理する
-    /// - PauseとHitStopは別物（Pauseは自動進行停止、HitStopは CombatFrame だけ停止）
+    /// 段階5の責務:
+    /// - Pause / Step / テスト用HitStop / テスト用Action開始・Reset を SimulationTick の外側で消化する
+    /// - H / A / R キーは状態を設定するだけで、追加の SimulationTick は進めない
+    /// - Pause中でも H / A / R / Space / . を受理する
+    ///
+    /// 混同しない3つの「止まる」:
+    /// - Pause … 自動の SimulationTick 進行を止める（手動Stepは可）
+    /// - HitStop … CombatFrame と ActionFrame だけ止める（SimulationTickは進む）
+    /// - Action停止 … ActionFrame だけ進まない（CombatFrameは進む）
     ///
     /// ProcessOneSimulationTick は「1tick進めると決まったあと」だけを担当します。
     /// </summary>
@@ -27,7 +31,7 @@ namespace FightingGameTrial.Simulation
         [SerializeField]
         private SimulationSession simulationSession;
 
-        [Tooltip("Pause / Step / HitStopテストのキー要求を取る DebugPlaybackInput です。")]
+        [Tooltip("Pause / Step / HitStop / Actionテストのキー要求を取る DebugPlaybackInput です。")]
         [SerializeField]
         private DebugPlaybackInput debugPlaybackInput;
 
@@ -93,7 +97,7 @@ namespace FightingGameTrial.Simulation
 
         /// <summary>
         /// Unityが描画フレームごとに呼びます。
-        /// Pause / HitStopテスト / Step の消化 →（必要なら）論理tick進行、の順です。
+        /// Pause / HitStop / Action / Step の消化 →（必要なら）論理tick進行、の順です。
         /// </summary>
         private void Update()
         {
@@ -138,7 +142,33 @@ namespace FightingGameTrial.Simulation
             }
 
             // ============================================================
-            // 3. Step要求を取得（SimulationTickの外側）
+            // 3. テスト用 Action 開始 / Reset（SimulationTickの外側）
+            //    Pause中でも受理する。A/Rだけでは tick を進めない。
+            //    Pause状態と Action再生状態は別物です。
+            // ============================================================
+            bool testActionStartRequested = false;
+            bool testActionResetRequested = false;
+            if (debugPlaybackInput != null)
+            {
+                testActionStartRequested = debugPlaybackInput.ConsumeTestActionStartRequest();
+                testActionResetRequested = debugPlaybackInput.ConsumeTestActionResetRequest();
+            }
+
+            // 同じUnityフレームで A と R が両方来た場合は、後勝ちではなく
+            // 「開始→Reset」の順で適用する（Resetが最終状態になる）。
+            // 通常は同時押しを想定しないが、処理順を明示しておく。
+            if (testActionStartRequested)
+            {
+                ApplyTestActionStart(timeState);
+            }
+
+            if (testActionResetRequested)
+            {
+                ApplyTestActionReset(timeState);
+            }
+
+            // ============================================================
+            // 4. Step要求を取得（SimulationTickの外側）
             // ============================================================
             bool stepRequested = false;
             if (debugPlaybackInput != null)
@@ -147,15 +177,15 @@ namespace FightingGameTrial.Simulation
             }
 
             // ============================================================
-            // 4. Pause中: Stepがあれば1tickだけ。なければ自動進行しない
+            // 5. Pause中: Stepがあれば1tickだけ。なければ自動進行しない
             // ============================================================
             if (timeState.IsPaused)
             {
                 // Pause中は蓄積時間を増やさない（解除直後の大量catch-up防止）
                 if (stepRequested)
                 {
-                    // HitStopの有無は Session 内で判断する。
-                    // 状態メッセージは Session が書く（HitStop中かどうかが分かるように）。
+                    // HitStop / Action再生の有無は Session 内で判断する。
+                    // 状態メッセージは Session が書く。
                     simulationSession.ProcessOneSimulationTick();
                     timeState.LastStepResult = "実行";
                     Debug.Log("[FightDebug] Step executed");
@@ -165,7 +195,7 @@ namespace FightingGameTrial.Simulation
             }
 
             // ============================================================
-            // 5. Pause解除中: Stepでは追加進行しない。通常の60Hz進行のみ
+            // 6. Pause解除中: Stepでは追加進行しない。通常の60Hz進行のみ
             // ============================================================
             if (stepRequested)
             {
@@ -225,6 +255,37 @@ namespace FightingGameTrial.Simulation
             timeState.LastStatusMessage =
                 "テスト用HitStopを" + testHitStopFrames + "フレーム発生しました";
             Debug.Log("[FightDebug] Test HitStop started: " + testHitStopFrames);
+        }
+
+        /// <summary>
+        /// Aキーによるテスト用 Action 開始です。
+        /// SimulationTickは進めません。ActionFrame=0 / 再生中=true にするだけです。
+        ///
+        /// 再生中に再度Aを押した場合:
+        /// ActionFrameを0へ戻し、IsActionPlayingはtrueのまま先頭から再開始します。
+        /// 加算や多重Actionは実装しません。
+        /// </summary>
+        private void ApplyTestActionStart(SimulationTimeState timeState)
+        {
+            timeState.ActionFrame = 0;
+            timeState.IsActionPlaying = true;
+            timeState.LastStatusMessage = "テスト用Actionを開始しました";
+            Debug.Log("[FightDebug] Test Action started");
+        }
+
+        /// <summary>
+        /// Rキーによるテスト用 Action 停止・リセットです。
+        /// SimulationTickは進めません。
+        /// ActionFrame=0 / 再生中=false にするだけです。
+        /// 自動終了フレームはまだありません（Rを押すまで再生状態を維持します）。
+        /// </summary>
+        private void ApplyTestActionReset(SimulationTimeState timeState)
+        {
+            timeState.ActionFrame = 0;
+            timeState.IsActionPlaying = false;
+            timeState.LastStatusMessage =
+                "テスト用Actionを停止し、ActionFrameを0へ戻しました";
+            Debug.Log("[FightDebug] Test Action reset");
         }
 
         /// <summary>

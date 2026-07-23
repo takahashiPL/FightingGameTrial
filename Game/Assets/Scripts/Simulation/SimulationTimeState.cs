@@ -7,6 +7,13 @@ namespace FightingGameTrial.Simulation
     /// 論理シミュレーションの「今の時刻と状態メッセージ」だけを保持する入れ物です。
     /// 進行ロジック（いつ増やすか、HitStopを減らすかなど）は持ちません。
     /// SimulationSession / SimulationClockDriver が値を更新し、DebugHudView が読み取ります。
+    ///
+    /// 時間軸の違い（段階5）:
+    /// - SimulationTick … 60Hzの論理更新回数。HitStop中も進む。
+    /// - CombatFrame … 対戦処理が進んだ回数。HitStop中は止まる。
+    /// - ActionFrame … 現在のテスト用Actionの進行フレーム。
+    ///   HitStop中は止まり、Action停止中も止まり、再生中かつHitStopなしのときだけ進む。
+    /// ActionFrameはCombatFrameの別名ではありません（行動・技の進行を別カウントするため）。
     /// </summary>
     [Serializable]
     public class SimulationTimeState
@@ -14,15 +21,29 @@ namespace FightingGameTrial.Simulation
         [Tooltip("入力記録用の論理tick番号。60Hzで進みます。初期値は0です。")]
         public int SimulationTick;
 
-        [Tooltip("戦闘進行用の論理フレーム番号。HitStop中は進めません（将来）。初期値は0です。")]
+        [Tooltip("戦闘進行用の論理フレーム番号。HitStop中は進めません。初期値は0です。")]
         public int CombatFrame;
+
+        [Tooltip(
+            "現在のテスト用Actionが何フレーム進んだかです。"
+            + " HitStop中とAction停止中（IsActionPlaying=false）は進みません。"
+            + " CombatFrameとは別カウントです。初期値は0です。負数にはしません。"
+        )]
+        public int ActionFrame;
+
+        [Tooltip(
+            "テスト用Actionが進行中かどうかです。"
+            + " trueのあいだだけ、HitStopではないCombat処理tickで ActionFrame が進みます。"
+            + " 本番のキャラクターステートや技ステートではありません（段階5の最小確認用）。"
+        )]
+        public bool IsActionPlaying;
 
         [Tooltip("自動の論理進行を止めているか。初期は false（Pause解除）です。Time.timeScale とは別物です。")]
         public bool IsPaused;
 
         [Tooltip(
             "HitStopの残り論理tickです。"
-            + " 0より大きいあいだは CombatFrame を進めません。"
+            + " 0より大きいあいだは CombatFrame と ActionFrame を進めません。"
             + " SimulationTick ごとに1減り、負数にはしません。"
             + " 初期値は0です。"
         )]
@@ -45,6 +66,8 @@ namespace FightingGameTrial.Simulation
         {
             SimulationTick = 0;
             CombatFrame = 0;
+            ActionFrame = 0;
+            IsActionPlaying = false;
             IsPaused = false;
             HitStopRemaining = 0;
             LastStepResult = "未実行";

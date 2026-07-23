@@ -7,18 +7,18 @@ namespace FightingGameTrial.DebugTools
     /// デバッグ再生用の操作要求だけを、Unityの描画フレームごとに取得します。
     ///
     /// 責務:
-    /// - Space / Period(.) / H の「押下エッジ」を検出する
-    /// - Pause切替・Step・テスト用HitStop要求を一時保持する
+    /// - Space / Period(.) / H / A / R の「押下エッジ」を検出する
+    /// - Pause切替・Step・テスト用HitStop・テスト用Action開始/Reset要求を一時保持する
     /// - SimulationClockDriver が外側で消化できるように公開する
     ///
     /// やらないこと:
     /// - SimulationTick を進めない
-    /// - Pause / HitStop の状態そのものを持たない
+    /// - Pause / HitStop / Action の状態そのものを持たない
     /// - 格闘用の方向入力や技入力は扱わない
     ///
     /// なぜ SimulationTick の外側で入力するか:
     /// Pause中は論理 SimulationTick が止まります。
-    /// それでも Pause解除・Step・HitStopテストキーは受け取る必要があるため、
+    /// それでも Pause解除・Step・HitStopテスト・Action開始/Resetキーは受け取る必要があるため、
     /// 入力取得は ProcessOneSimulationTick の中ではなく、Unityの Update 側で行います。
     /// </summary>
     [DefaultExecutionOrder(-100)]
@@ -38,6 +38,16 @@ namespace FightingGameTrial.DebugTools
         /// このUnityフレームでテスト用 HitStop 発生が要求されたか。
         /// </summary>
         private bool testHitStopRequested;
+
+        /// <summary>
+        /// このUnityフレームでテスト用 Action 開始が要求されたか。
+        /// </summary>
+        private bool testActionStartRequested;
+
+        /// <summary>
+        /// このUnityフレームでテスト用 Action Reset（停止＋Frame0）が要求されたか。
+        /// </summary>
+        private bool testActionResetRequested;
 
         /// <summary>
         /// Unityが描画フレームごとに呼びます。
@@ -65,6 +75,16 @@ namespace FightingGameTrial.DebugTools
             if (keyboard.hKey.wasPressedThisFrame)
             {
                 testHitStopRequested = true;
+            }
+
+            if (keyboard.aKey.wasPressedThisFrame)
+            {
+                testActionStartRequested = true;
+            }
+
+            if (keyboard.rKey.wasPressedThisFrame)
+            {
+                testActionResetRequested = true;
             }
         }
 
@@ -95,6 +115,26 @@ namespace FightingGameTrial.DebugTools
         {
             bool requested = testHitStopRequested;
             testHitStopRequested = false;
+            return requested;
+        }
+
+        /// <summary>
+        /// テスト用 Action 開始要求を1回分取り出し、内部フラグを下ろします。
+        /// </summary>
+        public bool ConsumeTestActionStartRequest()
+        {
+            bool requested = testActionStartRequested;
+            testActionStartRequested = false;
+            return requested;
+        }
+
+        /// <summary>
+        /// テスト用 Action Reset要求を1回分取り出し、内部フラグを下ろします。
+        /// </summary>
+        public bool ConsumeTestActionResetRequest()
+        {
+            bool requested = testActionResetRequested;
+            testActionResetRequested = false;
             return requested;
         }
     }

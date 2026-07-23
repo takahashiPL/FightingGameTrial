@@ -12,7 +12,7 @@ namespace FightingGameTrial.DebugTools
     /// - TextMeshProUGUI に日本語ラベル付きの文字列を設定する
     ///
     /// やらないこと:
-    /// - Pause / Step / Tick 進行の制御
+    /// - Pause / Step / Tick / Action 進行の制御
     /// - キー入力の読み取り
     /// - GameObject.Find や Singleton による参照取得
     /// - フォントの実行時生成（日本語フォントは Scene 上の NotoSansJP-Regular SDF を使用）
@@ -81,6 +81,8 @@ namespace FightingGameTrial.DebugTools
         private string BuildHudText(SimulationTimeState timeState)
         {
             string pauseLabel = timeState.IsPaused ? "はい" : "いいえ";
+            string actionPlayingLabel = timeState.IsActionPlaying ? "はい" : "いいえ";
+
             string stepLabel = timeState.LastStepResult;
             if (string.IsNullOrEmpty(stepLabel))
             {
@@ -93,12 +95,14 @@ namespace FightingGameTrial.DebugTools
                 statusLabel = "（なし）";
             }
 
-            // HitStopRemaining の実値を表示します（「未実装」表記は使いません）。
+            // HitStopRemaining の実値を表示します。
             string hitStopLabel = timeState.HitStopRemaining.ToString();
 
             string text = "";
             text = text + "SimulationTick : " + timeState.SimulationTick + "\n";
             text = text + "CombatFrame    : " + timeState.CombatFrame + "\n";
+            text = text + "ActionFrame    : " + timeState.ActionFrame + "\n";
+            text = text + "Action再生中   : " + actionPlayingLabel + "\n";
             text = text + "Pause中        : " + pauseLabel + "\n";
             text = text + "直近Step       : " + stepLabel + "\n";
             text = text + "HitStop残り    : " + hitStopLabel + "\n";
@@ -107,7 +111,9 @@ namespace FightingGameTrial.DebugTools
             text = text + "操作:\n";
             text = text + "Space = Pause切替\n";
             text = text + ".     = 1 SimulationTick送り（Pause中のみ）\n";
-            text = text + "H     = テスト用HitStop発生";
+            text = text + "H     = テスト用HitStop発生\n";
+            text = text + "A     = テスト用Action開始\n";
+            text = text + "R     = Action停止・ActionFrameリセット";
             return text;
         }
     }

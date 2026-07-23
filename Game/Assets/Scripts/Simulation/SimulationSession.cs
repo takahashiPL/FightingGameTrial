@@ -6,21 +6,26 @@ namespace FightingGameTrial.Simulation
     /// 1回分の論理 SimulationTick を進める入口です。
     /// docs/rules.md §10.3 の処理順を、ここで上から追える形にします。
     ///
-    /// 段階4:
+    /// 段階5:
     /// - SimulationTick は毎回 +1（HitStop中も進む）
-    /// - HitStopRemaining > 0 のあいだは CombatFrame を進めない
-    /// - HitStopRemaining は SimulationTick ごとに1減る（負数にはしない）
+    /// - HitStopRemaining > 0 のあいだは CombatFrame も ActionFrame も進めない
+    /// - HitStopなしなら CombatFrame を +1
+    /// - さらに IsActionPlaying なら ActionFrame も +1（停止中は据え置き）
+    ///
+    /// ActionFrame が CombatFrame と別である理由:
+    /// CombatFrameは「対戦全体の進行」、ActionFrameは「今の行動・技の進行」です。
+    /// 同じtickで両方進むこともあれば、Action停止中はCombatだけ進むこともあります。
     ///
     /// やらないこと（外側＝SimulationClockDriver側）:
-    /// - Pause切替 / Step / テスト用HitStop発生キーの取得
+    /// - Pause切替 / Step / テスト用HitStop / テスト用Action開始・Reset のキー取得
     /// - 自動進行するかどうかの判断
     ///
-    /// Pause（自動進行停止）と HitStop（CombatFrameだけ停止）は混同しません。
+    /// Pause（自動進行停止）と HitStop（Combat/Action停止）と Action停止（ActionFrameだけ停止）は混同しません。
     /// </summary>
     public class SimulationSession : MonoBehaviour
     {
         [Header("時間状態（進行ロジックは持たない入れ物）")]
-        [Tooltip("SimulationTick / CombatFrame / HitStop残り / 状態メッセージを保持します。")]
+        [Tooltip("SimulationTick / CombatFrame / ActionFrame / HitStop残り / 状態メッセージを保持します。")]
         [SerializeField]
         private SimulationTimeState timeState = new SimulationTimeState();
 
@@ -70,7 +75,7 @@ namespace FightingGameTrial.Simulation
 
             // ------------------------------------------------------------
             // 3〜4. HitStopRemaining を確認
-            //    1以上なら残りを1減らし、CombatFrameは進めずに終了する。
+            //    1以上なら残りを1減らし、CombatFrameもActionFrameも進めずに終了する。
             //    return する理由: このtickの戦闘進行（手順4〜18相当）をスキップするため。
             // ------------------------------------------------------------
             if (timeState.HitStopRemaining > 0)
@@ -81,7 +86,9 @@ namespace FightingGameTrial.Simulation
                     timeState.HitStopRemaining = 0;
                 }
 
-                timeState.LastStatusMessage = "HitStop中。CombatFrameは進めませんでした";
+                // HitStop中は CombatFrame も ActionFrame も据え置き
+                timeState.LastStatusMessage =
+                    "HitStop中。CombatFrameとActionFrameは進めませんでした";
 
                 // 残りが今ちょうど0になった = このtickでHitStop消費が終わった
                 if (timeState.HitStopRemaining == 0)
@@ -100,15 +107,35 @@ namespace FightingGameTrial.Simulation
 
             timeState.CombatFrame = timeState.CombatFrame + 1;
 
-            // 数値はログ側で組み立てる。ここには処理結果の日本語だけ入れる。
-            timeState.LastStatusMessage = "HitStopなし。CombatFrameを進めました";
+            // ------------------------------------------------------------
+            // 6〜8. IsActionPlaying を確認し、再生中だけ ActionFrame を進める
+            //    Action停止中でも CombatFrame は上で既に進んでいる。
+            // ------------------------------------------------------------
+            if (timeState.IsActionPlaying)
+            {
+                timeState.ActionFrame = timeState.ActionFrame + 1;
+                if (timeState.ActionFrame < 0)
+                {
+                    timeState.ActionFrame = 0;
+                }
+
+                timeState.LastStatusMessage =
+                    "HitStopなし。CombatFrameとActionFrameを進めました";
+            }
+            else
+            {
+                // ActionFrame は据え置き（CombatFrameだけ進んだ）
+                timeState.LastStatusMessage =
+                    "HitStopなし。CombatFrameを進め、ActionFrameは停止中です";
+            }
 
             WriteConsoleLogIfNeeded();
         }
 
         /// <summary>
         /// Console を埋めないよう、間隔ごとのみログします。
-        /// HitStop中の毎tickログは出しません（終了時の1件ログは上で別途出します）。
+        /// Action再生中・HitStop中の毎tickログは出しません
+        /// （開始/終了/Resetの1件ログは別途出します）。
         /// </summary>
         private void WriteConsoleLogIfNeeded()
         {
@@ -123,9 +150,13 @@ namespace FightingGameTrial.Simulation
                 return;
             }
 
+            string actionPlayingLabel = timeState.IsActionPlaying ? "true" : "false";
+
             Debug.Log(
                 "[FightDebug] SimulationTick=" + timeState.SimulationTick
                 + " / CombatFrame=" + timeState.CombatFrame
+                + " / ActionFrame=" + timeState.ActionFrame
+                + " / IsActionPlaying=" + actionPlayingLabel
                 + " / HitStopRemaining=" + timeState.HitStopRemaining
                 + "\n（" + timeState.LastStatusMessage + "）"
             );
