@@ -10,14 +10,15 @@ namespace FightingGameTrial.Simulation
     /// - Unity の Update / FixedUpdate はゲーム仕様の正本ではありません。
     /// - 正本は docs/rules.md の 60Hz 論理 SimulationTick です。
     ///
-    /// 段階5の責務:
+    /// 段階6の責務:
     /// - Pause / Step / テスト用HitStop / テスト用Action開始・Reset を SimulationTick の外側で消化する
     /// - H / A / R キーは状態を設定するだけで、追加の SimulationTick は進めない
     /// - Pause中でも H / A / R / Space / . を受理する
+    /// - ゲーム入力（矢印 / J）の内容は判断しない（DebugGameplayInput + Session の責務）
     ///
     /// 混同しない3つの「止まる」:
-    /// - Pause … 自動の SimulationTick 進行を止める（手動Stepは可）
-    /// - HitStop … CombatFrame と ActionFrame だけ止める（SimulationTickは進む）
+    /// - Pause … 自動の SimulationTick 進行を止める（手動Stepは可）。入力サンプルも増えない
+    /// - HitStop … CombatFrame と ActionFrame だけ止める（SimulationTickと入力サンプルは進む）
     /// - Action停止 … ActionFrame だけ進まない（CombatFrameは進む）
     ///
     /// ProcessOneSimulationTick は「1tick進めると決まったあと」だけを担当します。

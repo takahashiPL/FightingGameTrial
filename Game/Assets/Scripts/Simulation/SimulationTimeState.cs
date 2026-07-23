@@ -1,4 +1,5 @@
 using System;
+using FightingGameTrial.Input;
 using UnityEngine;
 
 namespace FightingGameTrial.Simulation
@@ -8,12 +9,16 @@ namespace FightingGameTrial.Simulation
     /// 進行ロジック（いつ増やすか、HitStopを減らすかなど）は持ちません。
     /// SimulationSession / SimulationClockDriver が値を更新し、DebugHudView が読み取ります。
     ///
-    /// 時間軸の違い（段階5）:
+    /// 時間軸の違い:
     /// - SimulationTick … 60Hzの論理更新回数。HitStop中も進む。
     /// - CombatFrame … 対戦処理が進んだ回数。HitStop中は止まる。
     /// - ActionFrame … 現在のテスト用Actionの進行フレーム。
     ///   HitStop中は止まり、Action停止中も止まり、再生中かつHitStopなしのときだけ進む。
     /// ActionFrameはCombatFrameの別名ではありません（行動・技の進行を別カウントするため）。
+    ///
+    /// 入力（段階6）:
+    /// CurrentInput は「最後に SimulationTick で確定した論理入力」です。
+    /// Pause中に物理キーを変えても、次の SimulationTick（または Step）までここは変わりません。
     /// </summary>
     [Serializable]
     public class SimulationTimeState
@@ -46,6 +51,7 @@ namespace FightingGameTrial.Simulation
             + " 0より大きいあいだは CombatFrame と ActionFrame を進めません。"
             + " SimulationTick ごとに1減り、負数にはしません。"
             + " 初期値は0です。"
+            + " 入力サンプリングは HitStop 中も止めません。"
         )]
         public int HitStopRemaining;
 
@@ -58,6 +64,13 @@ namespace FightingGameTrial.Simulation
 
         [Tooltip("直近の処理結果を人間が読める日本語メッセージで保持します。数値は含めません。")]
         public string LastStatusMessage;
+
+        [Tooltip(
+            "最後に SimulationTick で確定した論理入力です。"
+            + " DebugGameplayInput の物理状態とは別物です。"
+            + " Pause中は SimulationTick が進まないため、ここも更新されません。"
+        )]
+        public SimulationInputState CurrentInput = new SimulationInputState();
 
         /// <summary>
         /// 初期状態へ戻します。
@@ -72,6 +85,13 @@ namespace FightingGameTrial.Simulation
             HitStopRemaining = 0;
             LastStepResult = "未実行";
             LastStatusMessage = string.Empty;
+
+            if (CurrentInput == null)
+            {
+                CurrentInput = new SimulationInputState();
+            }
+
+            CurrentInput.ResetToInitialValues();
         }
     }
 }

@@ -1,3 +1,4 @@
+using FightingGameTrial.Input;
 using FightingGameTrial.Simulation;
 using TMPro;
 using UnityEngine;
@@ -10,10 +11,11 @@ namespace FightingGameTrial.DebugTools
     /// 責務:
     /// - SimulationSession 経由で SimulationTimeState を読む
     /// - TextMeshProUGUI に日本語ラベル付きの文字列を設定する
+    /// - 確定済みの論理入力（CurrentInput）を表示する
     ///
     /// やらないこと:
     /// - Pause / Step / Tick / Action 進行の制御
-    /// - キー入力の読み取り
+    /// - キー入力の読み取り（物理入力は DebugGameplayInput の責務）
     /// - GameObject.Find や Singleton による参照取得
     /// - フォントの実行時生成（日本語フォントは Scene 上の NotoSansJP-Regular SDF を使用）
     ///
@@ -98,6 +100,19 @@ namespace FightingGameTrial.DebugTools
             // HitStopRemaining の実値を表示します。
             string hitStopLabel = timeState.HitStopRemaining.ToString();
 
+            SimulationInputState input = timeState.CurrentInput;
+            if (input == null)
+            {
+                input = new SimulationInputState();
+            }
+
+            // bool は HUD では 1/0 で見やすくする
+            string leftLabel = input.Left ? "1" : "0";
+            string rightLabel = input.Right ? "1" : "0";
+            string upLabel = input.Up ? "1" : "0";
+            string downLabel = input.Down ? "1" : "0";
+            string attackLabel = input.Attack ? "1" : "0";
+
             string text = "";
             text = text + "SimulationTick : " + timeState.SimulationTick + "\n";
             text = text + "CombatFrame    : " + timeState.CombatFrame + "\n";
@@ -106,14 +121,21 @@ namespace FightingGameTrial.DebugTools
             text = text + "Pause中        : " + pauseLabel + "\n";
             text = text + "直近Step       : " + stepLabel + "\n";
             text = text + "HitStop残り    : " + hitStopLabel + "\n";
+            text = text + "入力Sample     : " + input.SampleSequence + "\n";
+            text = text + "入力Tick       : " + input.SampledAtSimulationTick + "\n";
+            text = text + "方向           : L=" + leftLabel
+                + " R=" + rightLabel
+                + " U=" + upLabel
+                + " D=" + downLabel + "\n";
+            text = text + "Attack         : " + attackLabel + "\n";
             text = text + "状態           : " + statusLabel + "\n";
             text = text + "\n";
+            // 操作説明のみ短縮（縦幅節約）。状態表示の行数・文言は変えない。
             text = text + "操作:\n";
-            text = text + "Space = Pause切替\n";
-            text = text + ".     = 1 SimulationTick送り（Pause中のみ）\n";
-            text = text + "H     = テスト用HitStop発生\n";
-            text = text + "A     = テスト用Action開始\n";
-            text = text + "R     = Action停止・ActionFrameリセット";
+            text = text + "Space=Pause切替      .=1Tick送り\n";
+            text = text + "H=HitStop            A=Action開始\n";
+            text = text + "R=Actionリセット     矢印=方向\n";
+            text = text + "J=Attack";
             return text;
         }
     }
