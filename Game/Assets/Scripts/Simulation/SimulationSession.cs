@@ -6,18 +6,18 @@ namespace FightingGameTrial.Simulation
     /// 1回分の論理 SimulationTick を進める入口です。
     /// docs/rules.md §10.3 の処理順を、将来ここで上から追える形に育てます。
     ///
-    /// 今回（段階1）:
-    /// - SimulationTick を1増やす
-    /// - HitStop未実装のため CombatFrame も1増やす
-    /// - 状態メッセージを更新する
-    /// - 一定間隔でのみ Console にログを出す
+    /// 段階2時点の役割:
+    /// - 「1tick進めると決定されたあと」に呼ばれ、SimulationTick / CombatFrame を進める
+    /// - HitStop未実装のため、呼ばれるたびに両方を1増やす
+    /// - 一定間隔でのみ Console に進行ログを出す
     ///
-    /// 今回はやらないこと:
-    /// - Pause / Step / HitStop / 入力本処理 / CSV / 判定
+    /// やらないこと（外側＝SimulationClockDriver側の責務）:
+    /// - Pause切替の取得と消化
+    /// - Step要求の取得と消化
+    /// - 自動進行するかどうかの判断
     ///
-    /// 設計メモ（将来）:
-    /// Pause切替やStep要求の取得は、SimulationTickが止まっている間も必要です。
-    /// そのためデバッグ操作の取得とPause切替は ProcessOneSimulationTick の外側で行います。
+    /// Pause / Step の入力は論理tickが止まっていても必要なため、
+    /// ProcessOneSimulationTick の中では扱いません。
     /// </summary>
     public class SimulationSession : MonoBehaviour
     {
@@ -91,7 +91,8 @@ namespace FightingGameTrial.Simulation
             timeState.CombatFrame = timeState.CombatFrame + 1;
 
             // 数値はログ側で組み立てる。ここには処理結果の日本語だけ入れる。
-            timeState.LastStatusMessage = "段階1: HitStop未実装のため両方進めました";
+            // Step時は ClockDriver 側が直後にメッセージを上書きすることがあります。
+            timeState.LastStatusMessage = "HitStop未実装のため SimulationTick と CombatFrame を両方進めました";
 
             WriteConsoleLogIfNeeded();
         }

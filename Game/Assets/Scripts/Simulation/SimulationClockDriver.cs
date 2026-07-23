@@ -1,3 +1,4 @@
+using FightingGameTrial.DebugTools;
 using UnityEngine;
 
 namespace FightingGameTrial.Simulation
@@ -8,19 +9,29 @@ namespace FightingGameTrial.Simulation
     /// 重要:
     /// - Unity の Update / FixedUpdate はゲーム仕様の正本ではありません。
     /// - 正本は docs/rules.md の 60Hz 論理 SimulationTick です。
-    /// - このクラスは「実時間が 1/60 秒たまったら Session に1回進めさせる」だけを担当します。
     ///
-    /// 今回（段階1）は Pause / Step を実装しません。
-    /// 将来、Pause中は自動進行を止め、Stepは外側から Session を1回呼ぶ想定です。
+    /// 段階2の責務:
+    /// - Pause切替要求と Step要求を SimulationTick の外側で消化する
+    /// - Pause中は自動進行しない
+    /// - Pause中の Step だけ ProcessOneSimulationTick を1回呼ぶ
+    /// - Pause解除中は従来どおり実時間蓄積で60Hz進行する
+    ///
+    /// Pause中でもキー入力を受け取る必要があるため、
+    /// 入力取得（DebugPlaybackInput）と Pause/Step の消化は
+    /// ProcessOneSimulationTick の外（この Update）で行います。
     /// </summary>
     public class SimulationClockDriver : MonoBehaviour
     {
         private const float DefaultSecondsPerTick = 1f / 60f;
 
         [Header("参照")]
-        [Tooltip("論理tickを実際に進める SimulationSession です。同じ SimulationRoot 配下を指定します。")]
+        [Tooltip("論理tickを実際に進める SimulationSession です。")]
         [SerializeField]
         private SimulationSession simulationSession;
+
+        [Tooltip("Pause / Step のキー要求を取る DebugPlaybackInput です。")]
+        [SerializeField]
+        private DebugPlaybackInput debugPlaybackInput;
 
         [Header("60Hz設定")]
         [Tooltip("1論理tickあたりの実時間（秒）。通常は 1/60 です。")]
@@ -37,13 +48,12 @@ namespace FightingGameTrial.Simulation
 
         /// <summary>
         /// まだ消費していない実時間（秒）です。
-        /// 1/60以上たまったら Session へ進行を依頼し、その分を減らします。
+        /// Pause中は増やさず、Pause突入時に0へ戻して解除直後の大量catch-upを防ぎます。
         /// </summary>
         private float accumulatedSeconds;
 
         /// <summary>
         /// Unityがこのコンポーネントを有効化した直後に1回呼びます。
-        /// Session参照の欠落を早く気づけるように検査します。
         /// </summary>
         private void Awake()
         {
@@ -51,7 +61,13 @@ namespace FightingGameTrial.Simulation
             {
                 Debug.LogError(
                     "SimulationClockDriver: SimulationSession が未設定です。"
-                    + " Inspector で SimulationRoot 配下の SimulationSession を割り当ててください。"
+                );
+            }
+
+            if (debugPlaybackInput == null)
+            {
+                Debug.LogError(
+                    "SimulationClockDriver: DebugPlaybackInput が未設定です。"
                 );
             }
 
@@ -69,9 +85,8 @@ namespace FightingGameTrial.Simulation
         }
 
         /// <summary>
-        /// Unityが描画フレームごとに呼びます（実時間の受け皿）。
-        /// ここで格闘判定や CombatFrame の仕様分岐は行いません。
-        /// たまった実時間に応じて ProcessOneSimulationTick を依頼するだけです。
+        /// Unityが描画フレームごとに呼びます。
+        /// Pause/Stepの消化 →（必要なら）論理tick進行、の順で上から追えます。
         /// </summary>
         private void Update()
         {
@@ -80,32 +95,112 @@ namespace FightingGameTrial.Simulation
                 return;
             }
 
-            // Time.timeScale の影響を受けにくいよう unscaled を使います。
-            // （将来の Pause は自前フラグで止める想定。今回は Pause未実装）
+            SimulationTimeState timeState = simulationSession.TimeState;
+            if (timeState == null)
+            {
+                return;
+            }
+
+            // ============================================================
+            // 1. Pause切替要求を取得（SimulationTickの外側）
+            // ============================================================
+            bool pauseToggleRequested = false;
+            if (debugPlaybackInput != null)
+            {
+                pauseToggleRequested = debugPlaybackInput.ConsumePauseToggleRequest();
+            }
+
+            // ============================================================
+            // 2. Pause切替要求を消化
+            // ============================================================
+            if (pauseToggleRequested)
+            {
+                ApplyPauseToggle(timeState);
+            }
+
+            // ============================================================
+            // 3. Step要求を取得（SimulationTickの外側）
+            // ============================================================
+            bool stepRequested = false;
+            if (debugPlaybackInput != null)
+            {
+                stepRequested = debugPlaybackInput.ConsumeStepRequest();
+            }
+
+            // ============================================================
+            // 4. Pause中: Stepがあれば1tickだけ。なければ自動進行しない
+            // ============================================================
+            if (timeState.IsPaused)
+            {
+                // Pause中は蓄積時間を増やさない（解除直後の大量catch-up防止）
+                if (stepRequested)
+                {
+                    simulationSession.ProcessOneSimulationTick();
+                    timeState.LastStatusMessage = "Pause中に1 SimulationTick進めました";
+                    Debug.Log("[FightDebug] Step executed");
+                }
+
+                return;
+            }
+
+            // ============================================================
+            // 5. Pause解除中: Stepでは追加進行しない。通常の60Hz進行のみ
+            // ============================================================
+            if (stepRequested)
+            {
+                timeState.LastStatusMessage = "Pause解除中のためStep要求を無視しました";
+                Debug.Log("[FightDebug] Step ignored (not paused)");
+            }
+
+            // Time.timeScale は変更しません。unscaled で実時間を受け取ります。
             float deltaSeconds = Time.unscaledDeltaTime;
             accumulatedSeconds = accumulatedSeconds + deltaSeconds;
 
+            AdvanceByAccumulatedTime();
+        }
+
+        /// <summary>
+        /// Pause状態を反転し、メッセージと即時ログを更新します。
+        /// Pauseへ入るときは蓄積残を0に戻します。
+        /// </summary>
+        private void ApplyPauseToggle(SimulationTimeState timeState)
+        {
+            bool willPause = (timeState.IsPaused == false);
+            timeState.IsPaused = willPause;
+
+            if (willPause)
+            {
+                // Pause中に実時間が溜まると解除直後に一気に進むため、残を捨てます。
+                accumulatedSeconds = 0f;
+                timeState.LastStatusMessage = "Pauseに入りました";
+                Debug.Log("[FightDebug] Pause ON");
+            }
+            else
+            {
+                timeState.LastStatusMessage = "Pauseを解除しました";
+                Debug.Log("[FightDebug] Pause OFF");
+            }
+        }
+
+        /// <summary>
+        /// 蓄積した実時間から、上限付きで SimulationTick を進めます。
+        /// Pause解除中だけ呼ばれます。
+        /// </summary>
+        private void AdvanceByAccumulatedTime()
+        {
             int processedCatchUpCount = 0;
 
-            // フレーム落ち時は while で複数tick追いつきます。
-            // ただし無制限にはせず、maxCatchUpTicksPerUpdate で打ち切ります。
             while (accumulatedSeconds >= secondsPerSimulationTick
                    && processedCatchUpCount < maxCatchUpTicksPerUpdate)
             {
                 accumulatedSeconds = accumulatedSeconds - secondsPerSimulationTick;
                 processedCatchUpCount = processedCatchUpCount + 1;
-
-                // 論理進行の本体は Session 側（ゲーム仕様に近い入口）
                 simulationSession.ProcessOneSimulationTick();
             }
 
-            // 上限で打ち切った場合、余り時間を捨てすぎないよう残します。
-            // ただし余りが極端に大きいと次フレームも上限に当たるため、
-            // 学習用には「遅れを一気に消化しすぎない」ことを優先します。
             if (processedCatchUpCount >= maxCatchUpTicksPerUpdate
                 && accumulatedSeconds >= secondsPerSimulationTick)
             {
-                // 溢れ分を1tickぶん未満に抑え、永久に遅れが膨らみ続けるのを防ぎます。
                 accumulatedSeconds = secondsPerSimulationTick * 0.99f;
             }
         }
