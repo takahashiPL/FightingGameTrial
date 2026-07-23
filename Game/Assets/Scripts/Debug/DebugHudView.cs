@@ -1,3 +1,4 @@
+using FightingGameTrial.Fighter;
 using FightingGameTrial.Input;
 using FightingGameTrial.Simulation;
 using TMPro;
@@ -9,25 +10,18 @@ namespace FightingGameTrial.DebugTools
     /// デバッグ用の画面表示だけを担当します。
     ///
     /// 責務:
-    /// - SimulationSession 経由で SimulationTimeState を読む
+    /// - SimulationSession 経由で SimulationTimeState / DebugFighterMotor を読む
     /// - TextMeshProUGUI に日本語ラベル付きの文字列を設定する
-    /// - 確定済みの論理入力（CurrentInput）を表示する
     ///
     /// やらないこと:
-    /// - Pause / Step / Tick / Action 進行の制御
-    /// - キー入力の読み取り（物理入力は DebugGameplayInput の責務）
+    /// - Pause / Step / Tick / Action / 移動の制御
+    /// - キー入力の読み取り
     /// - GameObject.Find や Singleton による参照取得
-    /// - フォントの実行時生成（日本語フォントは Scene 上の NotoSansJP-Regular SDF を使用）
-    ///
-    /// なぜ制御ロジックを持たないか:
-    /// HUDは「今の状態を見せる窓」です。
-    /// 進行や入力の判断をここへ入れると、
-    /// SimulationClockDriver との二重管理になり学習しづらくなります。
     /// </summary>
     public class DebugHudView : MonoBehaviour
     {
         [Header("参照（Inspectorで接続。自動検索はしません）")]
-        [Tooltip("時間状態へ到達するための SimulationSession です。")]
+        [Tooltip("時間状態と Fighter 参照へ到達するための SimulationSession です。")]
         [SerializeField]
         private SimulationSession simulationSession;
 
@@ -38,10 +32,6 @@ namespace FightingGameTrial.DebugTools
         [SerializeField]
         private TextMeshProUGUI hudText;
 
-        /// <summary>
-        /// Unityが有効化直後に1回呼びます。
-        /// 参照がつながっているかだけ検査します。
-        /// </summary>
         private void Awake()
         {
             if (simulationSession == null)
@@ -55,11 +45,6 @@ namespace FightingGameTrial.DebugTools
             }
         }
 
-        /// <summary>
-        /// Unityが描画フレームごとに呼びます。
-        /// 論理 SimulationTick とは別に、画面表示だけを毎フレーム更新します。
-        /// Consoleログは出しません。
-        /// </summary>
         private void Update()
         {
             if (simulationSession == null || hudText == null)
@@ -78,7 +63,7 @@ namespace FightingGameTrial.DebugTools
 
         /// <summary>
         /// 画面に出す全文を組み立てます。
-        /// 学習用に、項目ごとの意味が上から追える並びへしています。
+        /// 縦幅節約のため、入力行は詰めています（操作説明は増やしません）。
         /// </summary>
         private string BuildHudText(SimulationTimeState timeState)
         {
@@ -97,7 +82,6 @@ namespace FightingGameTrial.DebugTools
                 statusLabel = "（なし）";
             }
 
-            // HitStopRemaining の実値を表示します。
             string hitStopLabel = timeState.HitStopRemaining.ToString();
 
             SimulationInputState input = timeState.CurrentInput;
@@ -106,12 +90,21 @@ namespace FightingGameTrial.DebugTools
                 input = new SimulationInputState();
             }
 
-            // bool は HUD では 1/0 で見やすくする
             string leftLabel = input.Left ? "1" : "0";
             string rightLabel = input.Right ? "1" : "0";
             string upLabel = input.Up ? "1" : "0";
             string downLabel = input.Down ? "1" : "0";
             string attackLabel = input.Attack ? "1" : "0";
+
+            // Fighter 表示（Session経由。無ければ仮表示）
+            string fighterXLabel = "-";
+            string fighterFacingLabel = "-";
+            DebugFighterMotor motor = simulationSession.DebugFighterMotor;
+            if (motor != null)
+            {
+                fighterXLabel = motor.LogicalX.ToString("0.00");
+                fighterFacingLabel = motor.FacingRight ? "右" : "左";
+            }
 
             string text = "";
             text = text + "SimulationTick : " + timeState.SimulationTick + "\n";
@@ -121,16 +114,19 @@ namespace FightingGameTrial.DebugTools
             text = text + "Pause中        : " + pauseLabel + "\n";
             text = text + "直近Step       : " + stepLabel + "\n";
             text = text + "HitStop残り    : " + hitStopLabel + "\n";
-            text = text + "入力Sample     : " + input.SampleSequence + "\n";
-            text = text + "入力Tick       : " + input.SampledAtSimulationTick + "\n";
-            text = text + "方向           : L=" + leftLabel
+            // 入力行を詰めて縦幅を確保（Fighter表示追加のため）
+            text = text + "入力Sample/Tick: " + input.SampleSequence
+                + " / " + input.SampledAtSimulationTick + "\n";
+            text = text + "方向/Attack    : L=" + leftLabel
                 + " R=" + rightLabel
                 + " U=" + upLabel
-                + " D=" + downLabel + "\n";
-            text = text + "Attack         : " + attackLabel + "\n";
+                + " D=" + downLabel
+                + " A=" + attackLabel + "\n";
+            text = text + "Fighter X      : " + fighterXLabel + "\n";
+            text = text + "Fighter向き    : " + fighterFacingLabel + "\n";
             text = text + "状態           : " + statusLabel + "\n";
             text = text + "\n";
-            // 操作説明のみ短縮（縦幅節約）。状態表示の行数・文言は変えない。
+            // 操作説明のみ短縮（縦幅節約）。増やさない。
             text = text + "操作:\n";
             text = text + "Space=Pause切替      .=1Tick送り\n";
             text = text + "H=HitStop            A=Action開始\n";
