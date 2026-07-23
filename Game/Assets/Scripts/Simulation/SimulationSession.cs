@@ -4,25 +4,23 @@ namespace FightingGameTrial.Simulation
 {
     /// <summary>
     /// 1回分の論理 SimulationTick を進める入口です。
-    /// docs/rules.md §10.3 の処理順を、将来ここで上から追える形に育てます。
+    /// docs/rules.md §10.3 の処理順を、ここで上から追える形にします。
     ///
-    /// 段階2時点の役割:
-    /// - 「1tick進めると決定されたあと」に呼ばれ、SimulationTick / CombatFrame を進める
-    /// - HitStop未実装のため、呼ばれるたびに両方を1増やす
-    /// - 一定間隔でのみ Console に進行ログを出す
+    /// 段階4:
+    /// - SimulationTick は毎回 +1（HitStop中も進む）
+    /// - HitStopRemaining > 0 のあいだは CombatFrame を進めない
+    /// - HitStopRemaining は SimulationTick ごとに1減る（負数にはしない）
     ///
-    /// やらないこと（外側＝SimulationClockDriver側の責務）:
-    /// - Pause切替の取得と消化
-    /// - Step要求の取得と消化
+    /// やらないこと（外側＝SimulationClockDriver側）:
+    /// - Pause切替 / Step / テスト用HitStop発生キーの取得
     /// - 自動進行するかどうかの判断
     ///
-    /// Pause / Step の入力は論理tickが止まっていても必要なため、
-    /// ProcessOneSimulationTick の中では扱いません。
+    /// Pause（自動進行停止）と HitStop（CombatFrameだけ停止）は混同しません。
     /// </summary>
     public class SimulationSession : MonoBehaviour
     {
         [Header("時間状態（進行ロジックは持たない入れ物）")]
-        [Tooltip("SimulationTick / CombatFrame / 状態メッセージを保持します。")]
+        [Tooltip("SimulationTick / CombatFrame / HitStop残り / 状態メッセージを保持します。")]
         [SerializeField]
         private SimulationTimeState timeState = new SimulationTimeState();
 
@@ -41,7 +39,6 @@ namespace FightingGameTrial.Simulation
 
         /// <summary>
         /// Unityがこのコンポーネントを有効化した直後に1回呼びます。
-        /// ここでは初期値を整え、開始メッセージだけ残します。
         /// </summary>
         private void Awake()
         {
@@ -57,50 +54,61 @@ namespace FightingGameTrial.Simulation
 
         /// <summary>
         /// 論理 SimulationTick をちょうど1回分進めます。
-        /// SimulationClockDriver から、1/60秒ごと（または catch-up 分）に呼ばれます。
-        /// Unityの Update 自体がゲーム仕様の正本ではありません。
+        /// SimulationClockDriver から呼ばれます（自動進行または Pause中の Step）。
         /// </summary>
         public void ProcessOneSimulationTick()
         {
             // ------------------------------------------------------------
-            // 将来: 手順1〜2（入力サンプリング・入力履歴）をここに追加する
-            // 今回は未実装（空の予約位置）
-            // ------------------------------------------------------------
-
-            // ------------------------------------------------------------
-            // 手順相当: SimulationTick 番号を1進める
+            // 1. SimulationTick を1増やす（HitStop中も進む）
             // ------------------------------------------------------------
             timeState.SimulationTick = timeState.SimulationTick + 1;
 
             // ------------------------------------------------------------
-            // 将来: HitStop 分岐を入れる位置（rules.md §10.3 手順3）
-            //
-            // if (HitStopRemaining > 0)
-            // {
-            //     HitStopRemaining を1減らす
-            //     CombatFrame は進めない
-            //     LastStatusMessage を更新して return
-            // }
-            //
-            // 今回は HitStop 未実装のため、この分岐はまだ書きません。
+            // 2. 将来: 入力サンプリング・入力履歴（rules.md §10.3 手順1〜2）
+            //    今回は未実装（空の予約位置）
             // ------------------------------------------------------------
 
             // ------------------------------------------------------------
-            // 将来: 手順4〜17（状態遷移・移動・判定など）をここに追加する
-            // 今回は CombatFrame カウンタだけ進める
+            // 3〜4. HitStopRemaining を確認
+            //    1以上なら残りを1減らし、CombatFrameは進めずに終了する。
+            //    return する理由: このtickの戦闘進行（手順4〜18相当）をスキップするため。
             // ------------------------------------------------------------
+            if (timeState.HitStopRemaining > 0)
+            {
+                timeState.HitStopRemaining = timeState.HitStopRemaining - 1;
+                if (timeState.HitStopRemaining < 0)
+                {
+                    timeState.HitStopRemaining = 0;
+                }
+
+                timeState.LastStatusMessage = "HitStop中。CombatFrameは進めませんでした";
+
+                // 残りが今ちょうど0になった = このtickでHitStop消費が終わった
+                if (timeState.HitStopRemaining == 0)
+                {
+                    Debug.Log("[FightDebug] Test HitStop ended");
+                }
+
+                WriteConsoleLogIfNeeded();
+                return;
+            }
+
+            // ------------------------------------------------------------
+            // 5. HitStopなし: 将来のCombat処理スタブのあと、CombatFrameを1進める
+            // ------------------------------------------------------------
+            // 将来: 手順4〜17（状態遷移・移動・判定など）をここに追加する
+
             timeState.CombatFrame = timeState.CombatFrame + 1;
 
             // 数値はログ側で組み立てる。ここには処理結果の日本語だけ入れる。
-            // Step時は ClockDriver 側が直後にメッセージを上書きすることがあります。
-            timeState.LastStatusMessage = "HitStop未実装のため SimulationTick と CombatFrame を両方進めました";
+            timeState.LastStatusMessage = "HitStopなし。CombatFrameを進めました";
 
             WriteConsoleLogIfNeeded();
         }
 
         /// <summary>
         /// Console を埋めないよう、間隔ごとのみログします。
-        /// SimulationTick / CombatFrame の数値表示はここで1回だけ組み立てます。
+        /// HitStop中の毎tickログは出しません（終了時の1件ログは上で別途出します）。
         /// </summary>
         private void WriteConsoleLogIfNeeded()
         {
@@ -109,7 +117,6 @@ namespace FightingGameTrial.Simulation
                 return;
             }
 
-            // SimulationTick が間隔の倍数になったときだけ出す
             bool shouldLog = (timeState.SimulationTick % consoleLogIntervalTicks) == 0;
             if (shouldLog == false)
             {
@@ -119,6 +126,7 @@ namespace FightingGameTrial.Simulation
             Debug.Log(
                 "[FightDebug] SimulationTick=" + timeState.SimulationTick
                 + " / CombatFrame=" + timeState.CombatFrame
+                + " / HitStopRemaining=" + timeState.HitStopRemaining
                 + "\n（" + timeState.LastStatusMessage + "）"
             );
         }

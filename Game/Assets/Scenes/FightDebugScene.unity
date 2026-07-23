@@ -201,6 +201,7 @@ MonoBehaviour:
   debugPlaybackInput: {fileID: 400000003}
   secondsPerSimulationTick: 0.016666668
   maxCatchUpTicksPerUpdate: 5
+  testHitStopFrames: 6
 --- !u!1 &300000001
 GameObject:
   m_ObjectHideFlags: 0

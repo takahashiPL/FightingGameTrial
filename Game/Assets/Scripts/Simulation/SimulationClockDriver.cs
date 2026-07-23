@@ -10,15 +10,13 @@ namespace FightingGameTrial.Simulation
     /// - Unity の Update / FixedUpdate はゲーム仕様の正本ではありません。
     /// - 正本は docs/rules.md の 60Hz 論理 SimulationTick です。
     ///
-    /// 段階2の責務:
-    /// - Pause切替要求と Step要求を SimulationTick の外側で消化する
-    /// - Pause中は自動進行しない
-    /// - Pause中の Step だけ ProcessOneSimulationTick を1回呼ぶ
-    /// - Pause解除中は従来どおり実時間蓄積で60Hz進行する
+    /// 段階4の責務:
+    /// - Pause / Step / テスト用HitStop要求を SimulationTick の外側で消化する
+    /// - Hキーは HitStopRemaining を設定するだけで、追加の SimulationTick は進めない
+    /// - Pause中でも H / Space / . を受理する
+    /// - PauseとHitStopは別物（Pauseは自動進行停止、HitStopは CombatFrame だけ停止）
     ///
-    /// Pause中でもキー入力を受け取る必要があるため、
-    /// 入力取得（DebugPlaybackInput）と Pause/Step の消化は
-    /// ProcessOneSimulationTick の外（この Update）で行います。
+    /// ProcessOneSimulationTick は「1tick進めると決まったあと」だけを担当します。
     /// </summary>
     public class SimulationClockDriver : MonoBehaviour
     {
@@ -29,7 +27,7 @@ namespace FightingGameTrial.Simulation
         [SerializeField]
         private SimulationSession simulationSession;
 
-        [Tooltip("Pause / Step のキー要求を取る DebugPlaybackInput です。")]
+        [Tooltip("Pause / Step / HitStopテストのキー要求を取る DebugPlaybackInput です。")]
         [SerializeField]
         private DebugPlaybackInput debugPlaybackInput;
 
@@ -45,6 +43,15 @@ namespace FightingGameTrial.Simulation
         )]
         [SerializeField]
         private int maxCatchUpTicksPerUpdate = 5;
+
+        [Header("HitStopテスト（段階4）")]
+        [Tooltip(
+            "Hキーで設定するテスト用 HitStop の長さ（SimulationTick数）です。"
+            + " 0以下なら HitStop を発生させません。"
+            + " HitStop中に再度Hを押すと、この値で単純に上書きします（加算しません）。"
+        )]
+        [SerializeField]
+        private int testHitStopFrames = 6;
 
         /// <summary>
         /// まだ消費していない実時間（秒）です。
@@ -86,7 +93,7 @@ namespace FightingGameTrial.Simulation
 
         /// <summary>
         /// Unityが描画フレームごとに呼びます。
-        /// Pause/Stepの消化 →（必要なら）論理tick進行、の順で上から追えます。
+        /// Pause / HitStopテスト / Step の消化 →（必要なら）論理tick進行、の順です。
         /// </summary>
         private void Update()
         {
@@ -102,7 +109,7 @@ namespace FightingGameTrial.Simulation
             }
 
             // ============================================================
-            // 1. Pause切替要求を取得（SimulationTickの外側）
+            // 1. Pause切替要求を取得・消化（SimulationTickの外側）
             // ============================================================
             bool pauseToggleRequested = false;
             if (debugPlaybackInput != null)
@@ -110,12 +117,24 @@ namespace FightingGameTrial.Simulation
                 pauseToggleRequested = debugPlaybackInput.ConsumePauseToggleRequest();
             }
 
-            // ============================================================
-            // 2. Pause切替要求を消化
-            // ============================================================
             if (pauseToggleRequested)
             {
                 ApplyPauseToggle(timeState);
+            }
+
+            // ============================================================
+            // 2. テスト用 HitStop 要求を取得・消化（SimulationTickの外側）
+            //    Pause中でも受理する。Hだけでは tick を進めない。
+            // ============================================================
+            bool testHitStopRequested = false;
+            if (debugPlaybackInput != null)
+            {
+                testHitStopRequested = debugPlaybackInput.ConsumeTestHitStopRequest();
+            }
+
+            if (testHitStopRequested)
+            {
+                ApplyTestHitStop(timeState);
             }
 
             // ============================================================
@@ -135,10 +154,10 @@ namespace FightingGameTrial.Simulation
                 // Pause中は蓄積時間を増やさない（解除直後の大量catch-up防止）
                 if (stepRequested)
                 {
+                    // HitStopの有無は Session 内で判断する。
+                    // 状態メッセージは Session が書く（HitStop中かどうかが分かるように）。
                     simulationSession.ProcessOneSimulationTick();
-                    // HUD用の短い結果（制御はここ、表示は DebugHudView）
                     timeState.LastStepResult = "実行";
-                    timeState.LastStatusMessage = "Pause中に1 SimulationTick進めました";
                     Debug.Log("[FightDebug] Step executed");
                 }
 
@@ -163,8 +182,8 @@ namespace FightingGameTrial.Simulation
         }
 
         /// <summary>
-        /// Pause状態を反転し、メッセージと即時ログを更新します。
-        /// Pauseへ入るときは蓄積残を0に戻します。
+        /// Pause状態を反転します。Pauseへ入るときは蓄積残を0に戻します。
+        /// Pauseは自動進行を止めます。HitStop（CombatFrameだけ止める）とは別物です。
         /// </summary>
         private void ApplyPauseToggle(SimulationTimeState timeState)
         {
@@ -173,7 +192,6 @@ namespace FightingGameTrial.Simulation
 
             if (willPause)
             {
-                // Pause中に実時間が溜まると解除直後に一気に進むため、残を捨てます。
                 accumulatedSeconds = 0f;
                 timeState.LastStatusMessage = "Pauseに入りました";
                 Debug.Log("[FightDebug] Pause ON");
@@ -183,6 +201,30 @@ namespace FightingGameTrial.Simulation
                 timeState.LastStatusMessage = "Pauseを解除しました";
                 Debug.Log("[FightDebug] Pause OFF");
             }
+        }
+
+        /// <summary>
+        /// Hキーによるテスト用 HitStop を設定します。
+        /// SimulationTickは進めません。残りの上書きのみです。
+        ///
+        /// 再入力仕様（今回）:
+        /// HitStop中に再度Hを押した場合も、testHitStopFrames で単純上書きします。
+        /// 加算・最大値比較・延長規則はまだ実装しません。
+        /// </summary>
+        private void ApplyTestHitStop(SimulationTimeState timeState)
+        {
+            if (testHitStopFrames <= 0)
+            {
+                timeState.LastStatusMessage =
+                    "testHitStopFrames が0以下のため、テスト用HitStopを発生させませんでした";
+                return;
+            }
+
+            // 単純上書き（加算しない）
+            timeState.HitStopRemaining = testHitStopFrames;
+            timeState.LastStatusMessage =
+                "テスト用HitStopを" + testHitStopFrames + "フレーム発生しました";
+            Debug.Log("[FightDebug] Test HitStop started: " + testHitStopFrames);
         }
 
         /// <summary>

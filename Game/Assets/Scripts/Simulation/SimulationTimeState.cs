@@ -21,8 +21,10 @@ namespace FightingGameTrial.Simulation
         public bool IsPaused;
 
         [Tooltip(
-            "HitStopの残り論理tickです。段階3では本実装せず常に0です。"
-            + "段階4で減らす処理を入れるための受け皿です。"
+            "HitStopの残り論理tickです。"
+            + " 0より大きいあいだは CombatFrame を進めません。"
+            + " SimulationTick ごとに1減り、負数にはしません。"
+            + " 初期値は0です。"
         )]
         public int HitStopRemaining;
 

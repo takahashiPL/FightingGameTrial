@@ -93,8 +93,8 @@ namespace FightingGameTrial.DebugTools
                 statusLabel = "（なし）";
             }
 
-            // HitStop本実装前: 数値は0のまま。画面では未実装であることも併記します。
-            string hitStopLabel = timeState.HitStopRemaining.ToString() + "（未実装）";
+            // HitStopRemaining の実値を表示します（「未実装」表記は使いません）。
+            string hitStopLabel = timeState.HitStopRemaining.ToString();
 
             string text = "";
             text = text + "SimulationTick : " + timeState.SimulationTick + "\n";
@@ -106,7 +106,8 @@ namespace FightingGameTrial.DebugTools
             text = text + "\n";
             text = text + "操作:\n";
             text = text + "Space = Pause切替\n";
-            text = text + ".     = 1 SimulationTick送り（Pause中のみ）";
+            text = text + ".     = 1 SimulationTick送り（Pause中のみ）\n";
+            text = text + "H     = テスト用HitStop発生";
             return text;
         }
     }
