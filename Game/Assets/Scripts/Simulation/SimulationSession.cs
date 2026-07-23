@@ -51,6 +51,7 @@ namespace FightingGameTrial.Simulation
             }
 
             timeState.ResetToInitialValues();
+            timeState.LastStepResult = "未実行";
             timeState.LastStatusMessage = "SimulationSession を初期化しました。まだ自動進行前です。";
         }
 

@@ -136,6 +136,8 @@ namespace FightingGameTrial.Simulation
                 if (stepRequested)
                 {
                     simulationSession.ProcessOneSimulationTick();
+                    // HUD用の短い結果（制御はここ、表示は DebugHudView）
+                    timeState.LastStepResult = "実行";
                     timeState.LastStatusMessage = "Pause中に1 SimulationTick進めました";
                     Debug.Log("[FightDebug] Step executed");
                 }
@@ -148,6 +150,7 @@ namespace FightingGameTrial.Simulation
             // ============================================================
             if (stepRequested)
             {
+                timeState.LastStepResult = "無視（Pause解除中）";
                 timeState.LastStatusMessage = "Pause解除中のためStep要求を無視しました";
                 Debug.Log("[FightDebug] Step ignored (not paused)");
             }
