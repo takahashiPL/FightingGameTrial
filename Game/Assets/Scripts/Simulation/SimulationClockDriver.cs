@@ -275,7 +275,8 @@ namespace FightingGameTrial.Simulation
             timeState.ActionFrame = 0;
             timeState.IsActionPlaying = true;
             timeState.IsJPunchAttack = false;
-            timeState.LastStatusMessage = "テスト用Actionを開始しました";
+            timeState.HasCurrentJPunchHit = false;
+            timeState.LastStatusMessage = "Debug Action start";
             Debug.Log("[FightDebug] Test Action started");
 
             if (simulationSession != null)
@@ -289,15 +290,15 @@ namespace FightingGameTrial.Simulation
         /// SimulationTickは進めません。
         /// ActionFrame=0 / 再生中=false にするだけです。
         /// AキーのデバッグActionには自動終了がありません（Rで止める）。
-        /// Jパンチ進行中にRを押した場合も停止します。
+        /// Jパンチ進行中にRを押した場合も停止し、HasCurrentJPunchHit も false へ戻します。
         /// </summary>
         private void ApplyTestActionReset(SimulationTimeState timeState)
         {
             timeState.ActionFrame = 0;
             timeState.IsActionPlaying = false;
             timeState.IsJPunchAttack = false;
-            timeState.LastStatusMessage =
-                "テスト用Actionを停止し、ActionFrameを0へ戻しました";
+            timeState.HasCurrentJPunchHit = false;
+            timeState.LastStatusMessage = "Action reset";
             Debug.Log("[FightDebug] Test Action reset");
 
             if (simulationSession != null)

@@ -1,3 +1,4 @@
+using FightingGameTrial.Combat;
 using FightingGameTrial.Fighter;
 using FightingGameTrial.Input;
 using UnityEngine;
@@ -6,56 +7,55 @@ namespace FightingGameTrial.Simulation
 {
     /// <summary>
     /// 1回分の論理 SimulationTick を進める入口です。
-    /// docs/rules.md §10.3 の処理順を、ここで上から追える形にします。
     ///
-    /// 段階8:
-    /// - CurrentInput.Attack（Held）から立ち上がり（Pressed）を作る
-    /// - Jパンチ開始は Action 停止中かつ HitStop なしのときだけ
-    /// - ActionFrame に応じて DebugFighterVisual で Sprite を切り替える
-    /// - Jパンチは終了フレームで自動停止（AキーのデバッグActionは自動停止しない）
+    /// 段階9:
+    /// - Active Frame でダミーへの論理座標 Hit 判定
+    /// - Hit 成立で既存 HitStopRemaining を設定（同tickでは減らさない）
+    /// - 1攻撃1Hit（HasCurrentJPunchHit）
     ///
-    /// 処理順（このメソッド内）:
-    /// 1. SimulationTick +1
-    /// 2. 入力サンプリング
-    /// 3. Attack 立ち上がり判定
-    /// 4. HitStop判定
-    /// 5. HitStop中なら Combat/Action/移動を進めず、previousAttackHeld だけ更新して終了
-    /// 6. CombatFrame +1
-    /// 7. AttackPressed かつ Action停止中なら Jパンチ開始
-    /// 8. Fighter移動
-    /// 9. ActionFrame進行
-    /// 10. Visual反映
-    /// 11. Jパンチ終了フレームなら停止・0へ戻す
-    /// 12. 状態メッセージ更新 / previousAttackHeld 更新
+    /// Hit成立tickとHitStop開始tickの関係:
+    /// - Hitした CombatFrame では移動・Action進行・Visual・Hit通知まで完了してよい
+    /// - そこで HitStopRemaining=6 を「設定するだけ」
+    /// - 次の SimulationTick の先頭 HitStop 判定から Combat 処理を止める
+    /// - 同じtick内で Remaining を即5へ減らさない
     ///
-    /// Pause中は ClockDriver が自動でここを呼ばないため、自動攻撃進行もしません。
+    /// HitStop中に再判定しない理由:
+    /// CombatFrame / ActionFrame が進まないため Active 判定にも入らない。
     /// </summary>
     public class SimulationSession : MonoBehaviour
     {
+        private const int PunchStartupEndFrame = 3;
+        private const int PunchActiveStartFrame = 4;
+        private const int PunchActiveEndFrame = 6;
+        private const int PunchHitStopFrames = 6;
+
         [Header("参照（Inspectorで接続。自動検索はしません）")]
-        [Tooltip(
-            "物理キーの最新状態を持つ DebugGameplayInput です。"
-            + " SimulationTick ごとにここから読んで CurrentInput へ確定します。"
-        )]
+        [Tooltip("物理キーの最新状態を持つ DebugGameplayInput です。")]
         [SerializeField]
         private DebugGameplayInput debugGameplayInput;
 
-        [Tooltip(
-            "テスト用プレイヤーの左右移動を行う DebugFighterMotor です。"
-            + " HitStopなしの Combat 処理内でのみ呼び出します。"
-        )]
+        [Tooltip("テスト用プレイヤーの左右移動を行う DebugFighterMotor です。")]
         [SerializeField]
         private DebugFighterMotor debugFighterMotor;
 
-        [Tooltip(
-            "ActionFrame に応じて Idle/Attack Sprite を切り替える DebugFighterVisual です。"
-            + " HitStopなしの Combat 処理内、および A/R 直後の再描画で呼び出します。"
-        )]
+        [Tooltip("Idle/Attack Sprite を切り替える DebugFighterVisual です。")]
         [SerializeField]
         private DebugFighterVisual debugFighterVisual;
 
-        [Header("時間状態（進行ロジックは持たない入れ物）")]
-        [Tooltip("SimulationTick / CombatFrame / ActionFrame / 確定入力 / HitStop残り / 状態メッセージを保持します。")]
+        [Tooltip("相手ダミーの DebugDummyTarget です。Hit通知先です。")]
+        [SerializeField]
+        private DebugDummyTarget debugDummyTarget;
+
+        [Header("Jパンチ判定（段階9）")]
+        [Tooltip(
+            "Jパンチの攻撃距離（ワールド単位）です。"
+            + " 向いている側に相手がいて、この距離以内なら Active で Hit します。"
+        )]
+        [SerializeField]
+        private float attackRange = 1.35f;
+
+        [Header("時間状態")]
+        [Tooltip("SimulationTick / CombatFrame / ActionFrame / HitStop / 攻撃結果などを保持します。")]
         [SerializeField]
         private SimulationTimeState timeState = new SimulationTimeState();
 
@@ -64,73 +64,54 @@ namespace FightingGameTrial.Simulation
         [SerializeField]
         private int consoleLogIntervalTicks = 60;
 
-        /// <summary>
-        /// 直前 SimulationTick の Attack Held です。
-        /// Held から Pressed（立ち上がり）を作るために使います。
-        /// </summary>
         private bool previousAttackHeld;
-
-        /// <summary>
-        /// この SimulationTick で Attack の立ち上がりが起きたか（HUD / ログ用）。
-        /// </summary>
         private bool attackPressedThisTick;
 
-        /// <summary>
-        /// 外部（ClockDriverなど）から読むための時間状態です。
-        /// </summary>
         public SimulationTimeState TimeState
         {
             get { return timeState; }
         }
 
-        /// <summary>
-        /// HUD などから Fighter 移動値を読むための参照です。
-        /// </summary>
         public DebugFighterMotor DebugFighterMotor
         {
             get { return debugFighterMotor; }
         }
 
-        /// <summary>
-        /// HUD などから見た目名を読むための参照です。
-        /// </summary>
         public DebugFighterVisual DebugFighterVisual
         {
             get { return debugFighterVisual; }
         }
 
-        /// <summary>
-        /// この SimulationTick の Attack 立ち上がり（0/1 表示用）。
-        /// </summary>
+        public DebugDummyTarget DebugDummyTarget
+        {
+            get { return debugDummyTarget; }
+        }
+
         public bool AttackPressedThisTick
         {
             get { return attackPressedThisTick; }
         }
 
-        /// <summary>
-        /// Unityがこのコンポーネントを有効化した直後に1回呼びます。
-        /// </summary>
         private void Awake()
         {
             if (debugGameplayInput == null)
             {
-                Debug.LogError(
-                    "SimulationSession: DebugGameplayInput が未設定です。"
-                );
+                Debug.LogError("SimulationSession: DebugGameplayInput が未設定です。");
             }
 
             if (debugFighterMotor == null)
             {
-                Debug.LogError(
-                    "SimulationSession: DebugFighterMotor が未設定です。"
-                );
+                Debug.LogError("SimulationSession: DebugFighterMotor が未設定です。");
             }
 
             if (debugFighterVisual == null)
             {
-                Debug.LogError(
-                    "SimulationSession: DebugFighterVisual が未設定です。"
-                );
+                Debug.LogError("SimulationSession: DebugFighterVisual が未設定です。");
+            }
+
+            if (debugDummyTarget == null)
+            {
+                Debug.LogError("SimulationSession: DebugDummyTarget が未設定です。");
             }
 
             if (timeState == null)
@@ -140,38 +121,21 @@ namespace FightingGameTrial.Simulation
 
             timeState.ResetToInitialValues();
             timeState.LastStepResult = "未実行";
-            timeState.LastStatusMessage = "SimulationSession を初期化しました。まだ自動進行前です。";
+            timeState.LastStatusMessage = "Session ready";
 
             previousAttackHeld = false;
             attackPressedThisTick = false;
         }
 
-        /// <summary>
-        /// 論理 SimulationTick をちょうど1回分進めます。
-        /// </summary>
         public void ProcessOneSimulationTick()
         {
-            // ------------------------------------------------------------
-            // 1. SimulationTick を1増やす（HitStop中も進む）
-            // ------------------------------------------------------------
+            // 1. SimulationTick +1（HitStop中も進む）
             timeState.SimulationTick = timeState.SimulationTick + 1;
 
-            // ------------------------------------------------------------
-            // 2. 入力サンプリング（HitStop判定より前）
-            // ------------------------------------------------------------
+            // 2. 入力サンプリング
             SampleCurrentInputFromGameplay();
 
-            // ------------------------------------------------------------
-            // 3. Attack 立ち上がり判定（CurrentInput のみ。Keyboard は読まない）
-            //
-            //    なぜ Held から Pressed を作るか:
-            //    CurrentInput.Attack は押し続けでも true のままです。
-            //    「押した瞬間」だけ攻撃開始するには、前tickの Held と比較が必要です。
-            //
-            //    押しっぱなし連打防止:
-            //    previousAttackHeld が true のあいだは attackPressedThisTick が false。
-            //    攻撃終了後も J を離すまで立ち上がりは起きません。
-            // ------------------------------------------------------------
+            // 3. Attack 立ち上がり判定
             bool attackHeldNow = false;
             if (timeState.CurrentInput != null)
             {
@@ -180,16 +144,9 @@ namespace FightingGameTrial.Simulation
 
             attackPressedThisTick = attackHeldNow && (previousAttackHeld == false);
 
-            // ------------------------------------------------------------
-            // 4〜5. HitStopRemaining を確認
-            //    HitStop中は CombatFrame / ActionFrame / 移動 / 攻撃開始を進めない。
-            //    ただし入力サンプルと立ち上がり判定は上で済ませている。
-            //
-            //    HitStop中に AttackPressed が立っても、このtickでは攻撃開始しない。
-            //    入力予約はまだ作らない。
-            //    HitStop終了後に押しっぱなしでも自動開始しない
-            //    （previousAttackHeld を更新するため、離して再押しが必要）。
-            // ------------------------------------------------------------
+            // 4〜5. 既存 HitStop 判定
+            //    Remaining>0 なら Combat 処理へ入らず、ここで1減らして return。
+            //    （Hit成立tickで設定した6は、次tickから減り始める）
             if (timeState.HitStopRemaining > 0)
             {
                 timeState.HitStopRemaining = timeState.HitStopRemaining - 1;
@@ -198,46 +155,40 @@ namespace FightingGameTrial.Simulation
                     timeState.HitStopRemaining = 0;
                 }
 
-                timeState.LastStatusMessage =
-                    "HitStop: Combat/Action/Fighter stop";
+                timeState.LastStatusMessage = "HitStop: Combat/Action/Fighter stop";
 
                 if (timeState.HitStopRemaining == 0)
                 {
                     Debug.Log("[FightDebug] Test HitStop ended");
                 }
 
-                // 立ち上がりを「消費」して、解除後の押しっぱなし連打を防ぐ
                 previousAttackHeld = attackHeldNow;
-
                 WriteConsoleLogIfNeeded();
                 return;
             }
 
-            // ------------------------------------------------------------
-            // 6. HitStopなし: CombatFrame を1進める
-            // ------------------------------------------------------------
+            // 6. CombatFrame +1
             timeState.CombatFrame = timeState.CombatFrame + 1;
 
-            // ------------------------------------------------------------
-            // 7. AttackPressed かつ Action停止中なら Jパンチ開始
-            //    攻撃中の再Jは IsActionPlaying のため開始しない（現在の攻撃終了を優先）。
-            // ------------------------------------------------------------
+            // 7. Dummy の WasHitThisCombatFrame をリセット
+            if (debugDummyTarget != null)
+            {
+                debugDummyTarget.BeginCombatFrame();
+            }
+
+            // 8. Jパンチ開始判定
             if (attackPressedThisTick && (timeState.IsActionPlaying == false))
             {
                 StartJPunchAttack();
             }
 
-            // ------------------------------------------------------------
-            // 8. Fighter 移動（攻撃中も左右移動可）
-            // ------------------------------------------------------------
+            // 9. Player 移動
             if (debugFighterMotor != null)
             {
                 debugFighterMotor.ProcessOneCombatFrame(timeState.CurrentInput);
             }
 
-            // ------------------------------------------------------------
-            // 9. ActionFrame進行
-            // ------------------------------------------------------------
+            // 10. ActionFrame 進行
             if (timeState.IsActionPlaying)
             {
                 timeState.ActionFrame = timeState.ActionFrame + 1;
@@ -247,15 +198,14 @@ namespace FightingGameTrial.Simulation
                 }
             }
 
-            // ------------------------------------------------------------
-            // 10. Visual反映（ActionFrame と見た目の対応）
-            // ------------------------------------------------------------
+            // 11〜13. Active なら Hit 判定 → Dummy通知 → HitStopRemaining=6 設定
+            //         （このtickでは Remaining を減らさない）
+            TryResolveJPunchHit();
+
+            // 14. Visual 更新
             RefreshFighterVisual();
 
-            // ------------------------------------------------------------
-            // 11. Jパンチ終了フレームなら停止・0へ戻す
-            //     AキーのデバッグAction（IsJPunchAttack=false）はここでは終了しない。
-            // ------------------------------------------------------------
+            // 15. Action 終了判定（未Hitなら Miss ログ1回）
             if (timeState.IsJPunchAttack && timeState.IsActionPlaying)
             {
                 int endFrame = 12;
@@ -271,33 +221,41 @@ namespace FightingGameTrial.Simulation
                 }
             }
 
-            // ------------------------------------------------------------
-            // 12. 状態メッセージ / previousAttackHeld 更新
-            // ------------------------------------------------------------
-            if (timeState.IsActionPlaying)
-            {
-                if (timeState.IsJPunchAttack)
-                {
-                    timeState.LastStatusMessage = "J Punch active";
-                }
-                else
-                {
-                    timeState.LastStatusMessage = "Debug Action active";
-                }
-            }
-            else
-            {
-                timeState.LastStatusMessage = "Combat ok / Action stop";
-            }
-
+            // 16. 状態文 / previousAttackHeld
+            UpdateStatusMessage();
             previousAttackHeld = attackHeldNow;
-
             WriteConsoleLogIfNeeded();
         }
 
         /// <summary>
-        /// A/R キー直後など、tick外で Action 状態が変わったときに見た目だけ合わせます。
+        /// HUD用: Idle / Startup / Active / Recovery
         /// </summary>
+        public string GetPunchPhaseLabel()
+        {
+            if (timeState == null || timeState.IsJPunchAttack == false || timeState.IsActionPlaying == false)
+            {
+                return "Idle";
+            }
+
+            int frame = timeState.ActionFrame;
+            if (frame >= 1 && frame <= PunchStartupEndFrame)
+            {
+                return "Startup";
+            }
+
+            if (frame >= PunchActiveStartFrame && frame <= PunchActiveEndFrame)
+            {
+                return "Active";
+            }
+
+            if (frame > PunchActiveEndFrame)
+            {
+                return "Recovery";
+            }
+
+            return "Idle";
+        }
+
         public void RefreshFighterVisual()
         {
             if (debugFighterVisual == null || timeState == null)
@@ -312,33 +270,100 @@ namespace FightingGameTrial.Simulation
             );
         }
 
-        /// <summary>
-        /// Jキー時限パンチを開始します。
-        /// </summary>
         private void StartJPunchAttack()
         {
             timeState.ActionFrame = 0;
             timeState.IsActionPlaying = true;
             timeState.IsJPunchAttack = true;
+            timeState.HasCurrentJPunchHit = false;
+            timeState.LastAttackResult = "None";
             timeState.LastStatusMessage = "J Punch start";
             Debug.Log("[FightDebug] Attack started");
         }
 
-        /// <summary>
-        /// Jキー時限パンチを終了し、ActionFrame を0へ戻します。
-        /// </summary>
         private void EndJPunchAttack()
         {
+            // Miss は攻撃終了時に一度だけ（Active毎tickでは出さない）
+            if (timeState.HasCurrentJPunchHit == false)
+            {
+                timeState.LastAttackResult = "Miss";
+                Debug.Log("[FightDebug] Punch missed");
+            }
+
             timeState.ActionFrame = 0;
             timeState.IsActionPlaying = false;
             timeState.IsJPunchAttack = false;
+            timeState.HasCurrentJPunchHit = false;
             timeState.LastStatusMessage = "J Punch end";
             Debug.Log("[FightDebug] Attack ended");
         }
 
         /// <summary>
-        /// DebugGameplayInput の最新物理状態を CurrentInput へコピーして確定します。
+        /// Active Frame の Hit 判定と、成立時の Dummy通知 / HitStop 設定。
         /// </summary>
+        private void TryResolveJPunchHit()
+        {
+            if (timeState.IsJPunchAttack == false)
+            {
+                return;
+            }
+
+            if (debugFighterMotor == null || debugDummyTarget == null)
+            {
+                return;
+            }
+
+            bool isHit = DebugPunchHitResolver.TryResolveHit(
+                timeState.IsJPunchAttack,
+                timeState.ActionFrame,
+                PunchActiveStartFrame,
+                PunchActiveEndFrame,
+                timeState.HasCurrentJPunchHit,
+                debugFighterMotor.LogicalX,
+                debugFighterMotor.FacingRight,
+                debugDummyTarget.LogicalX,
+                attackRange
+            );
+
+            if (isHit == false)
+            {
+                return;
+            }
+
+            // 12. Dummy へ通知
+            debugDummyTarget.ReceiveHit(timeState.CombatFrame);
+            timeState.HasCurrentJPunchHit = true;
+            timeState.LastAttackResult = "Hit";
+            timeState.LastStatusMessage = "Punch Hit";
+
+            Debug.Log(
+                "[FightDebug] Punch hit Dummy at CombatFrame=" + timeState.CombatFrame
+            );
+
+            // 13. 既存 HitStop を開始（同tickでは減らさない）
+            //     次の SimulationTick 先頭の if (HitStopRemaining > 0) から Combat 停止が始まる。
+            timeState.HitStopRemaining = PunchHitStopFrames;
+        }
+
+        private void UpdateStatusMessage()
+        {
+            if (timeState.IsActionPlaying)
+            {
+                if (timeState.IsJPunchAttack)
+                {
+                    timeState.LastStatusMessage = "J Punch " + GetPunchPhaseLabel();
+                }
+                else
+                {
+                    timeState.LastStatusMessage = "Debug Action active";
+                }
+            }
+            else
+            {
+                timeState.LastStatusMessage = "Combat ok / Action stop";
+            }
+        }
+
         private void SampleCurrentInputFromGameplay()
         {
             if (timeState.CurrentInput == null)
@@ -371,9 +396,6 @@ namespace FightingGameTrial.Simulation
             );
         }
 
-        /// <summary>
-        /// Console を埋めないよう、間隔ごとのみログします。
-        /// </summary>
         private void WriteConsoleLogIfNeeded()
         {
             if (consoleLogIntervalTicks <= 0)
@@ -401,6 +423,7 @@ namespace FightingGameTrial.Simulation
             int downValue = input.Down ? 1 : 0;
             int attackValue = input.Attack ? 1 : 0;
             int attackPressedValue = attackPressedThisTick ? 1 : 0;
+            int punchHitDone = timeState.HasCurrentJPunchHit ? 1 : 0;
 
             string fighterPart = "";
             if (debugFighterMotor != null)
@@ -415,6 +438,20 @@ namespace FightingGameTrial.Simulation
             if (debugFighterVisual != null)
             {
                 visualLabel = debugFighterVisual.CurrentVisualLabel;
+            }
+
+            string dummyPart = "";
+            if (debugDummyTarget != null)
+            {
+                dummyPart =
+                    " DummyX=" + debugDummyTarget.LogicalX.ToString("0.00")
+                    + " DummyHitCount=" + debugDummyTarget.HitCount;
+            }
+
+            string attackResult = timeState.LastAttackResult;
+            if (string.IsNullOrEmpty(attackResult))
+            {
+                attackResult = "None";
             }
 
             Debug.Log(
@@ -433,6 +470,10 @@ namespace FightingGameTrial.Simulation
                 + " AttackPressed=" + attackPressedValue
                 + " FighterVisual=" + visualLabel
                 + fighterPart
+                + dummyPart
+                + " PunchPhase=" + GetPunchPhaseLabel()
+                + " AttackResult=" + attackResult
+                + " PunchHitDone=" + punchHitDone
                 + "\n（" + timeState.LastStatusMessage + "）"
             );
         }
