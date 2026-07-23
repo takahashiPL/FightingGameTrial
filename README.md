@@ -10,7 +10,7 @@
 詳細は **`docs/learning_and_readability.md`** を読んでください。要約:
 
 - 多少冗長でも処理順が見える構成を選ぶ
-- C# では日本語コメントを十分に入れる（実装開始後）
+- C# では日本語コメントを十分に入れる
 - 英語の名前だけで理解できる前提にしない
 - Unity の `Awake` / `Update` / `FixedUpdate` 等も説明するが、**ゲーム仕様の正本は 60Hz の SimulationTick / CombatFrame**（`docs/rules.md` §10）
 - 過度な LINQ・ワンライナー・難解な省略を避ける
@@ -18,7 +18,18 @@
 - まず読みやすい基準実装を残し、最適化は後
 - 中間状態をデバッグ表示する
 
-**現時点では実装（C# / Scene）を開始していません。** 仕様とデータの正本整備が先行します。
+## Unity 実装の到達点（要約）
+
+ブランチ `unity` 上で、**段階1〜9まで完了**しています。  
+最新実装コミット: **`0b84a81`**（Add minimal punch hit detection）
+
+| 区分 | 内容 |
+|---|---|
+| **実装済み** | 60Hz SimulationTick、Pause/Step、HUD、HitStop、ActionFrame、入力サンプリング、左右移動、Jパンチ、DebugDummy、暫定 Hit（距離＋向き）、1攻撃1Hit、Hit時6F HitStop |
+| **暫定** | 入力方向で Facing を変える挙動、距離ベース Hit（正式 Box ではない） |
+| **未実装（正式方針）** | 相手向き合いの Facing、Push/Hurt/Hit Box、Box 可視化、Box 重なり判定 |
+
+詳細・次工程（段階10以降）は **`docs/unity_implementation_status.md`** を正とする。
 
 ## ブランチ構成
 
@@ -27,9 +38,8 @@
 | `main` | 共通資料（docs / data / schemas / art） |
 | `unity` | 共通資料 + Unity プロジェクト（`Game/`） |
 
-`1f294cc`（Add initial Unity 2D project）は、**Unity プロジェクトを追加したときの基準コミット**です（最新コミット番号ではありません）。  
-Universal 2D テンプレートで作成済みです。  
-現在の仕様・資料更新は**未コミットの作業ツリー上**にあります。存在しない「最新コミット番号」を推測して書かないでください。
+`1f294cc`（Add initial Unity 2D project）は、**Unity プロジェクトを追加したときの基準コミット**です。  
+Universal 2D テンプレートで作成済みです。
 
 ### Git 管理について
 
@@ -47,9 +57,10 @@ Git 管理外: `Game/Library`、`Temp`、`Logs`、`UserSettings`、`obj` など
 2. `data/*.csv`
 3. `schemas/data_dictionary.md`
 4. `docs/learning_and_readability.md`（実装スタイル）
-5. `docs/production_spritesheet_spec.md`
-6. `docs/debug_screen_spec.md`
-7. 各種PNG参考画像
+5. `docs/unity_implementation_status.md`（Unity実装の到達点・暫定/正式・次工程）
+6. `docs/production_spritesheet_spec.md`
+7. `docs/debug_screen_spec.md`
+8. 各種PNG参考画像
 
 ### スプライト配置の正本
 
@@ -65,17 +76,16 @@ Git 管理外: `Game/Library`、`Temp`、`Logs`、`UserSettings`、`obj` など
 | `moves.csv` | 技設計。数値は provisional |
 | `state_transitions.csv` | **草案**（完全実行用SMではない） |
 | `hit_resolution.csv` | 方向ごとの一次分類参照（Tradeは複合集約・表外） |
-| 本番スプライト | **未完成** |
+| 本番スプライトシート | **未完成** |
+| デバッグ用透過PNG（Idle/Punch） | FightDebugScene 用の試験素材（本番清書ではない） |
 
-## 最初の実装対象（実装開始後）
+## 次の実装候補（要約）
 
-1. SimulationTick / CombatFrame 進行（Pause / 1フレーム送り）
-2. Idle
-3. StandPunch（ActionFrame と duration の正しい進め方）
-4. 判定箱表示
-5. デバッグHUD初期必須項目（SimulationTick 等の日本語説明付き）
+1. **段階10**: Facing と移動入力の分離、自動向き合い、Push Box、地上すり抜け防止  
+2. **段階11**: Hurt/Hit Box、可視化、距離判定→Box重なりへ置換  
+3. 以降: 被Hit/HitStun、ノックバック、HP、攻撃データ化  
 
-処理順の正本は `docs/rules.md` §10 です。
+詳細は `docs/unity_implementation_status.md`。
 
 ## スプライト制作方針（要約）
 
@@ -93,6 +103,7 @@ Git 管理外: `Game/Library`、`Temp`、`Logs`、`UserSettings`、`obj` など
 
 - `art/fighter_motion_reference_sheet.png` … デザイン参考。**完成スプライトではない**
 - `art/spritesheet_grid_template.png` … 128×128、8×8台紙（セルサイズ。画面等倍表示の意味ではない）
+- `Game/Assets/Art/Characters/fighter_idle_00_transparent.png` 等 … デバッグ表示用の透過試験素材（本番シートではない）
 - `docs/production_spritesheet_spec.md` … 制作工程とセル仕様の正本
 - `docs/sprite_art_status.md` … 現在の素材は未完成であること
 
@@ -107,6 +118,7 @@ Unity_FightingGameTrial
 ├─ docs/
 │  ├─ rules.md
 │  ├─ learning_and_readability.md
+│  ├─ unity_implementation_status.md
 │  ├─ debug_screen_spec.md
 │  └─ ...
 ├─ schemas/
@@ -117,7 +129,7 @@ Unity_FightingGameTrial
 
 ## 仮値・未確定（要約）
 
-暫定値: JustGuardWindow=3、Damage、Stun、Pushback、Jump移動量、LandingRecoveryフレーム数 など。  
+暫定値: JustGuardWindow=3、Damage、Stun、Pushback、Jump移動量、LandingRecoveryフレーム数、デバッグ用 attackRange=1.35 など。  
 未確定: 空中パンチのガード可否、多段技、必殺技、キャラ差、高度な壁際補正。  
 詳細は `docs/rules.md` §0。
 
@@ -129,5 +141,6 @@ Unity_FightingGameTrial
 - Clash は一次分類。Trade は双方向とも Hit のときの複合集約
 - SimulationTick（入力）と CombatFrame / ActionFrame（戦闘）を分離
 - 空中 Pushbox 無効。着地で復活＋等分分離
+- Facing は相手との位置関係を基本とし、移動入力と分離する（正式方針。デバッグ実装は暫定あり → `docs/unity_implementation_status.md`）
 - `attack_category` はラベルのみ
 - 必殺技は未実装・非表示

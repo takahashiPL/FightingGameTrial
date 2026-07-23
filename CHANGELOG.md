@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## v3.5（Unity段階1〜9到達・Facing方針・工程見直し）
+
+- Unity 実装の到達点・暫定/正式・次工程を `docs/unity_implementation_status.md` に集約
+- 段階1〜9完了を明記。最新実装コミット `0b84a81`（Add minimal punch hit detection）
+- 段階9の Hit は距離＋向きの**暫定**であり、正式 Box 判定ではないことを明記
+- Facing: 入力方向で向きを変える現状は暫定。正式は相手向き合い＋移動入力分離（未実装）
+- Push / Hurt / Hit Box 可視化・重なり判定は未実装と整理
+- 推奨工程を段階10（Facing分離・Push Box）→11（Box判定置換）→12以降（被Hit/KB/HP/データ化）に見直し
+- README を実装開始済みの要約へ更新（旧「実装未開始」記述を修正）
+- `docs/rules.md` §2.3 にデバッグ暫定 Facing との関係を追記
+- `docs/sprite_art_status.md` にデバッグ用透過試験PNGの存在を追記（本番清書ではない）
+
 ## v3.4（スプライト段階制作方針）
 
 - 専任デザイナー不在・ChatGPT支援前提の制作工程を `docs/production_spritesheet_spec.md` に正本として追加
