@@ -8,7 +8,12 @@ namespace FightingGameTrial.Simulation
     /// <summary>
     /// 1回分の論理 SimulationTick を進める入口です。
     ///
-    /// 段階10B-2:
+    /// 段階10B-3:
+    /// - 両体移動のあと、Facing 更新の前に Participant 共通 Push Box で重なりを解消する
+    /// - Facing は Push 補正後の最終位置を基準に更新する
+    /// - P1 専用停止ではなく、DebugFighterPushResolver で双方へ等分補正する
+    ///
+    /// 段階10B-2（維持）:
     /// - 攻撃状態（入力・開始・ActionFrame・終了・Visual）は各 Participant.AttackState
     /// - Hit 判定は attacker / defender 共通関数で行い、defender.ReceiveHit で被弾を記録する
     /// - 同一 CombatFrame 内で P1→P2 と P2→P1 の両方を判定する（相打ち将来対応）
@@ -18,7 +23,6 @@ namespace FightingGameTrial.Simulation
     /// 段階10B-1（維持）:
     /// - P1/P2 を同じ Participant + Motor + Visual 構成で扱う
     /// - P1 は Gameplay 入力、P2 は Neutral 入力（棒立ち）
-    /// - 両体の移動後、Hit 前に双方の Facing を相手向きへ確定する
     ///
     /// 段階10A（維持）:
     /// - 移動入力と Facing を分離する
@@ -33,14 +37,15 @@ namespace FightingGameTrial.Simulation
     /// 5. BeginCombatFrame（P1/P2 被弾旗リセット）
     /// 6. P1/P2 攻撃開始判定
     /// 7. P1 移動 / P2 移動
-    /// 8. P1 Facing / P2 Facing
-    /// 9. P1/P2 ActionFrame 進行
-    /// 10. P1→P2 Hit / P2→P1 Hit（共通関数）
-    /// 11. Visual 更新（AttackState 反映）
-    /// 12. P1/P2 攻撃終了判定
+    /// 8. Push Box 重なり解消（Participant 共通）
+    /// 9. P1 Facing / P2 Facing（Push 後の最終位置基準）
+    /// 10. P1/P2 ActionFrame 進行
+    /// 11. P1→P2 Hit / P2→P1 Hit（共通関数）
+    /// 12. Visual 更新（AttackState 反映）
+    /// 13. P1/P2 攻撃終了判定
     ///
     /// HitStop中:
-    /// Combat 処理全体をスキップするため、移動も Facing も Action も進めない。
+    /// Combat 処理全体をスキップするため、移動も Push も Facing も Action も進めない。
     /// ただし攻撃入力の SampleAttackInput は HitStop 前に行い、
     /// previousAttackHeld 相当の更新だけは維持する（既存仕様）。
     /// Hit 成立 tick では HitStopRemaining を設定するだけで、同じ tick 内では減らさない
@@ -101,9 +106,41 @@ namespace FightingGameTrial.Simulation
         /// </summary>
         private SimulationInputState p2NeutralInput;
 
+        /// <summary>
+        /// HUD 用: 直近 CombatFrame の Push 中心間距離（補正後）。
+        /// </summary>
+        private float lastPushCenterDistance;
+
+        /// <summary>
+        /// HUD 用: 直近 CombatFrame で補正前に重なっていたか。
+        /// </summary>
+        private bool lastPushWasOverlapping;
+
+        /// <summary>
+        /// 直前 CombatFrame で Push 補正したか。
+        /// 接触し続けている間の毎フレームログを避け、補正開始の立ち上がりだけ出すために使う。
+        /// </summary>
+        private bool previousPushDidCorrect;
+
         public SimulationTimeState TimeState
         {
             get { return timeState; }
+        }
+
+        /// <summary>
+        /// HUD 用: 直近の Push 中心間距離（補正後の絶対値）。
+        /// </summary>
+        public float LastPushCenterDistance
+        {
+            get { return lastPushCenterDistance; }
+        }
+
+        /// <summary>
+        /// HUD 用: 直近 CombatFrame で Push 補正前に重なっていたか。
+        /// </summary>
+        public bool LastPushWasOverlapping
+        {
+            get { return lastPushWasOverlapping; }
         }
 
         public DebugFighterParticipant ParticipantP1
@@ -197,8 +234,9 @@ namespace FightingGameTrial.Simulation
 
         private void Start()
         {
-            // Motor.Awake 直後は両体とも右向き初期値のため、開始表示だけ相手向きへ合わせる。
+            // 開始時に初期配置が重なっていた場合だけ Push で離し、その後 Facing を合わせる。
             // Combat 進行ではないので Hit / Action は触らない。
+            ResolvePushBoxBetweenParticipants(false);
             ApplyInitialFacingTowardOpponents();
             RefreshFighterVisual();
         }
@@ -256,27 +294,30 @@ namespace FightingGameTrial.Simulation
             ProcessOneFighterMovement(participantP1, inputP1);
             ProcessOneFighterMovement(participantP2, inputP2);
 
-            // 10. 両体 Facing 確定（Hit 判定より前）
+            // 10. Push Box 重なり解消（移動後・Facing 前。Participant 共通）
+            ResolvePushBoxBetweenParticipants(true);
+
+            // 11. 両体 Facing 確定（Push 後の最終位置基準。Hit 判定より前）
             UpdateFacingTowardOpponent(participantP1);
             UpdateFacingTowardOpponent(participantP2);
 
-            // 11. ActionFrame 進行（Participant 単位）
+            // 12. ActionFrame 進行（Participant 単位）
             AdvanceActionForParticipant(participantP1);
             AdvanceActionForParticipant(participantP2);
 
-            // 12. Hit 判定（attacker / defender 共通。同一tickで両方向を評価してから HitStop）
+            // 13. Hit 判定（attacker / defender 共通。同一tickで両方向を評価してから HitStop）
             TryResolveJPunchHit(participantP1, participantP2);
             TryResolveJPunchHit(participantP2, participantP1);
 
-            // 13. Visual 更新（各 AttackState を反映）
+            // 14. Visual 更新（各 AttackState を反映）
             RefreshFighterVisual();
 
-            // 14. 攻撃終了判定（AttackState 側）
+            // 15. 攻撃終了判定（AttackState 側）
             TryEndJPunchForParticipant(participantP1);
             TryEndJPunchForParticipant(participantP2);
             RefreshFighterVisual();
 
-            // 15. 状態文 / ログ
+            // 16. 状態文 / ログ
             UpdateStatusMessage();
             WriteConsoleLogIfNeeded();
         }
@@ -567,7 +608,74 @@ namespace FightingGameTrial.Simulation
         }
 
         /// <summary>
-        /// 移動後の論理座標から、self が相手と向き合う Facing を決めます（段階10A/10B-1）。
+        /// 両 Participant の横方向 Push Box 重なりを解消します（段階10B-3）。
+        ///
+        /// 何をするか:
+        /// - 移動後の論理 X を DebugFighterPushResolver へ渡し、必要なら双方を等分分離する
+        /// - HUD 用に中心距離・重なり有無を記録する
+        /// - 補正が起きたときだけ1行ログを出す（常時大量ログは出さない）
+        ///
+        /// なぜこの順か:
+        /// Facing と Hit は最終位置を使うため、移動の直後・Facing の直前で行う。
+        ///
+        /// logOnCorrect: Combat tick 中のみ true。Start 時の初期離しでは false。
+        /// </summary>
+        private void ResolvePushBoxBetweenParticipants(bool logOnCorrect)
+        {
+            if (participantP1 == null || participantP2 == null)
+            {
+                lastPushCenterDistance = 0f;
+                lastPushWasOverlapping = false;
+                return;
+            }
+
+            if (participantP1.Motor == null || participantP2.Motor == null)
+            {
+                lastPushCenterDistance = 0f;
+                lastPushWasOverlapping = false;
+                return;
+            }
+
+            float beforeP1X = participantP1.Motor.LogicalX;
+            float beforeP2X = participantP2.Motor.LogicalX;
+
+            float centerDistanceBefore;
+            float requiredMinDistance;
+            bool wasOverlapping;
+
+            bool didCorrect = DebugFighterPushResolver.TryResolveHorizontalOverlap(
+                participantP1,
+                participantP2,
+                out centerDistanceBefore,
+                out requiredMinDistance,
+                out wasOverlapping
+            );
+
+            lastPushWasOverlapping = wasOverlapping;
+
+            // HUD には補正後の中心距離を出す（接触中はほぼ最小距離になる）。
+            float afterP1X = participantP1.Motor.LogicalX;
+            float afterP2X = participantP2.Motor.LogicalX;
+            lastPushCenterDistance = Mathf.Abs(afterP2X - afterP1X);
+
+            // 補正開始の立ち上がりだけ1行ログ（押し続け中の毎フレーム出力はしない）。
+            if (didCorrect && logOnCorrect && previousPushDidCorrect == false)
+            {
+                Debug.Log(
+                    "[FightDebug] Push correct"
+                    + " P1 " + beforeP1X.ToString("0.00") + "->" + afterP1X.ToString("0.00")
+                    + " P2 " + beforeP2X.ToString("0.00") + "->" + afterP2X.ToString("0.00")
+                    + " dist " + centerDistanceBefore.ToString("0.00")
+                    + "->" + lastPushCenterDistance.ToString("0.00")
+                    + " min=" + requiredMinDistance.ToString("0.00")
+                );
+            }
+
+            previousPushDidCorrect = didCorrect;
+        }
+
+        /// <summary>
+        /// Push 補正後の論理座標から、self が相手と向き合う Facing を決めます（段階10A/10B-3）。
         ///
         /// - selfX が opponentX より小さい → 右向き
         /// - selfX が opponentX より大きい → 左向き

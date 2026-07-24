@@ -13,6 +13,7 @@ namespace FightingGameTrial.Fighter
     /// - 相手 Participant への明示参照を持つ
     /// - 自分専用の DebugFighterAttackState を1つ所有する
     /// - 自分専用の被弾記録（HitCount 等）を所有する
+    /// - 横方向 Push Box 半幅を持つ（段階10B-3。重なり解消の計算に使う）
     ///
     /// やらないこと:
     /// - Update で移動しない
@@ -21,6 +22,7 @@ namespace FightingGameTrial.Fighter
     /// - 相手を検索しない（Inspector で opponent を接続する）
     /// - 攻撃開始・ActionFrame進行・Hit判定を自分で回さない（状態の所有のみ。進行は Session）
     /// - attacker / defender の選択や Hit 成立判定をしない（Session の責務）
+    /// - Push 重なり解消を自分で回さない（Session が DebugFighterPushResolver を呼ぶ）
     /// - CharacterDefinition を持たない（後段）
     ///
     /// なぜ Slot とキャラ種類を分けるか:
@@ -80,6 +82,15 @@ namespace FightingGameTrial.Fighter
         )]
         [SerializeField]
         private bool usesGameplayInput = true;
+
+        [Header("Push Box（段階10B-3）")]
+        [Tooltip(
+            "横方向 Push Box の半幅（ワールド単位）です。"
+            + " 2人の中心間に必要な最小距離 = 双方の半幅の合計です。"
+            + " 縦方向・高さは判定しません。"
+        )]
+        [SerializeField]
+        private float pushBoxHalfWidth = 0.5f;
 
         [Header("攻撃状態")]
         [Tooltip(
@@ -145,6 +156,22 @@ namespace FightingGameTrial.Fighter
         public bool UsesGameplayInput
         {
             get { return usesGameplayInput; }
+        }
+
+        /// <summary>
+        /// 横方向 Push Box 半幅です。負数や 0 以下は安全側で 0 として扱います。
+        /// </summary>
+        public float PushBoxHalfWidth
+        {
+            get
+            {
+                if (pushBoxHalfWidth < 0f)
+                {
+                    return 0f;
+                }
+
+                return pushBoxHalfWidth;
+            }
         }
 
         public DebugFighterAttackState AttackState

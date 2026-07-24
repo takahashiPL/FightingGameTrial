@@ -11,10 +11,12 @@ namespace FightingGameTrial.Fighter
     /// - 1 CombatFrame 分の左右移動を行う（ワールド X のみ）
     /// - 外部から指定された Facing を SpriteRenderer.flipX へ反映する
     /// - Transform へ表示位置を反映する
+    /// - Push Box 補正後の論理 X を外部から書き戻す（SetLogicalX）
     ///
     /// やらないこと:
     /// - 入力 Left/Right から Facing を決めない（移動入力と Facing の分離）
     /// - 相手を直接探さない（Session が Facing を渡す）
+    /// - Push 重なり計算をしない（DebugFighterPushResolver / Session の責務）
     /// - Unity の Update / FixedUpdate で独自に移動しない
     /// - Input System（Keyboard.current）を直接読まない
     /// - Pause / Step / HitStop の判断をしない（呼ぶ側＝SimulationSession の責務）
@@ -117,7 +119,7 @@ namespace FightingGameTrial.Fighter
         /// Right → logicalX を増やすだけ
         /// Left  → logicalX を減らすだけ
         /// Neutral（Left/Right とも false）→ 移動なし（P2 棒立ち）
-        /// 向きは Session が移動後に SetFacingRight で決めます。
+        /// 向きは Session が Push 補正後に SetFacingRight で決めます。
         /// </summary>
         public void ProcessOneCombatFrame(SimulationInputState input)
         {
@@ -170,7 +172,7 @@ namespace FightingGameTrial.Fighter
         /// <summary>
         /// Facing だけを外部から設定します（段階10）。
         ///
-        /// 呼び出し側（SimulationSession）が、移動後の selfX と opponentX から
+        /// 呼び出し側（SimulationSession）が、Push 補正後の selfX と opponentX から
         /// 「相手と向き合う向き」を決めて渡します。
         /// 入力の Left/Right からは呼びません。
         /// </summary>
@@ -178,6 +180,30 @@ namespace FightingGameTrial.Fighter
         {
             facingRight = faceRight;
             ApplyFacingToSprite();
+        }
+
+        /// <summary>
+        /// Push Box 補正などで、論理 X だけを外部から書き戻します（段階10B-3）。
+        ///
+        /// 何をするか: logicalX を更新し、既存の minX/maxX でクランプして Transform へ反映。
+        /// なぜ必要か: 重なり解消は Session / PushResolver が計算し、位置の正本は Motor が持つため。
+        /// Facing は変更しません。
+        /// </summary>
+        public void SetLogicalX(float newX)
+        {
+            logicalX = newX;
+
+            if (logicalX < minX)
+            {
+                logicalX = minX;
+            }
+
+            if (logicalX > maxX)
+            {
+                logicalX = maxX;
+            }
+
+            ApplyLogicalPositionToTransform();
         }
 
         /// <summary>

@@ -183,6 +183,13 @@ namespace FightingGameTrial.DebugTools
             text = text + "P2 X/Face/Hit  : " + p2XLabel
                 + " / " + p2FacingLabel
                 + " / " + p2HitLabel + "\n";
+
+            // Push Box（段階10B-3）: ASCII のみ。常時大量ログは出さず HUD で確認する。
+            string pushDistLabel = simulationSession.LastPushCenterDistance.ToString("0.00");
+            string pushOverlapLabel = simulationSession.LastPushWasOverlapping ? "1" : "0";
+            text = text + "Push Dist/Over : " + pushDistLabel
+                + " / " + pushOverlapLabel + "\n";
+
             text = text + "Punch Phase    : " + punchPhase + "\n";
             text = text + "AttackResult   : " + attackResult + "\n";
             text = text + "PunchHitDone   : " + punchHitDone + "\n";
