@@ -20,16 +20,17 @@
 
 ## Unity 実装の到達点（要約）
 
-ブランチ `unity` 上で、**段階1〜12Aまで完了**しています。
-最新コミット済み HEAD: **`1d660fb`**（Document hit and hurt box collision completion）
-段階11Bまで: **完了・push 済み**
-段階12A（被 Hit / HitStun / 被 Hit 表示）は**検証済み・ドキュメント反映時点では未コミット**（作業ツリー）。
+ブランチ `unity` 上で、**段階1〜13Aまで完了**しています。
+最新コミット済み HEAD: **`f102e07`**（Document participant hit stun completion）
+段階12Aまで: **完了・push 済み**
+段階13A（Participant 共通ノックバック基盤）は**検証済み・ドキュメント反映時点では未コミット**（作業ツリー）。
+段階13全体（ステージ端含む）は**未完了**。
 
 | 区分 | 内容 |
 |---|---|
-| **実装済み** | 60Hz SimulationTick、Pause/Step、HUD（左上状態／左下操作）、HitStop、入力、左右移動、Facing分離、2体共通 Participant / AttackState / **HitState**、Push Box、Box 可視化、Hit×Hurt 重なり判定、Jパンチ、1攻撃1Hit、Hit時6F HitStop、**HitStun 12CF・被Hit表示**、Rで戦闘デバッグ初期化 |
-| **暫定** | Push 等分押し分け。論理接地 Y はデバッグ Sprite pivot から導出。HitStun 長は Participant 暫定値。相打ちは両方向判定の土台のみ（P2 は Neutral） |
-| **未実装（正式方針）** | ノックバック／押し戻し／ステージ端（段階13）、HP/Damage、複数 Hurt/Hit Box、キャラ固有データ化、攻撃データ SO 化 |
+| **実装済み** | 60Hz SimulationTick、Pause/Step、HUD（左上状態／左下操作）、HitStop、入力、左右移動、Facing分離、2体共通 Participant / AttackState / **HitState**、Push Box、Box 可視化、Hit×Hurt 重なり判定、Jパンチ、1攻撃1Hit、Hit時6F HitStop、**HitStun 12CF・被Hit表示**、**横ノックバック（固定CF・初速0.18/減速0.015）**、Rで戦闘デバッグ初期化 |
+| **暫定** | Push 等分押し分け。論理接地 Y はデバッグ Sprite pivot から導出。HitStun / ノックバック数値は Participant 暫定値。既存 Motor minX/maxX（±7）。相打ちは両方向判定の土台のみ（P2 は Neutral） |
+| **未実装（正式方針）** | ステージ端・壁際 Push 配分（段階13B）、HP/Damage、複数 Hurt/Hit Box、キャラ固有データ化、攻撃データ SO 化 |
 
 詳細・次工程は **`docs/unity_implementation_status.md`** を正とする。
 
@@ -83,9 +84,9 @@ Git 管理外: `Game/Library`、`Temp`、`Logs`、`UserSettings`、`obj` など
 
 ## 次の実装候補（要約）
 
-1. **段階13**: ノックバック、押し戻し、ステージ端（壁際 Push 配分の再検討を含む・既存工程表）
+1. **段階13B**: ステージ端・壁際 Push 配分（段階13の残作業・既存工程表）
 2. 以降: HP、攻撃データ化
-3. 2P入力/AI時: HitStun 行動制限・Facing Left 攻撃の実操作確認
+3. 2P入力/AI時: HitStun 行動制限・P1被Hit・左方向KB・Facing Left 攻撃の実操作確認
 
 詳細は `docs/unity_implementation_status.md`。
 

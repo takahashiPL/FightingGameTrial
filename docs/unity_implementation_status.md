@@ -1,10 +1,10 @@
-# Unity 実装状況・次工程（段階1〜12A到達後）
+# Unity 実装状況・次工程（段階1〜13A到達後）
 
 最終更新: 2026-07-24
 対象ブランチ: `unity`
-最新コミット済み HEAD: **`1d660fb`**（Document hit and hurt box collision completion）
-段階11Bまで: **完了・push 済み**
-段階12A（被 Hit / HitStun / 被 Hit 表示）: **検証済み・ドキュメント反映時点では未コミット**（作業ツリー）
+最新コミット済み HEAD: **`f102e07`**（Document participant hit stun completion）
+段階12Aまで: **完了・push 済み**
+段階13A（Participant 共通ノックバック基盤）: **検証済み・ドキュメント反映時点では未コミット**（作業ツリー）
 
 このファイルは、Unity 側の**実装済み / 暫定 / 未実装 / 次回候補 / 正式方針**を混同せずに追うための正本です。
 ゲーム仕様そのものの正本は引き続き `docs/rules.md` です。
@@ -23,7 +23,7 @@
 
 ---
 
-## 2. 段階1〜12Aの到達点
+## 2. 段階1〜13Aの到達点
 
 | 段階 | 内容 | 状態 |
 |---|---|---|
@@ -35,20 +35,22 @@
 | **11A** | Push / Hurt / Hit Box 可視化 | **実装済み・確認済み** |
 | **11B** | Hit×Hurt 重なり判定 | **実装済み・確認済み** |
 | **12A** | Participant 共通の被 Hit 状態・HitStun・被 Hit 表示、HUD 分離 | **実装済み・確認済み** |
+| **13A** | Participant 共通ノックバック基盤（横方向・固定 Combat Frame） | **実装済み・確認済み** |
 
-既存工程表の段階12（被 Hit 状態、HitStun、被 Hit 表示）は **12A で完了**。
-段階12に残る別項目は工程表上ない。次は既存計画の**段階13**。
+段階13全体（ノックバック＋押し戻し＋ステージ端）は**未完了**。
+13A で横ノックバック基盤は完了。次は既存計画どおり**段階13B（ステージ端・壁際 Push 配分）**。
 
 ### 2.1 責務分担（要約・維持）
 
 | 入れ物 | 担当 |
 |---|---|
 | **`DebugFighterAttackState`** | 攻撃進行の正本 |
-| **`DebugFighterHitState`** | 被 Hit / HitStun の正本（段階12A） |
+| **`DebugFighterHitState`** | 被 Hit / HitStun / **ノックバック速度**の正本（段階12A / 13A） |
+| **`DebugFighterMotor`** | LogicalX の書き込み（入力移動・Push・ノックバック共通） |
 | **`SimulationTimeState`** | 共有時間・**共有 HitStop** |
-| **`SimulationSession`** | tick 進行、移動→Push→Facing→Action→Hit→Visual→**HitStun消費** |
+| **`SimulationSession`** | tick 進行、入力移動→**ノックバック**→Push→Facing→Action→Hit→Visual→HitStun消費 |
 
-### 2.2 HitStop と HitStun の違い（段階12A）
+### 2.2 HitStop と HitStun の違い（段階12A・維持）
 
 | | HitStop | HitStun |
 |---|---|---|
@@ -57,48 +59,75 @@
 | 効果 | Combat 全体停止（移動・Action・判定も止まる） | 被弾側のみ行動不能（移動入力・新規攻撃不可） |
 | 進行 | SimulationTick 側で残りを減らす | **Combat 末尾**で1減らす。HitStop 中は減らさない |
 
-流れ: Hit成立 → HitStop=6・Stun=12（成立CFでは Stun 非減算） → HitStop中 Stun 維持 → HitStop後の各 Combat 末尾で 12→11→…→0 → Idle / 通常色。
+### 2.3 HitStop とノックバック開始タイミング（段階13A）
 
-### 2.3 段階12Aで確定した被 Hit 責務
+| 時点 | 位置 | knockbackVelocityX | HitStun |
+|---|---|---|---|
+| Hit 成立 CF | **未移動**（初速だけ予約） | 符号付き初速をセット | 12 開始 |
+| HitStop 6F 中 | **不変** | **減衰しない** | **減らない** |
+| HitStop 終了後の各 Combat | `X += velocity` | 毎 CF 0 へ 0.015 減速 | 末尾で1減 |
+
+流れ: Hit成立 → HitStop=6・Stun=12・初速予約（成立CFは移動なし） → HitStop中は位置・速度・Stun維持 → HitStop後の Combat から移動開始 → Stun=0 で残速度クリア・Idle / 通常色。
+
+方向は **Hit 成立時点の LogicalX 比較**（Facing は正本にしない）:
+- `attacker.X < defender.X` → 右（+）
+- `attacker.X > defender.X` → 左（-）
+- 同位置のみ attacker Facing を fallback
+
+### 2.4 段階13Aで確定したノックバック責務
 
 | 入れ物 | 担当 |
 |---|---|
-| **`DebugFighterHitState`** | HitStunRemaining / TotalHitCount / IsInHitStun / wasHitThisCombatFrame / lastHitCombatFrame |
-| **`Participant.HitCount`** | `HitState.TotalHitCount` の互換読み取り（旧独立正本は削除） |
-| **`Participant.hitStunFrames`** | 既定 **12**（SerializeField） |
-| **`AttackState.InterruptByHit`** | 被弾側の実行中攻撃を Miss なしで中断 |
-| **表示色** | HitStop/HitStun 中は赤系 Tint。優先: **Hit > Attack > Idle** |
+| **`HitState.knockbackVelocityX`** | 速度の正本（非公開） |
+| **`HitState.IsBeingKnockedBack`** | `velocityX != 0` から導出 |
+| **`Participant.knockbackInitialSpeed`** | 既定 **0.18**（SerializeField・暫定） |
+| **`Participant.knockbackDeceleration`** | 既定 **0.015**（SerializeField・暫定） |
+| **`Motor.SetLogicalX`** | 位置書き込み。Transform 直接書き込みはしない |
 
-HitStun 中に止める: 本人の移動入力、新規攻撃開始、（被弾側）実行中攻撃。
-維持: **Push 補正、Facing、Box 可視化**。ノックバック / Transform 移動はしない。
+固定フレーム計算（`Time.deltaTime` 不使用）:
+- `X += knockbackVelocityX`
+- 速度を毎 Combat Frame、0 へ deceleration だけ近づける（符号越えは 0 固定）
 
-Reset（R）: 両 Participant の AttackState / HitState / HitCount / HitStun / 表示色、共有 HitStop。位置・Facing は現行どおり維持。
+処理順（採用）:
+入力移動 → **ノックバック移動・減速** → Push → Facing → Action → Hit → Visual → HitStun消費
 
-### 2.4 HUD（段階12A）
+Push との関係:
+- ノックバック後のめり込みは**同フレームの Push**で解消
+- Push Resolver は速度を変更しない
+- 既存 `minX=-7` / `maxX=7` は有効のまま（仕様変更なし）
+- ステージ端・壁際 Push 配分は**今回変更していない**（段階13B）
 
-- P2 Stun/State、HitStop / HitStun 状態を追加
-- **レイアウト**: 状態表示=左上、操作説明=左下（別 TMP）。`DebugHudView` がランタイム自動生成。Scene 手動配線不要
-- 16:9 で下端切れを解消（状態行増加後の縦積みは廃止）
+HitStun 終了時: 残速度を 0 へクリア。ノックバックは HitStun 中だけ適用。
+Reset（R）: 上記に加え `knockbackVelocityX=0`。位置・Facing は現行どおり維持。
 
-### 2.5 確認済みの挙動（段階12Aまで）
+### 2.5 HUD（段階12A / 13A）
 
-- 近距離 J → Hit、P2 HitCount=1、Stun=12、State=HitStop、被Hit色
-- HitStop 6F: Tick のみ進行、Combat 停止、Stun=12 維持
-- HitStop 後: 最初の Combat 末尾で 12→11、以降1CFごと減少
-- Stun=0: Idle、色解除、HitCount は保持
-- 同一攻撃で二重 Hit なし。Push/Facing/Box 維持
-- R Reset で HitCount/Stun/State/AttackResult/PunchHitDone/HitStop/色が初期化。位置/Facing 維持
-- HUD 16:9 で全行表示。Error / Warning 0
+- P2 Stun/State、**P2 KB Vx/Act** を状態表示（左上）へ追加
+- 操作説明は左下の別 TMP（ランタイム分離維持）
+- Scene 手動配線不要
 
-### 2.6 未検証・将来注意（段階12Aは完了扱い）
+### 2.6 確認済みの挙動（段階13A）
 
-- P2 入力がないため、HitStun 中の移動禁止・攻撃開始禁止・攻撃中断は**コード経路確認済み／P2実操作未検証**
-- 将来 P1 被 Hit（2P 入力 / AI）時に共通経路を実操作確認
-- Facing Left 攻撃の実操作確認は引き続き将来項目
-- ノックバック、HP、ダメージ、ガード、ダウンは未実装（段階13〜14）
-- キャラ固有データ化、攻撃データ SO 化は未実装（段階15）
+- Hit 成立（例 CF 306）: P2 X=3.85、Stun=12、KB Vx=0.180、HitStop=6、位置未移動
+- HitStop 6F: Combat 停止、X=3.85・Vx=0.180・Stun=12 維持
+- HitStop 後最初の Combat（例 CF 307）: X=4.03、Vx=0.165、Stun=11
+- 途中（例 CF 310）: X=4.48、Vx=0.120、Stun=8
+- 終了: X=5.02、Stun=0 / Idle、KB Vx=0 / Active=0、被Hit色解除、HitCount=1 保持
+- 攻撃者から離れる方向。Push Dist 1.00→2.17。Facing P1=R / P2=L 維持。Box 追従
+- 同一攻撃で初速二重設定なし。R Reset で HitCount/Stun/KB/HitStop/色初期化、位置/Facing 維持
+- Error / Warning 0
 
-### 2.7 相打ち・キャラ差し替え
+### 2.7 未実装・未検証（段階13Aは完了扱い、段階13全体は未完了）
+
+- ステージ端・壁、壁際 Push 補正配分（**段階13B**）
+- ノックバック中に既存 minX/maxX へ到達した際の正式仕様
+- 左方向ノックバックの実操作確認
+- P1 が被 Hit する共通経路の実操作確認
+- Y 方向ノックバック、HP / Damage / Guard / Down
+- Character 固有データ化、攻撃データ SO 化
+- Unity Physics は使用していない
+
+### 2.8 相打ち・キャラ差し替え
 
 - 相打ち: 両方向判定の土台のみ。P2 Neutral のため実動作確認は未実施
 - キャラ差し替え・複数 Hurt/Hit Box: 未実装
@@ -107,7 +136,8 @@ Reset（R）: 両 Participant の AttackState / HitState / HitCount / HitStun / 
 
 ## 3. Facing / Push（維持）
 
-Facing 分離・Push 等分分離は実装済み。HitStun 中も Push / Facing は維持（段階12A）。
+Facing 分離・Push 等分分離は実装済み。HitStun / ノックバック中も Push / Facing は維持（段階12A / 13A）。
+壁際の片側補正配分は段階13Bで再検討。
 
 ---
 
@@ -123,8 +153,10 @@ Push / Hurt / Hit の可視化（11A）と Hit×Hurt 重なり判定（11B）は
 |---|---|---|
 | **10A / 10B-2 / 10B-3** | Facing、2体共通化、Push Box | **完了** |
 | **11A / 11B** | Box 可視化、Hit×Hurt 重なり判定 | **完了** |
-| **12 / 12A** | 被 Hit 状態、HitStun、被 Hit 表示（工程表どおり。12Aで充足） | **完了** |
-| **13** | ノックバック、押し戻し、ステージ端（壁際 Push 配分の再検討を含む） | **次回候補** |
+| **12 / 12A** | 被 Hit 状態、HitStun、被 Hit 表示 | **完了** |
+| **13A** | Participant 共通ノックバック基盤（横・固定CF） | **完了** |
+| **13B** | ステージ端・壁際 Push 配分（既存工程表の段階13残作業） | **次回候補** |
+| **13**（全体） | ノックバック＋押し戻し＋ステージ端 | **未完了**（13Aのみ充足） |
 | **14** | HP、Damage、KO | 未実装 |
 | **15** | 攻撃データ化（Startup/Active/Recovery、Hit Box、Damage、HitStop、HitStun、Knockback） | 未実装 |
 
@@ -134,7 +166,7 @@ Push / Hurt / Hit の可視化（11A）と Hit×Hurt 重なり判定（11B）は
 - 複数攻撃、入力バッファ、キャンセル
 - ガード、コンボ
 - Animation 本接続
-- 2P 入力 / CPU、ラウンド進行（HitStun 行動制限の実操作確認を含む）
+- 2P 入力 / CPU、ラウンド進行（HitStun 行動制限・P1被Hit・左方向KBの実操作確認を含む）
 - Facing Left 攻撃の実操作確認
 - 明示的なキャラクター接地原点
 - 複数 Hurt / Hit Box
@@ -156,9 +188,8 @@ Push / Hurt / Hit の可視化（11A）と Hit×Hurt 重なり判定（11B）は
 
 ## 7. 一言まとめ
 
-- 段階1〜**12A**まで到達（被 Hit / HitStun / 被 Hit 表示完了。段階12は工程表どおり充足）
-- 最新コミット済み HEAD: `1d660fb`。段階12A は検証済み・未コミット
-- HitStop=共有6F、HitStun=機体ごと12CF。HitStop中は Stun 非減算
-- HitStun 中も Push / Facing 維持。ノックバック・HP は未実装
-- HUD: 左上=状態、左下=操作（ランタイム分離）
-- 次は既存計画どおり段階13（**ノックバック、押し戻し、ステージ端**）
+- 段階1〜**13A**まで到達（横ノックバック基盤完了。段階13全体は未完了）
+- 最新コミット済み HEAD: `f102e07`。段階13A は検証済み・未コミット
+- HitStop中は位置・KB速度・Stunすべて維持。HitStop後の Combat から固定フレーム移動
+- 速度正本は HitState、位置書き込みは Motor。Push は速度を触らない
+- 次は既存計画どおり段階**13B**（**ステージ端・壁際 Push 配分**）

@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## v3.11（Unity段階13A完了・Participant共通ノックバック基盤）
+
+- 段階13A完了を明記。`HitState.knockbackVelocityX` と Participant 暫定初速0.18／減速0.015を Docs に反映
+- Hit成立時に LogicalX 比較で方向決定（Facingは正本にしない。同位置のみ Facing fallback）
+- HitStop中は位置・速度・Stunすべて維持。HitStop後の Combat から `X+=V`・毎CF 0.015減速（deltaTime不使用）
+- 処理順: 入力移動→ノックバック→Push→Facing→Action→Hit→Visual→HitStun。速度正本はHitState、位置はMotor
+- HitStun終了／Resetで残速度0。既存 minX/maxX は有効のまま。ステージ端・壁際Pushは未変更
+- HUD: P2 KB Vx/Act。左上状態／左下操作の分離維持
+- 段階13全体は未完了。次工程は既存計画の段階13B（ステージ端・壁際 Push 配分）
+- README / `docs/unity_implementation_status.md` / `docs/rules.md` を更新
+
 ## v3.10（Unity段階12A完了・被Hit/HitStun/被Hit表示）
 
 - 段階12A完了を明記。`DebugFighterHitState`（Participant 共通）と HitStun 12CF・被Hit色を Docs に反映
