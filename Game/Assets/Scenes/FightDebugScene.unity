@@ -250,16 +250,10 @@ MonoBehaviour:
   debugGameplayInput: {fileID: 600000003}
   participantP1: {fileID: 700000016}
   participantP2: {fileID: 700000027}
-  debugDummyTarget: {fileID: 700000024}
   attackRange: 1.35
   timeState:
     SimulationTick: 0
     CombatFrame: 0
-    ActionFrame: 0
-    IsActionPlaying: 0
-    IsJPunchAttack: 0
-    HasCurrentJPunchHit: 0
-    LastAttackResult: None
     IsPaused: 0
     HitStopRemaining: 0
     LastStepResult: "\u672A\u5B9F\u884C"
@@ -1100,7 +1094,6 @@ GameObject:
   - component: {fileID: 700000025}
   - component: {fileID: 700000026}
   - component: {fileID: 700000027}
-  - component: {fileID: 700000024}
   m_Layer: 0
   m_Name: DebugDummy
   m_TagString: Untagged
@@ -1235,18 +1228,6 @@ MonoBehaviour:
   opponent: {fileID: 700000016}
   displayTint: {r: 0.65, g: 0.78, b: 0.95, a: 1}
   usesGameplayInput: 0
---- !u!114 &700000024
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 700000021}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b2d4f6a8c0e35f7b1d3a5c7e9f1b2c67, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: FightingGameTrial.Fighter::FightingGameTrial.Fighter.DebugDummyTarget
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

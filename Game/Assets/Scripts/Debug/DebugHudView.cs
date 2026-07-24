@@ -8,6 +8,14 @@ namespace FightingGameTrial.DebugTools
 {
     /// <summary>
     /// デバッグ用の画面表示だけを担当します。
+    ///
+    /// 攻撃状態表示の正本:
+    /// P1 DebugFighterParticipant.AttackState（Action / AF / Punch Phase / AttackResult / PunchHitDone）。
+    ///
+    /// SimulationTimeState が担う共有時間状態:
+    /// SimulationTick / CombatFrame / Pause / HitStop / Step / Status / 入力サンプル。
+    ///
+    /// Inspector 明示参照のみ使い、検索はしません。
     /// </summary>
     public class DebugHudView : MonoBehaviour
     {
@@ -55,8 +63,29 @@ namespace FightingGameTrial.DebugTools
         /// </summary>
         private string BuildHudText(SimulationTimeState timeState)
         {
+            // P1 AttackState を1回だけ取得（攻撃表示の正本。重複取得しない）
+            DebugFighterParticipant p1 = simulationSession.ParticipantP1;
+            DebugFighterAttackState attackState = null;
+            if (p1 != null)
+            {
+                attackState = p1.AttackState;
+            }
+
             string pauseLabel = timeState.IsPaused ? "Yes" : "No";
-            string actionPlayingLabel = timeState.IsActionPlaying ? "Yes" : "No";
+
+            // Action 表示: P1 AttackState が正本
+            string actionPlayingLabel = "No";
+            if (attackState != null && attackState.IsActionPlaying)
+            {
+                actionPlayingLabel = "Yes";
+            }
+
+            // AF 表示: P1 AttackState が正本
+            int actionFrameValue = 0;
+            if (attackState != null)
+            {
+                actionFrameValue = attackState.ActionFrame;
+            }
 
             string stepLabel = timeState.LastStepResult;
             if (string.IsNullOrEmpty(stepLabel))
@@ -86,7 +115,6 @@ namespace FightingGameTrial.DebugTools
             // ASCII labels only (avoid adding new JP glyphs to NotoSansJP SDF).
             string p1XLabel = "-";
             string p1FacingLabel = "-";
-            DebugFighterParticipant p1 = simulationSession.ParticipantP1;
             if (p1 != null && p1.Motor != null)
             {
                 p1XLabel = p1.Motor.LogicalX.ToString("0.00");
@@ -109,25 +137,40 @@ namespace FightingGameTrial.DebugTools
             }
 
             string p2HitLabel = "0";
-            DebugDummyTarget dummy = simulationSession.DebugDummyTarget;
-            if (dummy != null)
+            if (p2 != null)
             {
-                p2HitLabel = dummy.HitCount.ToString();
+                p2HitLabel = p2.HitCount.ToString();
             }
 
             string punchPhase = simulationSession.GetPunchPhaseLabel();
-            string attackResult = timeState.LastAttackResult;
+            if (string.IsNullOrEmpty(punchPhase))
+            {
+                punchPhase = "Idle";
+            }
+
+            // AttackResult / PunchHitDone も同じ attackState を再利用
+            string attackResult = "None";
+            string punchHitDone = "0";
+            if (attackState != null)
+            {
+                attackResult = attackState.LastAttackResult;
+                if (attackState.HasCurrentJPunchHit)
+                {
+                    punchHitDone = "1";
+                }
+            }
+
             if (string.IsNullOrEmpty(attackResult))
             {
                 attackResult = "None";
             }
 
-            string punchHitDone = timeState.HasCurrentJPunchHit ? "1" : "0";
-
             string text = "";
+            // Tick / Combat は timeState。AF だけ AttackState。
             text = text + "Tick/Combat/AF : " + timeState.SimulationTick
                 + " / " + timeState.CombatFrame
-                + " / " + timeState.ActionFrame + "\n";
+                + " / " + actionFrameValue + "\n";
+            // Action は AttackState。Pause / HitStop は timeState。
             text = text + "Action/Pause/HS: " + actionPlayingLabel
                 + " / " + pauseLabel
                 + " / " + timeState.HitStopRemaining + "\n";

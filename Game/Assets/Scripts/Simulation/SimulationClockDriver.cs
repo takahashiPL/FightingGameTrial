@@ -10,15 +10,21 @@ namespace FightingGameTrial.Simulation
     /// - Unity の Update / FixedUpdate はゲーム仕様の正本ではありません。
     /// - 正本は docs/rules.md の 60Hz 論理 SimulationTick です。
     ///
-    /// 段階6の責務:
-    /// - Pause / Step / テスト用HitStop / テスト用Action開始・Reset を SimulationTick の外側で消化する
+    /// 責務:
+    /// - Pause / Step / テスト用HitStop / A・R のデバッグ操作を SimulationTick の外側で消化する
     /// - H / A / R キーは状態を設定するだけで、追加の SimulationTick は進めない
     /// - Pause中でも H / A / R / Space / . を受理する
     /// - ゲーム入力（矢印 / J）の内容は判断しない（DebugGameplayInput + Session の責務）
     ///
+    /// A / R（段階10B-2）:
+    /// - P1 AttackState のデバッグ操作（Session.StartTestActionForP1 / ResetTestActionForP1）
+    /// - ClockDriver は Participant を検索せず、既存の Session 参照だけを使う
+    /// - 攻撃進行は通常の Participant 共通 tick 経路を使用（専用進行は持たない）
+    /// - Pause + Step によるフレーム確認に使う
+    ///
     /// 混同しない3つの「止まる」:
     /// - Pause … 自動の SimulationTick 進行を止める（手動Stepは可）。入力サンプルも増えない
-    /// - HitStop … CombatFrame と ActionFrame だけ止める（SimulationTickと入力サンプルは進む）
+    /// - HitStop … CombatFrame と Action 進行だけ止める（SimulationTickと入力サンプルは進む）
     /// - Action停止 … ActionFrame だけ進まない（CombatFrameは進む）
     ///
     /// ProcessOneSimulationTick は「1tick進めると決まったあと」だけを担当します。
@@ -160,12 +166,12 @@ namespace FightingGameTrial.Simulation
             // 通常は同時押しを想定しないが、処理順を明示しておく。
             if (testActionStartRequested)
             {
-                ApplyTestActionStart(timeState);
+                ApplyTestActionStart();
             }
 
             if (testActionResetRequested)
             {
-                ApplyTestActionReset(timeState);
+                ApplyTestActionReset();
             }
 
             // ============================================================
@@ -260,51 +266,34 @@ namespace FightingGameTrial.Simulation
         }
 
         /// <summary>
-        /// Aキーによるテスト用 Action 開始です。
-        /// SimulationTickは進めません。ActionFrame=0 / 再生中=true にするだけです。
+        /// Aキー: P1 AttackState のテスト用パンチ開始を Session に依頼します。
         ///
-        /// 再生中に再度Aを押した場合:
-        /// ActionFrameを0へ戻し、IsActionPlayingはtrueのまま先頭から再開始します。
-        ///
-        /// Jパンチとの区別:
-        /// IsJPunchAttack を false にし、12フレーム自動終了の対象外にします。
-        /// 見た目は DebugFighterVisual を即時再描画します（Aは攻撃ポーズへ切り替えません）。
+        /// SimulationTick は進めません。Pause 中でも受理します。
         /// </summary>
-        private void ApplyTestActionStart(SimulationTimeState timeState)
+        private void ApplyTestActionStart()
         {
-            timeState.ActionFrame = 0;
-            timeState.IsActionPlaying = true;
-            timeState.IsJPunchAttack = false;
-            timeState.HasCurrentJPunchHit = false;
-            timeState.LastStatusMessage = "Debug Action start";
-            Debug.Log("[FightDebug] Test Action started");
-
-            if (simulationSession != null)
+            if (simulationSession == null)
             {
-                simulationSession.RefreshFighterVisual();
+                return;
             }
+
+            simulationSession.StartTestActionForP1();
         }
 
         /// <summary>
-        /// Rキーによるテスト用 Action 停止・リセットです。
-        /// SimulationTickは進めません。
-        /// ActionFrame=0 / 再生中=false にするだけです。
-        /// AキーのデバッグActionには自動終了がありません（Rで止める）。
-        /// Jパンチ進行中にRを押した場合も停止し、HasCurrentJPunchHit も false へ戻します。
+        /// Rキー: P1 AttackState のリセットを Session に依頼します。
+        ///
+        /// SimulationTick は進めません。Pause 中でも受理します。
+        /// Jパンチ進行中でも Idle へ戻せます。
         /// </summary>
-        private void ApplyTestActionReset(SimulationTimeState timeState)
+        private void ApplyTestActionReset()
         {
-            timeState.ActionFrame = 0;
-            timeState.IsActionPlaying = false;
-            timeState.IsJPunchAttack = false;
-            timeState.HasCurrentJPunchHit = false;
-            timeState.LastStatusMessage = "Action reset";
-            Debug.Log("[FightDebug] Test Action reset");
-
-            if (simulationSession != null)
+            if (simulationSession == null)
             {
-                simulationSession.RefreshFighterVisual();
+                return;
             }
+
+            simulationSession.ResetTestActionForP1();
         }
 
         /// <summary>
