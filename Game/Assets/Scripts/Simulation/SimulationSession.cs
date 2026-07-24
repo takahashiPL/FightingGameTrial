@@ -8,19 +8,18 @@ namespace FightingGameTrial.Simulation
     /// <summary>
     /// 1回分の論理 SimulationTick を進める入口です。
     ///
-    /// 段階9:
+    /// 段階10:
+    /// - 移動入力と Facing を分離する
+    /// - 移動後の PlayerX / DummyX から「相手と向き合う Facing」を確定する
+    /// - Facing 確定のあとで Hit 判定を行う（向き込み距離判定のため）
+    ///
+    /// 段階9（維持）:
     /// - Active Frame でダミーへの論理座標 Hit 判定
     /// - Hit 成立で既存 HitStopRemaining を設定（同tickでは減らさない）
     /// - 1攻撃1Hit（HasCurrentJPunchHit）
     ///
-    /// Hit成立tickとHitStop開始tickの関係:
-    /// - Hitした CombatFrame では移動・Action進行・Visual・Hit通知まで完了してよい
-    /// - そこで HitStopRemaining=6 を「設定するだけ」
-    /// - 次の SimulationTick の先頭 HitStop 判定から Combat 処理を止める
-    /// - 同じtick内で Remaining を即5へ減らさない
-    ///
-    /// HitStop中に再判定しない理由:
-    /// CombatFrame / ActionFrame が進まないため Active 判定にも入らない。
+    /// HitStop中:
+    /// Combat 処理全体をスキップするため、移動も Facing 更新もしない。
     /// </summary>
     public class SimulationSession : MonoBehaviour
     {
@@ -28,6 +27,12 @@ namespace FightingGameTrial.Simulation
         private const int PunchActiveStartFrame = 4;
         private const int PunchActiveEndFrame = 6;
         private const int PunchHitStopFrames = 6;
+
+        /// <summary>
+        /// PlayerX と DummyX がほぼ同じときの Facing 維持用しきい値です。
+        /// 完全一致や微小な誤差で毎フレーム向きが反転しないようにします。
+        /// </summary>
+        private const float FacingSameXEpsilon = 0.001f;
 
         [Header("参照（Inspectorで接続。自動検索はしません）")]
         [Tooltip("物理キーの最新状態を持つ DebugGameplayInput です。")]
@@ -182,11 +187,15 @@ namespace FightingGameTrial.Simulation
                 StartJPunchAttack();
             }
 
-            // 9. Player 移動
+            // 9. Player 移動（ワールド X のみ。Facing はここでは変えない）
             if (debugFighterMotor != null)
             {
                 debugFighterMotor.ProcessOneCombatFrame(timeState.CurrentInput);
             }
+
+            // 9.5 Facing 確定（移動後の PlayerX / DummyX から相手向き合い）
+            //     Hit 判定が Facing を読む前に、ここで確定する必要がある。
+            UpdatePlayerFacingTowardDummy();
 
             // 10. ActionFrame 進行
             if (timeState.IsActionPlaying)
@@ -200,6 +209,7 @@ namespace FightingGameTrial.Simulation
 
             // 11〜13. Active なら Hit 判定 → Dummy通知 → HitStopRemaining=6 設定
             //         （このtickでは Remaining を減らさない）
+            //         Facing は 9.5 で確定済み。
             TryResolveJPunchHit();
 
             // 14. Visual 更新
@@ -268,6 +278,51 @@ namespace FightingGameTrial.Simulation
                 timeState.ActionFrame,
                 timeState.IsJPunchAttack
             );
+        }
+
+        /// <summary>
+        /// 移動後の論理座標から、Player が Dummy と向き合う Facing を決めます（段階10）。
+        ///
+        /// 正式方針:
+        /// - PlayerX が DummyX より小さい → 右向き
+        /// - PlayerX が DummyX より大きい → 左向き
+        /// - ほぼ同位置 → 直前 Facing を維持（毎フレーム反転を防ぐ）
+        ///
+        /// 入力 Left/Right では呼ばない。移動入力と Facing を分離するため。
+        /// Inspector で接続済みの debugFighterMotor / debugDummyTarget だけを使う（検索しない）。
+        /// </summary>
+        private void UpdatePlayerFacingTowardDummy()
+        {
+            if (debugFighterMotor == null)
+            {
+                return;
+            }
+
+            if (debugDummyTarget == null)
+            {
+                return;
+            }
+
+            float playerX = debugFighterMotor.LogicalX;
+            float dummyX = debugDummyTarget.LogicalX;
+            float deltaX = dummyX - playerX;
+
+            // 同位置付近では向きを切り替えない。
+            // 理由: 浮動小数の微小差やすれ違い直後に、毎 CombatFrame で flipX が点滅するのを防ぐため。
+            if (deltaX > FacingSameXEpsilon)
+            {
+                // Dummy が右側 → Player は右向き（相手と向き合う）
+                debugFighterMotor.SetFacingRight(true);
+            }
+            else if (deltaX < -FacingSameXEpsilon)
+            {
+                // Dummy が左側 → Player は左向き
+                debugFighterMotor.SetFacingRight(false);
+            }
+            else
+            {
+                // |deltaX| <= epsilon: 直前 Facing を維持（何もしない）
+            }
         }
 
         private void StartJPunchAttack()

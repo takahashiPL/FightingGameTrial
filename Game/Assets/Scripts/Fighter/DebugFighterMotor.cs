@@ -4,20 +4,25 @@ using UnityEngine;
 namespace FightingGameTrial.Fighter
 {
     /// <summary>
-    /// テスト用プレイヤーの左右移動と見た目の向きだけを担当します（段階7）。
+    /// テスト用プレイヤーの左右移動と見た目の向きを担当します（段階10）。
     ///
     /// 責務:
     /// - 論理位置 logicalX を保持する
-    /// - 1 CombatFrame 分の左右移動を行う
-    /// - 確定入力 CurrentInput の Left/Right から移動方向を決める
-    /// - SpriteRenderer.flipX で向きを更新する
+    /// - 1 CombatFrame 分の左右移動を行う（ワールド X のみ）
+    /// - 外部から指定された Facing を SpriteRenderer.flipX へ反映する
     /// - Transform へ表示位置を反映する
     ///
     /// やらないこと:
+    /// - 入力 Left/Right から Facing を決めない（段階10で分離）
+    /// - 相手 Dummy を直接探さない（Session が Facing を渡す）
     /// - Unity の Update / FixedUpdate で独自に移動しない
     /// - Input System（Keyboard.current）を直接読まない
     /// - Pause / Step / HitStop の判断をしない（呼ぶ側＝SimulationSession の責務）
-    /// - SimulationClockDriver を参照しない
+    ///
+    /// なぜ入力で向きを変えないか（正式方針）:
+    /// Player は基本的に相手と向き合う。
+    /// Left/Right はワールド X の移動だけを決め、前進／後退は相手との位置関係で解釈する。
+    /// 例: 相手の左側で Left を押しても「後退」であり、左向きにはならない。
     ///
     /// なぜ Update ではなく SimulationTick 側で動かすか:
     /// ゲーム仕様の正本は 60Hz の論理進行です。
@@ -27,12 +32,6 @@ namespace FightingGameTrial.Fighter
     ///
     /// なぜ HitStop中に移動しないか:
     /// HitStop中は CombatFrame が進まないため、Session がこの Motor を呼びません。
-    /// SimulationTick と入力サンプルは進んでも、見た目の位置は止まります。
-    ///
-    /// なぜ物理入力ではなく CurrentInput を使うか:
-    /// Pause中にキーを変えても、次の SimulationTick（または Step）で確定するまで
-    /// 論理入力は古いままです。移動もその確定入力に従うことで、
-    /// 「入力サンプル」と「移動結果」が同じ時刻軸になります。
     /// </summary>
     public class DebugFighterMotor : MonoBehaviour
     {
@@ -56,7 +55,7 @@ namespace FightingGameTrial.Fighter
 
         [Tooltip(
             "元画像が右向きなら true、左向きなら false です。"
-            + " この値で素材の初期向きを吸収し、入力に対する見た目を合わせます。"
+            + " この値で素材の初期向きを吸収し、SetFacingRight の見た目へ合わせます。"
         )]
         [SerializeField]
         private bool facesRightByDefault = true;
@@ -64,17 +63,12 @@ namespace FightingGameTrial.Fighter
         /// <summary>
         /// 論理上の X 位置です。
         /// Transform.position を毎フレーム加算し続けるのではなく、ここに正本を持ちます。
-        ///
-        /// 理由（学習用）:
-        /// - Clamp や将来の判定座標を、描画の丸め誤差から切り離しやすい
-        /// - Pause / HitStop で止まったあとも、再開時の位置が明確
-        /// - 表示は「論理位置を Transform へ写す」だけのアダプタにする
         /// </summary>
         private float logicalX;
 
         /// <summary>
-        /// 見た目として右を向いているか（最後に確定した向き）。
-        /// 同時入力・無入力ではこの向きを維持します。
+        /// 見た目として右を向いているか。
+        /// 入力では変えず、SimulationSession が相手位置から SetFacingRight で設定します。
         /// </summary>
         private bool facingRight = true;
 
@@ -112,8 +106,12 @@ namespace FightingGameTrial.Fighter
         }
 
         /// <summary>
-        /// 1 CombatFrame 分だけ左右移動と向き更新を行います。
+        /// 1 CombatFrame 分だけ左右移動を行います（Facing は変えません）。
         /// SimulationSession が HitStop なしのときだけ呼びます。
+        ///
+        /// Right → logicalX を増やすだけ
+        /// Left  → logicalX を減らすだけ
+        /// 向きは Session が移動後に SetFacingRight で決めます。
         /// </summary>
         public void ProcessOneCombatFrame(SimulationInputState input)
         {
@@ -127,29 +125,26 @@ namespace FightingGameTrial.Fighter
             bool right = input.Right;
 
             // ------------------------------------------------------------
-            // 左右・同時入力の解決（段階7の最小規則）
+            // 左右・同時入力の解決（移動のみ）
             // Left+Right 同時は「どちらにも動かない」。
-            // 理由: 入力サンプリングは両方 true のまま保持する一方、
-            //       移動解釈は後段責務。今回は単純に移動なしとし、最後の向きを維持する。
+            // Facing はここでは触らない（段階10: 移動入力と Facing の分離）。
             // 上下入力は今回の移動には使わない。
             // ------------------------------------------------------------
             if (left && right)
             {
-                // 移動なし・向き維持
+                // 移動なし
             }
             else if (right)
             {
                 logicalX = logicalX + moveUnitsPerCombatFrame;
-                facingRight = true;
             }
             else if (left)
             {
                 logicalX = logicalX - moveUnitsPerCombatFrame;
-                facingRight = false;
             }
             else
             {
-                // どちらもなし: 移動なし・向き維持
+                // どちらもなし: 移動なし
             }
 
             // 端で止める（画面外へ出さない）
@@ -163,17 +158,25 @@ namespace FightingGameTrial.Fighter
                 logicalX = maxX;
             }
 
-            ApplyFacingToSprite();
             ApplyLogicalPositionToTransform();
+        }
+
+        /// <summary>
+        /// Facing だけを外部から設定します（段階10）。
+        ///
+        /// 呼び出し側（SimulationSession）が、移動後の PlayerX と DummyX から
+        /// 「相手と向き合う向き」を決めて渡します。
+        /// 入力の Left/Right からは呼びません。
+        /// </summary>
+        public void SetFacingRight(bool faceRight)
+        {
+            facingRight = faceRight;
+            ApplyFacingToSprite();
         }
 
         /// <summary>
         /// SpriteRenderer.flipX で見た目の左右を合わせます。
         /// Transform.localScale の X 符号反転は使いません。
-        ///
-        /// 理由:
-        /// - scale をいじると子オブジェクトや将来の判定箱表示にも影響しやすい
-        /// - flipX は描画だけ反転する（学習用にも意図が分かりやすい）
         /// </summary>
         private void ApplyFacingToSprite()
         {
