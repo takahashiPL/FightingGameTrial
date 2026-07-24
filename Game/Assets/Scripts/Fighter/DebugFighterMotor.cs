@@ -4,25 +4,29 @@ using UnityEngine;
 namespace FightingGameTrial.Fighter
 {
     /// <summary>
-    /// テスト用プレイヤーの左右移動と見た目の向きを担当します（段階10）。
+    /// Fighter の左右移動と見た目の向きを担当します（段階10 / 10B-1）。
     ///
     /// 責務:
-    /// - 論理位置 logicalX を保持する
+    /// - 論理位置 logicalX を保持する（位置の正本）
     /// - 1 CombatFrame 分の左右移動を行う（ワールド X のみ）
     /// - 外部から指定された Facing を SpriteRenderer.flipX へ反映する
     /// - Transform へ表示位置を反映する
     ///
     /// やらないこと:
-    /// - 入力 Left/Right から Facing を決めない（段階10で分離）
-    /// - 相手 Dummy を直接探さない（Session が Facing を渡す）
+    /// - 入力 Left/Right から Facing を決めない（移動入力と Facing の分離）
+    /// - 相手を直接探さない（Session が Facing を渡す）
     /// - Unity の Update / FixedUpdate で独自に移動しない
     /// - Input System（Keyboard.current）を直接読まない
     /// - Pause / Step / HitStop の判断をしない（呼ぶ側＝SimulationSession の責務）
+    /// - SpriteRenderer.color を触らない（色違いは Participant の Tint）
+    ///
+    /// なぜ P1/P2 で同じ Motor を使うか:
+    /// 戦闘上の位置・Facing は参加枠に依存しない共通処理だからです。
+    /// P2 が棒立ちなのは Neutral 入力が渡されるだけで、専用移動コードはありません。
     ///
     /// なぜ入力で向きを変えないか（正式方針）:
-    /// Player は基本的に相手と向き合う。
+    /// Fighter は基本的に相手と向き合う。
     /// Left/Right はワールド X の移動だけを決め、前進／後退は相手との位置関係で解釈する。
-    /// 例: 相手の左側で Left を押しても「後退」であり、左向きにはならない。
     ///
     /// なぜ Update ではなく SimulationTick 側で動かすか:
     /// ゲーム仕様の正本は 60Hz の論理進行です。
@@ -56,6 +60,7 @@ namespace FightingGameTrial.Fighter
         [Tooltip(
             "元画像が右向きなら true、左向きなら false です。"
             + " この値で素材の初期向きを吸収し、SetFacingRight の見た目へ合わせます。"
+            + " SlotId（P1/P2）では分岐しません。"
         )]
         [SerializeField]
         private bool facesRightByDefault = true;
@@ -111,6 +116,7 @@ namespace FightingGameTrial.Fighter
         ///
         /// Right → logicalX を増やすだけ
         /// Left  → logicalX を減らすだけ
+        /// Neutral（Left/Right とも false）→ 移動なし（P2 棒立ち）
         /// 向きは Session が移動後に SetFacingRight で決めます。
         /// </summary>
         public void ProcessOneCombatFrame(SimulationInputState input)
@@ -144,7 +150,7 @@ namespace FightingGameTrial.Fighter
             }
             else
             {
-                // どちらもなし: 移動なし
+                // どちらもなし: 移動なし（Neutral 入力の棒立ち）
             }
 
             // 端で止める（画面外へ出さない）
@@ -164,7 +170,7 @@ namespace FightingGameTrial.Fighter
         /// <summary>
         /// Facing だけを外部から設定します（段階10）。
         ///
-        /// 呼び出し側（SimulationSession）が、移動後の PlayerX と DummyX から
+        /// 呼び出し側（SimulationSession）が、移動後の selfX と opponentX から
         /// 「相手と向き合う向き」を決めて渡します。
         /// 入力の Left/Right からは呼びません。
         /// </summary>
@@ -177,6 +183,7 @@ namespace FightingGameTrial.Fighter
         /// <summary>
         /// SpriteRenderer.flipX で見た目の左右を合わせます。
         /// Transform.localScale の X 符号反転は使いません。
+        /// color は変更しません（Tint は Participant 側）。
         /// </summary>
         private void ApplyFacingToSprite()
         {

@@ -12,7 +12,7 @@ namespace FightingGameTrial.DebugTools
     public class DebugHudView : MonoBehaviour
     {
         [Header("参照（Inspectorで接続。自動検索はしません）")]
-        [Tooltip("時間状態と Fighter / Dummy 参照へ到達するための SimulationSession です。")]
+        [Tooltip("時間状態と P1/P2 Participant 参照へ到達するための SimulationSession です。")]
         [SerializeField]
         private SimulationSession simulationSession;
 
@@ -83,29 +83,36 @@ namespace FightingGameTrial.DebugTools
             string attackHeldLabel = input.Attack ? "1" : "0";
             string attackPressedLabel = simulationSession.AttackPressedThisTick ? "1" : "0";
 
-            string fighterXLabel = "-";
-            string fighterFacingLabel = "-";
-            DebugFighterMotor motor = simulationSession.DebugFighterMotor;
-            if (motor != null)
+            // ASCII labels only (avoid adding new JP glyphs to NotoSansJP SDF).
+            string p1XLabel = "-";
+            string p1FacingLabel = "-";
+            DebugFighterParticipant p1 = simulationSession.ParticipantP1;
+            if (p1 != null && p1.Motor != null)
             {
-                fighterXLabel = motor.LogicalX.ToString("0.00");
-                fighterFacingLabel = motor.FacingRight ? "R" : "L";
+                p1XLabel = p1.Motor.LogicalX.ToString("0.00");
+                p1FacingLabel = p1.Motor.FacingRight ? "R" : "L";
             }
 
             string visualLabel = "Idle";
-            DebugFighterVisual visual = simulationSession.DebugFighterVisual;
-            if (visual != null)
+            if (p1 != null && p1.Visual != null)
             {
-                visualLabel = visual.CurrentVisualLabel;
+                visualLabel = p1.Visual.CurrentVisualLabel;
             }
 
-            string dummyXLabel = "-";
-            string dummyHitLabel = "0";
+            string p2XLabel = "-";
+            string p2FacingLabel = "-";
+            DebugFighterParticipant p2 = simulationSession.ParticipantP2;
+            if (p2 != null && p2.Motor != null)
+            {
+                p2XLabel = p2.Motor.LogicalX.ToString("0.00");
+                p2FacingLabel = p2.Motor.FacingRight ? "R" : "L";
+            }
+
+            string p2HitLabel = "0";
             DebugDummyTarget dummy = simulationSession.DebugDummyTarget;
             if (dummy != null)
             {
-                dummyXLabel = dummy.LogicalX.ToString("0.00");
-                dummyHitLabel = dummy.HitCount.ToString();
+                p2HitLabel = dummy.HitCount.ToString();
             }
 
             string punchPhase = simulationSession.GetPunchPhaseLabel();
@@ -127,11 +134,12 @@ namespace FightingGameTrial.DebugTools
             text = text + "Step           : " + stepLabel + "\n";
             text = text + "LRUD / Atk H/P : " + leftLabel + rightLabel + upLabel + downLabel
                 + " / " + attackHeldLabel + "/" + attackPressedLabel + "\n";
-            text = text + "Player X/Face  : " + fighterXLabel
-                + " / " + fighterFacingLabel + "\n";
+            text = text + "P1 X/Face      : " + p1XLabel
+                + " / " + p1FacingLabel + "\n";
             text = text + "Sprite         : " + visualLabel + "\n";
-            text = text + "Dummy X/Hit    : " + dummyXLabel
-                + " / " + dummyHitLabel + "\n";
+            text = text + "P2 X/Face/Hit  : " + p2XLabel
+                + " / " + p2FacingLabel
+                + " / " + p2HitLabel + "\n";
             text = text + "Punch Phase    : " + punchPhase + "\n";
             text = text + "AttackResult   : " + attackResult + "\n";
             text = text + "PunchHitDone   : " + punchHitDone + "\n";

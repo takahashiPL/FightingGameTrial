@@ -3,41 +3,25 @@ using UnityEngine;
 namespace FightingGameTrial.Fighter
 {
     /// <summary>
-    /// 相手ダミーの論理位置と被弾情報だけを保持します（段階9）。
+    /// P2 被弾デバッグ用の一時 Component です（段階10B-1 / 案A）。
     ///
-    /// 責務:
-    /// - 論理 X を保持し Transform へ反映する
-    /// - Hit 回数・直近 Hit 情報を保持する
-    /// - Session からの Hit 通知を受ける
+    /// 責務（今回）:
+    /// - HitCount / 直近 Hit 情報を保持する
+    /// - Session からの ReceiveHit を受ける
+    /// - CombatFrame 開始時に WasHitThisCombatFrame を下ろす
     ///
     /// やらないこと:
+    /// - LogicalX / Facing を持たない（正本は同じ GameObject の DebugFighterMotor）
     /// - 入力 / Clock / Keyboard を読まない
     /// - Update / FixedUpdate を使わない
-    /// - ダメージ・ノックバック・硬直を持たない（今回は Hit 検出のみ）
+    /// - ダメージ・ノックバック・硬直を持たない
     ///
-    /// なぜ Player コードから分離するか:
-    /// 攻撃側と被弾側を混ぜると、誰が座標を正本にしているか分かりにくくなります。
-    /// ダミーは「受け取る側」として最小の入れ物にします。
+    /// なぜ残すか（案A）:
+    /// 10B-1 では攻撃状態の共通化をしないため、既存の P1→P2 Hit 通知口を小さく維持する。
+    /// LogicalX の二重管理だけを解消し、HitCount の完全移設と本 Component 廃止は 10B-2 へ延期する。
     /// </summary>
     public class DebugDummyTarget : MonoBehaviour
     {
-        [Header("参照")]
-        [Tooltip("ダミー表示用の SpriteRenderer です。色・flipX は Scene で設定します。")]
-        [SerializeField]
-        private SpriteRenderer spriteRenderer;
-
-        [Tooltip(
-            "元画像が右向きのとき、左向きに見せるなら true です。"
-            + " true なら Awake で flipX=true を設定します（実行中は毎tick書き換えません）。"
-        )]
-        [SerializeField]
-        private bool facesLeft = true;
-
-        /// <summary>
-        /// 論理上の X 位置です。Awake で Transform.position.x から初期化します。
-        /// </summary>
-        private float logicalX;
-
         /// <summary>
         /// 累計 Hit 回数です。
         /// </summary>
@@ -52,11 +36,6 @@ namespace FightingGameTrial.Fighter
         /// 直近で Hit した CombatFrame 番号です。未Hitは -1。
         /// </summary>
         private int lastHitCombatFrame = -1;
-
-        public float LogicalX
-        {
-            get { return logicalX; }
-        }
 
         public int HitCount
         {
@@ -75,23 +54,9 @@ namespace FightingGameTrial.Fighter
 
         private void Awake()
         {
-            if (spriteRenderer == null)
-            {
-                Debug.LogError("DebugDummyTarget: SpriteRenderer が未設定です。");
-            }
-
-            logicalX = transform.position.x;
             hitCount = 0;
             wasHitThisCombatFrame = false;
             lastHitCombatFrame = -1;
-
-            // 向きは初期化時だけ設定（毎tick書き換えない）
-            if (spriteRenderer != null && facesLeft)
-            {
-                spriteRenderer.flipX = true;
-            }
-
-            ApplyLogicalPositionToTransform();
         }
 
         /// <summary>
@@ -110,13 +75,6 @@ namespace FightingGameTrial.Fighter
             hitCount = hitCount + 1;
             wasHitThisCombatFrame = true;
             lastHitCombatFrame = combatFrame;
-        }
-
-        private void ApplyLogicalPositionToTransform()
-        {
-            Vector3 position = transform.position;
-            position.x = logicalX;
-            transform.position = position;
         }
     }
 }

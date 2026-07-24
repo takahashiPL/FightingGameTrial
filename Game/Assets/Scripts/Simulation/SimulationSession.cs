@@ -8,18 +8,34 @@ namespace FightingGameTrial.Simulation
     /// <summary>
     /// 1回分の論理 SimulationTick を進める入口です。
     ///
-    /// 段階10:
+    /// 段階10B-1:
+    /// - P1/P2 を同じ Participant + Motor + Visual 構成で扱う
+    /// - P1 は Gameplay 入力、P2 は Neutral 入力（棒立ち）
+    /// - 両体の移動後、Hit 前に双方の Facing を相手向きへ確定する
+    /// - 攻撃状態の共通化・対称 Hit・Push Box・CharacterDefinition はまだ行わない
+    ///
+    /// 段階10A（維持）:
     /// - 移動入力と Facing を分離する
-    /// - 移動後の PlayerX / DummyX から「相手と向き合う Facing」を確定する
-    /// - Facing 確定のあとで Hit 判定を行う（向き込み距離判定のため）
+    /// - Facing 確定のあとで Hit 判定を行う
+    /// - ほぼ同位置なら直前 Facing を維持する
     ///
     /// 段階9（維持）:
-    /// - Active Frame でダミーへの論理座標 Hit 判定
+    /// - Active Frame で P1→P2 の論理座標 Hit 判定
     /// - Hit 成立で既存 HitStopRemaining を設定（同tickでは減らさない）
     /// - 1攻撃1Hit（HasCurrentJPunchHit）
     ///
+    /// 1 CombatFrame 内の処理順:
+    /// 1. P1 移動
+    /// 2. P2 移動
+    /// 3. P1 Facing 確定
+    /// 4. P2 Facing 確定
+    /// 5. ActionFrame 進行
+    /// 6. 既存 P1→P2 暫定 Hit 判定
+    /// 7. Visual 更新
+    ///
     /// HitStop中:
     /// Combat 処理全体をスキップするため、移動も Facing 更新もしない。
+    /// Pause中は自動進行せず、Step 時だけ本メソッドが1回呼ばれます。
     /// </summary>
     public class SimulationSession : MonoBehaviour
     {
@@ -29,29 +45,32 @@ namespace FightingGameTrial.Simulation
         private const int PunchHitStopFrames = 6;
 
         /// <summary>
-        /// PlayerX と DummyX がほぼ同じときの Facing 維持用しきい値です。
+        /// selfX と opponentX がほぼ同じときの Facing 維持用しきい値です。
         /// 完全一致や微小な誤差で毎フレーム向きが反転しないようにします。
         /// </summary>
         private const float FacingSameXEpsilon = 0.001f;
 
         [Header("参照（Inspectorで接続。自動検索はしません）")]
-        [Tooltip("物理キーの最新状態を持つ DebugGameplayInput です。")]
+        [Tooltip("物理キーの最新状態を持つ DebugGameplayInput です（P1用）。")]
         [SerializeField]
         private DebugGameplayInput debugGameplayInput;
 
-        [Tooltip("テスト用プレイヤーの左右移動を行う DebugFighterMotor です。")]
+        [Tooltip("P1 参加枠です。Motor / Visual / Opponent を内包します。")]
         [SerializeField]
-        private DebugFighterMotor debugFighterMotor;
+        private DebugFighterParticipant participantP1;
 
-        [Tooltip("Idle/Attack Sprite を切り替える DebugFighterVisual です。")]
+        [Tooltip("P2 参加枠です。Motor / Visual / Opponent を内包します。")]
         [SerializeField]
-        private DebugFighterVisual debugFighterVisual;
+        private DebugFighterParticipant participantP2;
 
-        [Tooltip("相手ダミーの DebugDummyTarget です。Hit通知先です。")]
+        [Tooltip(
+            "P2 被弾デバッグ用の DebugDummyTarget です（段階10B-1 案A）。"
+            + " HitCount / ReceiveHit のみ。LogicalX の正本は P2 Motor です。"
+        )]
         [SerializeField]
         private DebugDummyTarget debugDummyTarget;
 
-        [Header("Jパンチ判定（段階9）")]
+        [Header("Jパンチ判定（段階9・暫定）")]
         [Tooltip(
             "Jパンチの攻撃距離（ワールド単位）です。"
             + " 向いている側に相手がいて、この距離以内なら Active で Hit します。"
@@ -72,19 +91,58 @@ namespace FightingGameTrial.Simulation
         private bool previousAttackHeld;
         private bool attackPressedThisTick;
 
+        /// <summary>
+        /// P2 専用の Neutral 入力です。
+        /// P1 の CurrentInput とは別インスタンスで、毎tick new しません。
+        /// 静的共有値にもしません（誤って書き換えられるのを防ぐため）。
+        /// </summary>
+        private SimulationInputState p2NeutralInput;
+
         public SimulationTimeState TimeState
         {
             get { return timeState; }
         }
 
-        public DebugFighterMotor DebugFighterMotor
+        public DebugFighterParticipant ParticipantP1
         {
-            get { return debugFighterMotor; }
+            get { return participantP1; }
         }
 
+        public DebugFighterParticipant ParticipantP2
+        {
+            get { return participantP2; }
+        }
+
+        /// <summary>
+        /// HUD / ClockDriver 互換用。P1 Motor を返します。
+        /// </summary>
+        public DebugFighterMotor DebugFighterMotor
+        {
+            get
+            {
+                if (participantP1 == null)
+                {
+                    return null;
+                }
+
+                return participantP1.Motor;
+            }
+        }
+
+        /// <summary>
+        /// HUD / ClockDriver 互換用。P1 Visual を返します。
+        /// </summary>
         public DebugFighterVisual DebugFighterVisual
         {
-            get { return debugFighterVisual; }
+            get
+            {
+                if (participantP1 == null)
+                {
+                    return null;
+                }
+
+                return participantP1.Visual;
+            }
         }
 
         public DebugDummyTarget DebugDummyTarget
@@ -104,14 +162,14 @@ namespace FightingGameTrial.Simulation
                 Debug.LogError("SimulationSession: DebugGameplayInput が未設定です。");
             }
 
-            if (debugFighterMotor == null)
+            if (participantP1 == null)
             {
-                Debug.LogError("SimulationSession: DebugFighterMotor が未設定です。");
+                Debug.LogError("SimulationSession: ParticipantP1 が未設定です。");
             }
 
-            if (debugFighterVisual == null)
+            if (participantP2 == null)
             {
-                Debug.LogError("SimulationSession: DebugFighterVisual が未設定です。");
+                Debug.LogError("SimulationSession: ParticipantP2 が未設定です。");
             }
 
             if (debugDummyTarget == null)
@@ -124,6 +182,10 @@ namespace FightingGameTrial.Simulation
                 timeState = new SimulationTimeState();
             }
 
+            // P2 Neutral: 別インスタンスを1つだけ作り、以後書き換えない（全 false のまま）。
+            p2NeutralInput = new SimulationInputState();
+            p2NeutralInput.ResetToInitialValues();
+
             timeState.ResetToInitialValues();
             timeState.LastStepResult = "未実行";
             timeState.LastStatusMessage = "Session ready";
@@ -132,15 +194,23 @@ namespace FightingGameTrial.Simulation
             attackPressedThisTick = false;
         }
 
+        private void Start()
+        {
+            // Motor.Awake 直後は両体とも右向き初期値のため、開始表示だけ相手向きへ合わせる。
+            // Combat 進行ではないので Hit / Action は触らない。
+            ApplyInitialFacingTowardOpponents();
+            RefreshFighterVisual();
+        }
+
         public void ProcessOneSimulationTick()
         {
             // 1. SimulationTick +1（HitStop中も進む）
             timeState.SimulationTick = timeState.SimulationTick + 1;
 
-            // 2. 入力サンプリング
+            // 2. 入力サンプリング（P1 用 CurrentInput。P2 Neutral は別オブジェクト）
             SampleCurrentInputFromGameplay();
 
-            // 3. Attack 立ち上がり判定
+            // 3. Attack 立ち上がり判定（P1 のみ。攻撃状態の共通化は 10B-2）
             bool attackHeldNow = false;
             if (timeState.CurrentInput != null)
             {
@@ -181,23 +251,22 @@ namespace FightingGameTrial.Simulation
                 debugDummyTarget.BeginCombatFrame();
             }
 
-            // 8. Jパンチ開始判定
+            // 8. Jパンチ開始判定（P1 のみ・既存）
             if (attackPressedThisTick && (timeState.IsActionPlaying == false))
             {
                 StartJPunchAttack();
             }
 
-            // 9. Player 移動（ワールド X のみ。Facing はここでは変えない）
-            if (debugFighterMotor != null)
-            {
-                debugFighterMotor.ProcessOneCombatFrame(timeState.CurrentInput);
-            }
+            // 9. 両体移動（ワールド X のみ。Facing はここでは変えない）
+            //    P1: Gameplay 入力 / P2: Neutral → 棒立ち
+            ProcessOneFighterMovement(participantP1, ResolveInputForParticipant(participantP1));
+            ProcessOneFighterMovement(participantP2, ResolveInputForParticipant(participantP2));
 
-            // 9.5 Facing 確定（移動後の PlayerX / DummyX から相手向き合い）
-            //     Hit 判定が Facing を読む前に、ここで確定する必要がある。
-            UpdatePlayerFacingTowardDummy();
+            // 10. 両体 Facing 確定（Hit 判定より前）
+            UpdateFacingTowardOpponent(participantP1);
+            UpdateFacingTowardOpponent(participantP2);
 
-            // 10. ActionFrame 進行
+            // 11. ActionFrame 進行
             if (timeState.IsActionPlaying)
             {
                 timeState.ActionFrame = timeState.ActionFrame + 1;
@@ -207,21 +276,21 @@ namespace FightingGameTrial.Simulation
                 }
             }
 
-            // 11〜13. Active なら Hit 判定 → Dummy通知 → HitStopRemaining=6 設定
-            //         （このtickでは Remaining を減らさない）
-            //         Facing は 9.5 で確定済み。
+            // 12. Active なら Hit 判定 → Dummy通知 → HitStopRemaining=6 設定
+            //     Facing は 10 で確定済み。P2 位置は P2 Motor.LogicalX を読む。
             TryResolveJPunchHit();
 
-            // 14. Visual 更新
+            // 13. Visual 更新
             RefreshFighterVisual();
 
-            // 15. Action 終了判定（未Hitなら Miss ログ1回）
+            // 14. Action 終了判定（未Hitなら Miss ログ1回）
             if (timeState.IsJPunchAttack && timeState.IsActionPlaying)
             {
                 int endFrame = 12;
-                if (debugFighterVisual != null)
+                DebugFighterVisual p1Visual = DebugFighterVisual;
+                if (p1Visual != null)
                 {
-                    endFrame = debugFighterVisual.ActionEndFrame;
+                    endFrame = p1Visual.ActionEndFrame;
                 }
 
                 if (timeState.ActionFrame >= endFrame)
@@ -231,7 +300,7 @@ namespace FightingGameTrial.Simulation
                 }
             }
 
-            // 16. 状態文 / previousAttackHeld
+            // 15. 状態文 / previousAttackHeld
             UpdateStatusMessage();
             previousAttackHeld = attackHeldNow;
             WriteConsoleLogIfNeeded();
@@ -268,61 +337,114 @@ namespace FightingGameTrial.Simulation
 
         public void RefreshFighterVisual()
         {
-            if (debugFighterVisual == null || timeState == null)
+            if (timeState == null)
             {
                 return;
             }
 
-            debugFighterVisual.Apply(
-                timeState.IsActionPlaying,
-                timeState.ActionFrame,
-                timeState.IsJPunchAttack
-            );
+            // P1: 既存の攻撃状態を反映
+            if (participantP1 != null && participantP1.Visual != null)
+            {
+                participantP1.Visual.Apply(
+                    timeState.IsActionPlaying,
+                    timeState.ActionFrame,
+                    timeState.IsJPunchAttack
+                );
+            }
+
+            // P2: 今回は攻撃しないため Idle のまま（共通 Visual 経路は通す）
+            if (participantP2 != null && participantP2.Visual != null)
+            {
+                participantP2.Visual.Apply(false, 0, false);
+            }
         }
 
         /// <summary>
-        /// 移動後の論理座標から、Player が Dummy と向き合う Facing を決めます（段階10）。
-        ///
-        /// 正式方針:
-        /// - PlayerX が DummyX より小さい → 右向き
-        /// - PlayerX が DummyX より大きい → 左向き
-        /// - ほぼ同位置 → 直前 Facing を維持（毎フレーム反転を防ぐ）
-        ///
-        /// 入力 Left/Right では呼ばない。移動入力と Facing を分離するため。
-        /// Inspector で接続済みの debugFighterMotor / debugDummyTarget だけを使う（検索しない）。
+        /// 参加枠へ 1 CombatFrame 分の移動を依頼します。
+        /// Facing は変えません。
         /// </summary>
-        private void UpdatePlayerFacingTowardDummy()
+        private void ProcessOneFighterMovement(
+            DebugFighterParticipant participant,
+            SimulationInputState input)
         {
-            if (debugFighterMotor == null)
+            if (participant == null)
             {
                 return;
             }
 
-            if (debugDummyTarget == null)
+            if (participant.Motor == null)
             {
                 return;
             }
 
-            float playerX = debugFighterMotor.LogicalX;
-            float dummyX = debugDummyTarget.LogicalX;
-            float deltaX = dummyX - playerX;
+            participant.Motor.ProcessOneCombatFrame(input);
+        }
+
+        /// <summary>
+        /// Participant の UsesGameplayInput に応じて入力を選びます。
+        /// P1: CurrentInput / P2: 専用 Neutral（共有・静的・毎tick new しない）。
+        /// </summary>
+        private SimulationInputState ResolveInputForParticipant(DebugFighterParticipant participant)
+        {
+            if (participant == null)
+            {
+                return p2NeutralInput;
+            }
+
+            if (participant.UsesGameplayInput)
+            {
+                return timeState.CurrentInput;
+            }
+
+            return p2NeutralInput;
+        }
+
+        /// <summary>
+        /// 移動後の論理座標から、self が相手と向き合う Facing を決めます（段階10A/10B-1）。
+        ///
+        /// - selfX が opponentX より小さい → 右向き
+        /// - selfX が opponentX より大きい → 左向き
+        /// - ほぼ同位置 → 直前 Facing を維持
+        ///
+        /// 入力 Left/Right では呼ばない。P1 専用に増築せず、両体で同じ処理を使います。
+        /// </summary>
+        private void UpdateFacingTowardOpponent(DebugFighterParticipant self)
+        {
+            if (self == null || self.Motor == null)
+            {
+                return;
+            }
+
+            DebugFighterParticipant opponent = self.Opponent;
+            if (opponent == null || opponent.Motor == null)
+            {
+                return;
+            }
+
+            float selfX = self.Motor.LogicalX;
+            float opponentX = opponent.Motor.LogicalX;
+            float deltaX = opponentX - selfX;
 
             // 同位置付近では向きを切り替えない。
             // 理由: 浮動小数の微小差やすれ違い直後に、毎 CombatFrame で flipX が点滅するのを防ぐため。
             if (deltaX > FacingSameXEpsilon)
             {
-                // Dummy が右側 → Player は右向き（相手と向き合う）
-                debugFighterMotor.SetFacingRight(true);
+                self.Motor.SetFacingRight(true);
             }
             else if (deltaX < -FacingSameXEpsilon)
             {
-                // Dummy が左側 → Player は左向き
-                debugFighterMotor.SetFacingRight(false);
+                self.Motor.SetFacingRight(false);
             }
             else
             {
                 // |deltaX| <= epsilon: 直前 Facing を維持（何もしない）
             }
+        }
+
+        private void ApplyInitialFacingTowardOpponents()
+        {
+            UpdateFacingTowardOpponent(participantP1);
+            UpdateFacingTowardOpponent(participantP2);
         }
 
         private void StartJPunchAttack()
@@ -355,6 +477,7 @@ namespace FightingGameTrial.Simulation
 
         /// <summary>
         /// Active Frame の Hit 判定と、成立時の Dummy通知 / HitStop 設定。
+        /// 攻撃状態はまだ Session/TimeState 側（P1専用）。位置は両 Motor から読む。
         /// </summary>
         private void TryResolveJPunchHit()
         {
@@ -363,7 +486,14 @@ namespace FightingGameTrial.Simulation
                 return;
             }
 
-            if (debugFighterMotor == null || debugDummyTarget == null)
+            DebugFighterMotor p1Motor = DebugFighterMotor;
+            DebugFighterMotor p2Motor = null;
+            if (participantP2 != null)
+            {
+                p2Motor = participantP2.Motor;
+            }
+
+            if (p1Motor == null || p2Motor == null || debugDummyTarget == null)
             {
                 return;
             }
@@ -374,9 +504,9 @@ namespace FightingGameTrial.Simulation
                 PunchActiveStartFrame,
                 PunchActiveEndFrame,
                 timeState.HasCurrentJPunchHit,
-                debugFighterMotor.LogicalX,
-                debugFighterMotor.FacingRight,
-                debugDummyTarget.LogicalX,
+                p1Motor.LogicalX,
+                p1Motor.FacingRight,
+                p2Motor.LogicalX,
                 attackRange
             );
 
@@ -385,7 +515,7 @@ namespace FightingGameTrial.Simulation
                 return;
             }
 
-            // 12. Dummy へ通知
+            // DummyTarget へ通知（HitCount のみ。座標は Motor 側）
             debugDummyTarget.ReceiveHit(timeState.CombatFrame);
             timeState.HasCurrentJPunchHit = true;
             timeState.LastAttackResult = "Hit";
@@ -395,8 +525,7 @@ namespace FightingGameTrial.Simulation
                 "[FightDebug] Punch hit Dummy at CombatFrame=" + timeState.CombatFrame
             );
 
-            // 13. 既存 HitStop を開始（同tickでは減らさない）
-            //     次の SimulationTick 先頭の if (HitStopRemaining > 0) から Combat 停止が始まる。
+            // 既存 HitStop を開始（同tickでは減らさない）
             timeState.HitStopRemaining = PunchHitStopFrames;
         }
 
@@ -480,27 +609,36 @@ namespace FightingGameTrial.Simulation
             int attackPressedValue = attackPressedThisTick ? 1 : 0;
             int punchHitDone = timeState.HasCurrentJPunchHit ? 1 : 0;
 
-            string fighterPart = "";
-            if (debugFighterMotor != null)
+            string p1Part = "";
+            DebugFighterMotor p1Motor = DebugFighterMotor;
+            if (p1Motor != null)
             {
-                string facingLabel = debugFighterMotor.FacingRight ? "true" : "false";
-                fighterPart =
-                    " FighterX=" + debugFighterMotor.LogicalX.ToString("0.00")
-                    + " FacingRight=" + facingLabel;
+                string facingLabel = p1Motor.FacingRight ? "true" : "false";
+                p1Part =
+                    " P1X=" + p1Motor.LogicalX.ToString("0.00")
+                    + " P1FacingRight=" + facingLabel;
             }
 
             string visualLabel = "Idle";
-            if (debugFighterVisual != null)
+            DebugFighterVisual p1Visual = DebugFighterVisual;
+            if (p1Visual != null)
             {
-                visualLabel = debugFighterVisual.CurrentVisualLabel;
+                visualLabel = p1Visual.CurrentVisualLabel;
             }
 
-            string dummyPart = "";
+            string p2Part = "";
+            if (participantP2 != null && participantP2.Motor != null)
+            {
+                string p2FacingLabel = participantP2.Motor.FacingRight ? "true" : "false";
+                p2Part =
+                    " P2X=" + participantP2.Motor.LogicalX.ToString("0.00")
+                    + " P2FacingRight=" + p2FacingLabel;
+            }
+
+            string dummyHitPart = "";
             if (debugDummyTarget != null)
             {
-                dummyPart =
-                    " DummyX=" + debugDummyTarget.LogicalX.ToString("0.00")
-                    + " DummyHitCount=" + debugDummyTarget.HitCount;
+                dummyHitPart = " DummyHitCount=" + debugDummyTarget.HitCount;
             }
 
             string attackResult = timeState.LastAttackResult;
@@ -524,8 +662,9 @@ namespace FightingGameTrial.Simulation
                 + " Attack=" + attackValue
                 + " AttackPressed=" + attackPressedValue
                 + " FighterVisual=" + visualLabel
-                + fighterPart
-                + dummyPart
+                + p1Part
+                + p2Part
+                + dummyHitPart
                 + " PunchPhase=" + GetPunchPhaseLabel()
                 + " AttackResult=" + attackResult
                 + " PunchHitDone=" + punchHitDone

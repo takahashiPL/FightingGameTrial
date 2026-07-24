@@ -3,7 +3,7 @@ using UnityEngine;
 namespace FightingGameTrial.Fighter
 {
     /// <summary>
-    /// ActionFrame に応じて Sprite を切り替える表示専用コンポーネントです（段階8）。
+    /// ActionFrame に応じて Sprite を切り替える表示専用コンポーネントです（段階8 / 10B-1）。
     ///
     /// 責務:
     /// - Idle / Attack の Sprite 参照を保持する
@@ -13,10 +13,16 @@ namespace FightingGameTrial.Fighter
     /// - 入力を読まない
     /// - 時間（Update / FixedUpdate）を使わない
     /// - 移動や flipX を扱わない（向きは DebugFighterMotor の責務）
+    /// - SpriteRenderer.color を毎フレーム上書きしない（色違いは Participant.Tint）
     ///
     /// なぜ Motor から分離するか:
     /// 移動と見た目のコマ送りは別の関心です。
     /// 混ぜると「なぜこのフレームでスプライトが変わったか」が追いづらくなります。
+    ///
+    /// なぜ P1/P2 で同じ Visual を使うか:
+    /// Sprite 切替は参加枠に依存しない共通表示処理だからです。
+    /// Idle/Attack Sprite 自体は SerializeField で持ち、SlotId では分岐しません。
+    /// CharacterDefinition はまだ導入せず、将来ここに差し替え余地を残します。
     ///
     /// なぜ Animator をまだ使わないか:
     /// 学習用に、ActionFrame と Sprite の対応をコード上で直接追えるようにするためです。
@@ -30,15 +36,21 @@ namespace FightingGameTrial.Fighter
     public class DebugFighterVisual : MonoBehaviour
     {
         [Header("参照")]
-        [Tooltip("切り替える対象の SpriteRenderer です（DebugPlayer 上）。")]
+        [Tooltip("切り替える対象の SpriteRenderer です。")]
         [SerializeField]
         private SpriteRenderer spriteRenderer;
 
-        [Tooltip("待機（Idle）用の Sprite です。fighter_idle_00_transparent を割り当てます。")]
+        [Tooltip(
+            "待機（Idle）用の Sprite です。fighter_idle_00_transparent を割り当てます。"
+            + " SlotId では分岐しません（将来の CharacterDefinition 差し替えを阻害しない）。"
+        )]
         [SerializeField]
         private Sprite idleSprite;
 
-        [Tooltip("攻撃ポーズ用の Sprite です。fighter_attack_punch_transparent を割り当てます。")]
+        [Tooltip(
+            "攻撃ポーズ用の Sprite です。fighter_attack_punch_transparent を割り当てます。"
+            + " SlotId では分岐しません。"
+        )]
         [SerializeField]
         private Sprite attackSprite;
 
