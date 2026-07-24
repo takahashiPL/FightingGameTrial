@@ -187,7 +187,8 @@ namespace FightingGameTrial.Fighter
         ///
         /// 何をするか: logicalX を更新し、既存の minX/maxX でクランプして Transform へ反映。
         /// なぜ必要か: 重なり解消・ノックバックは Session が計算し、位置の正本は Motor が持つため。
-        /// Facing は変更しません。minX/maxX の仕様は変更しません（ステージ端の壁処理は段階13B）。
+        /// Facing は変更しません。minX/maxX の値自体は変更しません。
+        /// 実移動量を知りたいときは TryMoveLogicalXBy を使います（段階13B-1）。
         /// </summary>
         public void SetLogicalX(float newX)
         {
@@ -204,6 +205,24 @@ namespace FightingGameTrial.Fighter
             }
 
             ApplyLogicalPositionToTransform();
+        }
+
+        /// <summary>
+        /// 論理 X を deltaX だけ動かそうとし、minX/maxX クランプ後の実移動量を返します（段階13B-1）。
+        ///
+        /// 戻り値: 実際に変わった量（signed）。要求どおりなら deltaX に近い値。
+        /// 端で止まった場合は |戻り値| &lt; |deltaX| になる。
+        ///
+        /// なぜ必要か:
+        /// Push が「要求した補正」と「実際に動けた量」の差（未消化）を測り、
+        /// 反対側へ再配分するため。KnockbackVelocityX は触らない。
+        /// Transform へは既存どおりここ経由でのみ書く。
+        /// </summary>
+        public float TryMoveLogicalXBy(float deltaX)
+        {
+            float beforeX = logicalX;
+            SetLogicalX(logicalX + deltaX);
+            return logicalX - beforeX;
         }
 
         /// <summary>

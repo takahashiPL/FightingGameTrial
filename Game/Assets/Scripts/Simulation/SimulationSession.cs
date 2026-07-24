@@ -18,12 +18,17 @@ namespace FightingGameTrial.Simulation
     /// - 可視化と同じ EvaluateWorldHitBox / EvaluateWorldHurtBox を実判定でも使う
     /// - 旧 attackRange 距離判定は使用しない
     ///
+    /// 段階13B-1:
+    /// - Push 補正でステージ端（Motor minX/maxX）により片方の実移動が足りないとき、
+    ///   未解消量をもう片方へ再配分する（DebugFighterPushResolver + TryMoveLogicalXBy）
+    /// - KnockbackVelocityX は Push で変更しない。Facing は既存どおり Push 後
+    ///
     /// 段階13A:
     /// - Hit 成立時に被弾側へ横ノックバック初速を予約する（LogicalX 比較で符号決定）
     /// - HitStop 中は移動・減速しない。HitStop 終了後の Combat から固定フレームで移動
     /// - 入力移動 → ノックバック移動 → Push → Facing → Action → Hit → Visual → HitStun
-    /// - ノックバックは Motor.SetLogicalX 経由。Push 計算内容・minX/maxX は変更しない
-    /// - ステージ端の壁処理・壁際 Push 配分はしない（段階13B 予定）
+    /// - ノックバックは Motor.SetLogicalX / TryMoveLogicalXBy 経由
+    /// - ステージ端の壁バウンド・壁やられはしない（Push 再配分のみ 13B-1）
     ///
     /// 段階12A:
     /// - 被弾側 Participant が HitState（HitStun / TotalHitCount / ノックバック速度）を所有する
@@ -132,6 +137,12 @@ namespace FightingGameTrial.Simulation
         /// 接触し続けている間の毎フレームログを避け、補正開始の立ち上がりだけ出すために使う。
         /// </summary>
         private bool previousPushDidCorrect;
+
+        /// <summary>
+        /// 直前 CombatFrame で壁際 Push 再配分を試みたか（段階13B-1）。
+        /// 毎フレーム大量ログを避け、立ち上がりだけ出すために使う。
+        /// </summary>
+        private bool previousPushWallRedistributed;
 
         /// <summary>
         /// HUD 用: 直近の P1→P2 Hit 評価で Box が重なっていたか（段階11B）。
@@ -692,7 +703,7 @@ namespace FightingGameTrial.Simulation
         ///
         /// Motor との責務:
         /// 速度の正本は HitState。位置書き込みは Motor.SetLogicalX。
-        /// 既存 minX/maxX クランプはそのまま（今回ステージ端仕様は変更しない）。
+        /// 既存 minX/maxX クランプはそのまま（壁バウンドはしない。Push 再配分は Resolver 側）。
         ///
         /// Push との関係:
         /// ノックバック後にめり込んだ場合、同フレームの Push で解消する。
@@ -771,15 +782,16 @@ namespace FightingGameTrial.Simulation
         }
 
         /// <summary>
-        /// 両 Participant の横方向 Push Box 重なりを解消します（段階10B-3）。
+        /// 両 Participant の横方向 Push Box 重なりを解消します（段階10B-3 / 13B-1）。
         ///
         /// 何をするか:
-        /// - 移動後の論理 X を DebugFighterPushResolver へ渡し、必要なら双方を等分分離する
+        /// - DebugFighterPushResolver に等分分離と壁際再配分を依頼する
         /// - HUD 用に中心距離・重なり有無を記録する
-        /// - 補正が起きたときだけ1行ログを出す（常時大量ログは出さない）
+        /// - 補正開始／壁際再配分の立ち上がりだけ1行ログを出す（常時大量ログは出さない）
         ///
         /// なぜこの順か:
         /// Facing と Hit は最終位置を使うため、移動の直後・Facing の直前で行う。
+        /// Push は KnockbackVelocityX を変更しない（位置のみ）。
         ///
         /// logOnCorrect: Combat tick 中のみ true。Start 時の初期離しでは false。
         /// </summary>
@@ -805,13 +817,17 @@ namespace FightingGameTrial.Simulation
             float centerDistanceBefore;
             float requiredMinDistance;
             bool wasOverlapping;
+            bool didWallRedistribute;
+            string wallLog;
 
             bool didCorrect = DebugFighterPushResolver.TryResolveHorizontalOverlap(
                 participantP1,
                 participantP2,
                 out centerDistanceBefore,
                 out requiredMinDistance,
-                out wasOverlapping
+                out wasOverlapping,
+                out didWallRedistribute,
+                out wallLog
             );
 
             lastPushWasOverlapping = wasOverlapping;
@@ -834,7 +850,17 @@ namespace FightingGameTrial.Simulation
                 );
             }
 
+            // 壁際再配分の立ち上がりだけ1行（段階13B-1）。押し続け中は出さない。
+            if (didWallRedistribute
+                && logOnCorrect
+                && previousPushWallRedistributed == false
+                && string.IsNullOrEmpty(wallLog) == false)
+            {
+                Debug.Log("[FightDebug] Push wall redistribute " + wallLog);
+            }
+
             previousPushDidCorrect = didCorrect;
+            previousPushWallRedistributed = didWallRedistribute;
         }
 
         /// <summary>
