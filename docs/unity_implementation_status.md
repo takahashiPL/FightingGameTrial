@@ -2,6 +2,7 @@
 
 最終更新: 2026-07-24
 対象ブランチ: `unity`
+最新全体コミット（HEAD）: **`241e45f`**（Document participant attack and hit foundation）
 最新実装コミット: **`582619b`**（Move fighter attack and hit state to participants）
 
 このファイルは、Unity 側の**実装済み / 暫定 / 未実装 / 次回候補 / 正式方針**を混同せずに追うための正本です。
@@ -136,7 +137,8 @@ P1 / P2 は同じ `DebugFighterParticipant` 基盤を使用しており、
 
 ### 3.2 段階10のうち未実装の残り
 
-自動振り向きとセットで設計する **Push Box / 地上すり抜け防止 / Box 可視化** はまだ未実装。
+Facing 分離とセットで設計する **Push Box / 地上すり抜け防止** はまだ未実装。
+（Box **可視化**そのものは段階11の Hurt/Hit Box 作業と合わせて扱う。）
 
 ---
 
@@ -160,7 +162,7 @@ P1 / P2 は同じ `DebugFighterParticipant` 基盤を使用しており、
 
 | 段階 | 内容 | 区分 |
 |---|---|---|
-| **10（残り）** | Push Box 定義・可視化、地上すり抜け防止（Facing 分離・2体共通化は完了） | **次回候補** |
+| **10（残り）** | Push Box 定義、地上すり抜け防止（Facing 分離・2体共通化は完了。可視化は段階11と合わせて可） | **次回候補** |
 | **11** | Hurt Box / Punch Hit Box、Active のみ Hit Box 有効、Facing 反転、Box 可視化、距離判定→Box 重なりへ置換 | 次回以降 |
 | **12** | 被 Hit 状態、HitStun、被 Hit 表示 | 未実装 |
 | **13** | ノックバック、押し戻し、ステージ端 | 未実装 |
@@ -192,7 +194,8 @@ P1 / P2 は同じ `DebugFighterParticipant` 基盤を使用しており、
 
 ## 7. 一言まとめ
 
-- 段階1〜**10B-2**まで到達。最新コミット `582619b`
+- 段階1〜**10B-2**まで到達
+- 最新全体コミット（HEAD）: `241e45f`（Docs）。最新実装コミット: `582619b`
 - 攻撃状態の正本は各 **`Participant.AttackState`**。`SimulationTimeState` は共有時間・Pause・HitStop
 - Facing 分離・相手向き合い・2体共通 Hit 経路は**実装済み**
 - Hit はなお**距離＋向きの暫定**。Box 判定ではない

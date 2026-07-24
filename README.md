@@ -21,6 +21,7 @@
 ## Unity 実装の到達点（要約）
 
 ブランチ `unity` 上で、**段階1〜10B-2まで完了**しています。
+最新全体コミット（HEAD）: **`241e45f`**（Document participant attack and hit foundation）
 最新実装コミット: **`582619b`**（Move fighter attack and hit state to participants）
 
 | 区分 | 内容 |
