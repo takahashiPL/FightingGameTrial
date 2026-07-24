@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## v3.7（Unity段階10B-3完了・Push Box／すり抜け防止）
+
+- 段階10B-3完了を明記。Participant 共通の横方向 Push Box／すり抜け防止を Docs に反映
+- 責務: `Participant.pushBoxHalfWidth`（既定 0.5）、`Motor.SetLogicalX`、`DebugFighterPushResolver`、Session が移動→Push→Facing 順を管理
+- 補正は中心距離不足分の左右等分分離。Motor min/max で片側が止まった分は相手へ転送（現段階の暫定仕様）
+- 検証済み: 非重なり・非すり抜け、接触時 Push Dist=1.00、押し分け、Facing 安定、接触中 J/Hit/HitStop、Pause/Step、Error/Warning 0
+- 縦方向・ノックバック・画面端専用処理・飛び越え反転は未実装。壁際配分はステージ境界実装時に再検討
+- 段階10の Push Box 残作業を完了へ移し、次工程を段階11（Box 可視化または判定基盤）へ更新
+- README / `docs/unity_implementation_status.md` / `docs/rules.md` §2.3.1・§14 を更新
+
 ## v3.6（Unity段階10B-2完了・AttackState正本化）
 
 - 段階10A/10B-2完了を明記。最新実装コミット `582619b`（Move fighter attack and hit state to participants）

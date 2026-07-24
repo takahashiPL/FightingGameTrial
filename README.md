@@ -20,15 +20,16 @@
 
 ## Unity 実装の到達点（要約）
 
-ブランチ `unity` 上で、**段階1〜10B-2まで完了**しています。
-最新全体コミット（HEAD）: **`241e45f`**（Document participant attack and hit foundation）
-最新実装コミット: **`582619b`**（Move fighter attack and hit state to participants）
+ブランチ `unity` 上で、**段階1〜10B-3まで完了**しています。
+最新全体コミット（HEAD）: **`c22bc2a`**（Keep dynamic font data across builds）
+最新コミット済み実装: **`582619b`**（Move fighter attack and hit state to participants）
+段階10B-3（Push Box）は**検証済み・ドキュメント反映時点では未コミット**（作業ツリー）。
 
 | 区分 | 内容 |
 |---|---|
-| **実装済み** | 60Hz SimulationTick、Pause/Step、HUD、HitStop、入力サンプリング、左右移動、Facing分離・相手向き合い、2体共通 Participant / AttackState、Jパンチ、attacker/defender 暫定 Hit、1攻撃1Hit、Hit時6F HitStop、A/R→P1 AttackState |
-| **暫定** | 距離ベース Hit（正式 Box ではない）。相打ちは両方向判定の土台のみ（P2 は Neutral） |
-| **未実装（正式方針）** | Push/Hurt/Hit Box、Box 可視化、Box 重なり判定、すり抜け防止 |
+| **実装済み** | 60Hz SimulationTick、Pause/Step、HUD、HitStop、入力サンプリング、左右移動、Facing分離・相手向き合い、2体共通 Participant / AttackState、横方向 Push Box／すり抜け防止、Jパンチ、attacker/defender 暫定 Hit、1攻撃1Hit、Hit時6F HitStop、A/R→P1 AttackState |
+| **暫定** | 距離ベース Hit（正式 Box ではない）。Push 接触後の等分押し分け。相打ちは両方向判定の土台のみ（P2 は Neutral） |
+| **未実装（正式方針）** | Hurt/Hit Box、Box 可視化、Box 重なり判定、ステージ端・壁際の Push 配分再検討、縦方向 Push |
 
 詳細・次工程は **`docs/unity_implementation_status.md`** を正とする。
 
@@ -82,9 +83,9 @@ Git 管理外: `Game/Library`、`Temp`、`Logs`、`UserSettings`、`obj` など
 
 ## 次の実装候補（要約）
 
-1. **段階10の残り**: Push Box、地上すり抜け防止（Facing 分離・2体共通化は完了）
-2. **段階11**: Hurt/Hit Box、可視化、距離判定→Box重なりへ置換
-3. 以降: 被Hit/HitStun、ノックバック、HP、攻撃データ化
+1. **段階11**: Push/Hurt/Hit Box の可視化、または判定基盤（距離判定→Box重なりへ置換）
+2. 以降: 被Hit/HitStun、ノックバック、HP、攻撃データ化
+3. ステージ端実装時: Push の壁際補正配分を再検討
 
 詳細は `docs/unity_implementation_status.md`。
 
@@ -142,6 +143,6 @@ Unity_FightingGameTrial
 - Clash は一次分類。Trade は双方向とも Hit のときの複合集約
 - SimulationTick（入力）と CombatFrame / ActionFrame（戦闘）を分離
 - 空中 Pushbox 無効。着地で復活＋等分分離
-- Facing は相手との位置関係を基本とし、移動入力と分離する（Unity デバッグでは段階10Aで実装済み → `docs/unity_implementation_status.md`）
+- Facing は相手との位置関係を基本とし、移動入力と分離する。Push 補正後の位置で Facing を更新する（Unity デバッグでは段階10A/10B-3 → `docs/unity_implementation_status.md`）
 - `attack_category` はラベルのみ
 - 必殺技は未実装・非表示
