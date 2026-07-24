@@ -138,6 +138,20 @@ namespace FightingGameTrial.Fighter
         }
 
         /// <summary>
+        /// 攻撃中に被 Hit したとき、攻撃を即時中断します（段階12A）。
+        ///
+        /// Miss 記録は付けない（被弾による中断であり、空振り終了ではない）。
+        /// previousAttackHeld は維持し、入力サンプリング経路を壊さない。
+        /// </summary>
+        public void InterruptByHit()
+        {
+            actionFrame = 0;
+            isActionPlaying = false;
+            isJPunchAttack = false;
+            hasCurrentJPunchHit = false;
+        }
+
+        /// <summary>
         /// 現在の攻撃を終了します。
         ///
         /// HitしていなければMissとして記録します。

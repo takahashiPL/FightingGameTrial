@@ -18,6 +18,11 @@ namespace FightingGameTrial.Simulation
     /// - 可視化と同じ EvaluateWorldHitBox / EvaluateWorldHurtBox を実判定でも使う
     /// - 旧 attackRange 距離判定は使用しない
     ///
+    /// 段階12A:
+    /// - 被弾側 Participant が HitState（HitStun / TotalHitCount）を所有する
+    /// - HitStop 中は HitStun を減らさない。Combat 末尾で1回だけ消費する
+    /// - HitStun 中は移動・攻撃開始を止め、Push / Facing は維持する
+    ///
     /// 段階10B-2（維持）:
     /// - 攻撃状態（入力・開始・ActionFrame・終了・Visual）は各 Participant.AttackState
     /// - Hit 判定は attacker / defender 共通関数で行い、defender.ReceiveHit で被弾を記録する
@@ -340,7 +345,7 @@ namespace FightingGameTrial.Simulation
             TryResolveJPunchHit(participantP1, participantP2);
             TryResolveJPunchHit(participantP2, participantP1);
 
-            // 14. Visual 更新（各 AttackState を反映）
+            // 14. Visual 更新（各 AttackState を反映。HitStun 中は Idle Sprite 優先）
             RefreshFighterVisual();
 
             // 15. 攻撃終了判定（AttackState 側）
@@ -348,7 +353,11 @@ namespace FightingGameTrial.Simulation
             TryEndJPunchForParticipant(participantP2);
             RefreshFighterVisual();
 
-            // 16. 状態文 / ログ
+            // 16. HitStun 消費（Combat Frame 末尾・1回だけ。HitStop 外のみここに到達）
+            TickHitStunForParticipant(participantP1);
+            TickHitStunForParticipant(participantP2);
+
+            // 17. 状態文 / ログ
             UpdateStatusMessage();
             WriteConsoleLogIfNeeded();
         }
@@ -435,34 +444,47 @@ namespace FightingGameTrial.Simulation
         }
 
         /// <summary>
-        /// Rキー用: P1 の AttackState を初期状態へ戻します（段階10B-2整理）。
+        /// Rキー用: デバッグ戦闘状態を初期化します（段階12A）。
         ///
-        /// 何をするか: AttackState.Reset → P1 Visual を Idle へ即時更新。
+        /// 何をするか:
+        /// - P1/P2 の AttackState・HitState・表示色を Reset
+        /// - 共有 HitStopRemaining を 0
+        /// - Visual を Idle へ即時更新
+        ///
         /// SimulationTick は進めません。Pause 中でも呼べます。
-        /// Reset 後は J を一度離して再度押せば、通常攻撃を開始できる状態になります。
+        /// 位置・Facing の Scene 初期化は従来どおり Play 再開に任せます（R では動かさない）。
         /// </summary>
         public void ResetTestActionForP1()
         {
-            if (participantP1 == null || participantP1.AttackState == null)
+            if (participantP1 != null)
             {
-                Debug.LogError("SimulationSession: ResetTestActionForP1 に P1 AttackState がありません。");
-                return;
+                participantP1.ResetCombatDebugState();
+            }
+            else
+            {
+                Debug.LogError("SimulationSession: ResetTestActionForP1 に P1 がありません。");
             }
 
-            participantP1.AttackState.Reset();
-            RefreshOneFighterVisual(participantP1);
+            if (participantP2 != null)
+            {
+                participantP2.ResetCombatDebugState();
+            }
 
             if (timeState != null)
             {
-                timeState.LastStatusMessage = "Test Action reset P1";
+                timeState.HitStopRemaining = 0;
+                timeState.LastStatusMessage = "Debug combat reset";
             }
 
-            Debug.Log("[FightDebug] Test Action reset slot=P1");
+            RefreshFighterVisual();
+            Debug.Log("[FightDebug] Debug combat reset (Attack/HitStun/HitStop)");
         }
 
         /// <summary>
-        /// 1体分の Visual を AttackState から反映します。
-        /// Sprite のみ切替し、color（Tint）は触りません。
+        /// 1体分の Visual を AttackState / HitState から反映します。
+        ///
+        /// 表示優先: HitStun 中は Idle Sprite（被 Hit 色は Participant.ApplyDisplayColor）。
+        /// color は Visual では触らない。
         /// </summary>
         private void RefreshOneFighterVisual(DebugFighterParticipant participant)
         {
@@ -471,11 +493,20 @@ namespace FightingGameTrial.Simulation
                 return;
             }
 
+            // Hit 表示 > Attack 表示 > Idle
+            if (participant.IsInHitStun)
+            {
+                participant.Visual.Apply(false, 0, false);
+                participant.ApplyDisplayColor();
+                return;
+            }
+
             DebugFighterAttackState attackState = participant.AttackState;
 
             if (attackState == null)
             {
                 participant.Visual.Apply(false, 0, false);
+                participant.ApplyDisplayColor();
                 return;
             }
 
@@ -484,6 +515,7 @@ namespace FightingGameTrial.Simulation
                 attackState.ActionFrame,
                 attackState.IsJPunchAttack
             );
+            participant.ApplyDisplayColor();
         }
 
         /// <summary>
@@ -511,11 +543,17 @@ namespace FightingGameTrial.Simulation
 
         /// <summary>
         /// Participant 単位で Jパンチ開始を試みます。
-        /// AttackPressedThisTick かつ未 Action のときだけ開始します。
+        /// AttackPressedThisTick かつ未 Action かつ HitStun でないときだけ開始します。
         /// </summary>
         private void TryStartJPunchForParticipant(DebugFighterParticipant participant)
         {
             if (participant == null || participant.AttackState == null)
+            {
+                return;
+            }
+
+            // HitStun 中は新規攻撃不可（段階12A）
+            if (participant.IsInHitStun)
             {
                 return;
             }
@@ -600,7 +638,7 @@ namespace FightingGameTrial.Simulation
 
         /// <summary>
         /// 参加枠へ 1 CombatFrame 分の移動を依頼します。
-        /// Facing は変えません。
+        /// Facing は変えません。HitStun 中は移動入力を適用しません（Push は別経路）。
         /// </summary>
         private void ProcessOneFighterMovement(
             DebugFighterParticipant participant,
@@ -616,7 +654,34 @@ namespace FightingGameTrial.Simulation
                 return;
             }
 
+            // HitStun 中は本人の移動だけ無効。Push 補正は後段で双方に効く。
+            if (participant.IsInHitStun)
+            {
+                return;
+            }
+
             participant.Motor.ProcessOneCombatFrame(input);
+        }
+
+        /// <summary>
+        /// Combat 末尾で HitStun を1減らします（段階12A）。
+        ///
+        /// HitStop 中（成立 tick で Remaining を立てた直後を含む）は減らさない。
+        /// HitStop 外の Combat にだけ到達し、かつ Remaining==0 のときだけ消費する。
+        /// </summary>
+        private void TickHitStunForParticipant(DebugFighterParticipant participant)
+        {
+            if (participant == null)
+            {
+                return;
+            }
+
+            if (timeState != null && timeState.HitStopRemaining > 0)
+            {
+                return;
+            }
+
+            participant.TickHitStunForCombatFrame();
         }
 
         /// <summary>
@@ -826,8 +891,10 @@ namespace FightingGameTrial.Simulation
                 return false;
             }
 
-            // 被弾記録は defender（Participant）側が所有する
-            defender.ReceiveHit(timeState.CombatFrame);
+            // 被弾記録は defender（Participant）側が所有する。
+            // HitStun を開始し、被弾側の実行中攻撃があれば中断する（段階12A）。
+            defender.ReceiveHit(timeState.CombatFrame, defender.HitStunFrames);
+            RefreshOneFighterVisual(defender);
 
             // 1攻撃1Hit の正本は attacker の AttackState
             attackState.MarkHit();

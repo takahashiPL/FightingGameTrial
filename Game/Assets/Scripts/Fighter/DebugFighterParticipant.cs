@@ -13,7 +13,7 @@ namespace FightingGameTrial.Fighter
     /// - ゲームプレイ入力を使うか（使わないなら Session が Neutral を渡す）
     /// - 相手 Participant への明示参照を持つ
     /// - 自分専用の DebugFighterAttackState を1つ所有する
-    /// - 自分専用の被弾記録（HitCount 等）を所有する
+    /// - 自分専用の DebugFighterHitState（被 Hit / HitStun）を所有する（段階12A）
     /// - 横方向 Push Box 半幅を持つ（段階10B-3。重なり解消の計算に使う）
     /// - Push / Hurt / Hit Box のローカル定義を持ち、World Box を計算する（段階11A）
     ///
@@ -37,10 +37,10 @@ namespace FightingGameTrial.Fighter
     /// Dummy 専用ロジックだからではなく、Session が Neutral 入力（全 false）を渡すから。
     /// 同じ Motor 処理を通るが、Left/Right が無いので移動しない。
     ///
-    /// 攻撃と被弾（段階10B-2）:
-    /// Participant は自分の AttackState と被弾記録を所有します。
+    /// 攻撃と被弾（段階10B-2 / 12A）:
+    /// Participant は自分の AttackState と HitState を所有します。
     /// SimulationSession が attacker / defender を選び Hit を解決し、
-    /// 成立時に defender.ReceiveHit で被弾を記録します。
+    /// 成立時に defender.ReceiveHit で被弾・HitStun を記録します。
     ///
     /// Box 可視化（段階11A）:
     /// ローカル定義はここが所有し、World 変換もここで行う。
@@ -87,11 +87,18 @@ namespace FightingGameTrial.Fighter
         [Header("表示バリエーション（参加枠側）")]
         [Tooltip(
             "同キャラ色違い用の表示色です。"
-            + " Visual は sprite だけを切り替え、color は上書きしません。"
+            + " Visual は sprite だけを切り替え、通常時の color はここが正本です。"
             + " 将来の Material / Palette 差し替え余地として、まずは Color のみ使います。"
         )]
         [SerializeField]
         private Color displayTint = Color.white;
+
+        [Tooltip(
+            "HitStop / HitStun 中の被 Hit 表示色です（段階12A）。"
+            + " LineRenderer の Box 色は変更しません。"
+        )]
+        [SerializeField]
+        private Color hitStunDisplayColor = new Color(1f, 0.35f, 0.35f, 1f);
 
         [Header("入力")]
         [Tooltip(
@@ -100,6 +107,14 @@ namespace FightingGameTrial.Fighter
         )]
         [SerializeField]
         private bool usesGameplayInput = true;
+
+        [Header("HitStun（段階12A・暫定）")]
+        [Tooltip(
+            "被 Hit 後、HitStop 終了から行動不能となる Combat Frame 数です。"
+            + " 攻撃データ化前の暫定値。ノックバックや HP は扱いません。"
+        )]
+        [SerializeField]
+        private int hitStunFrames = 12;
 
         [Header("Push Box（段階10B-3・判定用半幅）")]
         [Tooltip(
@@ -161,27 +176,19 @@ namespace FightingGameTrial.Fighter
         private DebugFighterAttackState attackState =
             new DebugFighterAttackState();
 
+        [Header("被 Hit 状態（段階12A）")]
+        [Tooltip(
+            "この参加者自身の被 Hit / HitStun 状態です。"
+            + " P1/P2で同じ型を持ち、Sessionから共通処理されます。"
+        )]
+        [SerializeField]
+        private DebugFighterHitState hitState = new DebugFighterHitState();
+
         // ------------------------------------------------------------
-        // 被弾状態（段階10B-2）
-        //
-        // 試合中のランタイム状態です。Inspector から編集する設定値ではないため
-        // SerializeField は付けません。参加者ごとに独立した private フィールドです。
+        // 表示色の復元用（Awake で displayTint を控える）
         // ------------------------------------------------------------
 
-        /// <summary>
-        /// 累計 Hit 回数です。
-        /// </summary>
-        private int hitCount;
-
-        /// <summary>
-        /// 今の CombatFrame で Hit を受けたか。
-        /// </summary>
-        private bool wasHitThisCombatFrame;
-
-        /// <summary>
-        /// 直近で Hit した CombatFrame 番号です。未Hitは -1。
-        /// </summary>
-        private int lastHitCombatFrame = -1;
+        private Color baseDisplayTint = Color.white;
 
         public DebugFighterSlotId SlotId
         {
@@ -239,19 +246,83 @@ namespace FightingGameTrial.Fighter
             get { return attackState; }
         }
 
+        public DebugFighterHitState HitState
+        {
+            get { return hitState; }
+        }
+
+        /// <summary>
+        /// 被 Hit 累計です。正本は HitState.TotalHitCount（HUD の P2HitCount 互換）。
+        /// </summary>
         public int HitCount
         {
-            get { return hitCount; }
+            get
+            {
+                if (hitState == null)
+                {
+                    return 0;
+                }
+
+                return hitState.TotalHitCount;
+            }
         }
 
         public bool WasHitThisCombatFrame
         {
-            get { return wasHitThisCombatFrame; }
+            get
+            {
+                if (hitState == null)
+                {
+                    return false;
+                }
+
+                return hitState.WasHitThisCombatFrame;
+            }
         }
 
         public int LastHitCombatFrame
         {
-            get { return lastHitCombatFrame; }
+            get
+            {
+                if (hitState == null)
+                {
+                    return -1;
+                }
+
+                return hitState.LastHitCombatFrame;
+            }
+        }
+
+        /// <summary>
+        /// HitStun 中（残り > 0）か。HitStop 中も残りは維持されるため true になり得る。
+        /// </summary>
+        public bool IsInHitStun
+        {
+            get
+            {
+                if (hitState == null)
+                {
+                    return false;
+                }
+
+                return hitState.IsInHitStun;
+            }
+        }
+
+        /// <summary>
+        /// 被 Hit 時に適用する HitStun 長（Combat Frame）。負数は 0 扱い。
+        /// </summary>
+        public int HitStunFrames
+        {
+            get
+            {
+                if (hitStunFrames < 0)
+                {
+                    return 0;
+                }
+
+                return hitStunFrames;
+            }
         }
 
         /// <summary>
@@ -334,12 +405,15 @@ namespace FightingGameTrial.Fighter
 
             attackState.Reset();
 
-            // 被弾記録も参加者ごとに独立して初期化する（共有しない）。
-            hitCount = 0;
-            wasHitThisCombatFrame = false;
-            lastHitCombatFrame = -1;
+            if (hitState == null)
+            {
+                hitState = new DebugFighterHitState();
+            }
 
-            ApplyDisplayTint();
+            hitState.Reset();
+
+            baseDisplayTint = displayTint;
+            ApplyDisplayColor();
             EnsureBoxView();
         }
 
@@ -610,24 +684,119 @@ namespace FightingGameTrial.Fighter
 
         /// <summary>
         /// 新しい CombatFrame の開始時に、このフレームの Hit 旗を下ろします。
+        /// HitStun 残りは減らしません（Session が Combat 末尾で Tick）。
         /// </summary>
         public void BeginCombatFrame()
         {
-            wasHitThisCombatFrame = false;
+            if (hitState == null)
+            {
+                return;
+            }
+
+            hitState.BeginCombatFrame();
         }
 
         /// <summary>
-        /// パンチ Hit を受け取り、被弾記録だけを更新します。
+        /// パンチ Hit を受け取り、被弾記録と HitStun を開始します（段階12A）。
         ///
-        /// 何をするか: HitCount 加算、今フレーム被弾旗、直近 CombatFrame の記録。
+        /// 何をするか:
+        /// - HitState.BeginHitStun（累計加算・Stun 残り設定）
+        /// - 実行中の自分の攻撃があれば InterruptByHit（攻撃側の攻撃は触らない）
+        /// - 被 Hit 表示色へ切替
+        ///
         /// なぜ必要か: Session が defender.ReceiveHit を呼ぶ共通口にするため。
-        /// やらないこと: Hit 判定、ログ出力、ダメージ、ノックバック（Session / 後段）。
+        /// やらないこと: Hit 判定、HitStop 設定、ノックバック、HP、ログ出力。
         /// </summary>
         public void ReceiveHit(int combatFrame)
         {
-            hitCount = hitCount + 1;
-            wasHitThisCombatFrame = true;
-            lastHitCombatFrame = combatFrame;
+            ReceiveHit(combatFrame, HitStunFrames);
+        }
+
+        /// <summary>
+        /// hitStunFrames を明示して被 Hit を受け取ります。
+        /// </summary>
+        public void ReceiveHit(int combatFrame, int hitStunFrameCount)
+        {
+            if (hitState == null)
+            {
+                hitState = new DebugFighterHitState();
+            }
+
+            hitState.BeginHitStun(hitStunFrameCount, combatFrame);
+
+            // 被弾側が攻撃中なら即時中断（Hit Box も IsActive で消える）。
+            // 実操作未検証でも、P1/P2 共通基盤として持つ。
+            if (attackState != null && attackState.IsActionPlaying)
+            {
+                attackState.InterruptByHit();
+            }
+
+            ApplyDisplayColor();
+        }
+
+        /// <summary>
+        /// 1 Combat Frame 分の HitStun 消費を Participant に依頼します。
+        /// Session が HitStop 外の Combat 末尾で1回だけ呼びます。
+        /// </summary>
+        public void TickHitStunForCombatFrame()
+        {
+            if (hitState == null)
+            {
+                return;
+            }
+
+            bool wasInHitStun = hitState.IsInHitStun;
+            hitState.TickCombatFrame();
+
+            if (wasInHitStun && hitState.IsInHitStun == false)
+            {
+                ApplyDisplayColor();
+            }
+        }
+
+        /// <summary>
+        /// HUD 用: Idle / Attack / HitStop / HitStun の短い状態名。
+        /// HitStop は共有残りが >0 かつ自分が HitStun 中のとき。
+        /// </summary>
+        public string BuildDebugStateLabel(int sharedHitStopRemaining)
+        {
+            if (hitState != null && hitState.IsInHitStun)
+            {
+                if (sharedHitStopRemaining > 0)
+                {
+                    return "HitStop";
+                }
+
+                return "HitStun";
+            }
+
+            if (attackState != null && attackState.IsActionPlaying)
+            {
+                return "Attack";
+            }
+
+            return "Idle";
+        }
+
+        /// <summary>
+        /// HitState / AttackState / 表示色を初期化します（R キー Reset 用）。
+        /// </summary>
+        public void ResetCombatDebugState()
+        {
+            if (attackState == null)
+            {
+                attackState = new DebugFighterAttackState();
+            }
+
+            attackState.Reset();
+
+            if (hitState == null)
+            {
+                hitState = new DebugFighterHitState();
+            }
+
+            hitState.Reset();
+            ApplyDisplayColor();
         }
 
         /// <summary>
@@ -636,12 +805,28 @@ namespace FightingGameTrial.Fighter
         /// </summary>
         public void ApplyDisplayTint()
         {
+            ApplyDisplayColor();
+        }
+
+        /// <summary>
+        /// 表示色の正本を反映します（段階12A）。
+        /// 優先: HitStun/HitStop 見た目（IsInHitStun） > 通常 Tint。
+        /// Attack Sprite 切替は Visual 側。色はここが担当。
+        /// </summary>
+        public void ApplyDisplayColor()
+        {
             if (spriteRenderer == null)
             {
                 return;
             }
 
-            spriteRenderer.color = displayTint;
+            if (hitState != null && hitState.IsInHitStun)
+            {
+                spriteRenderer.color = hitStunDisplayColor;
+                return;
+            }
+
+            spriteRenderer.color = baseDisplayTint;
         }
     }
 }

@@ -15,18 +15,33 @@ namespace FightingGameTrial.DebugTools
     /// SimulationTimeState が担う共有時間状態:
     /// SimulationTick / CombatFrame / Pause / HitStop / Step / Status / 入力サンプル。
     ///
+    /// レイアウト（段階12A 後）:
+    /// - 状態行: 左上（既存 hudText）
+    /// - 操作説明: 左下（ランタイム生成の別 TMP）
+    /// 縦に1本で積み続けず、状態行が増えても操作説明へ重ならないようにする。
+    ///
     /// Inspector 明示参照のみ使い、検索はしません。
+    /// Scene の手動再配線は不要です（操作ブロックは Awake で構築）。
     /// </summary>
     public class DebugHudView : MonoBehaviour
     {
+        private const float HudMarginPixels = 28f;
+        private const float HelpBlockHeightPixels = 120f;
+        private const float StatusHelpGapPixels = 16f;
+
         [Header("参照（Inspectorで接続。自動検索はしません）")]
         [Tooltip("時間状態と P1/P2 Participant 参照へ到達するための SimulationSession です。")]
         [SerializeField]
         private SimulationSession simulationSession;
 
-        [Tooltip("HUD本文を表示する TextMeshProUGUI です。")]
+        [Tooltip("左上の状態表示用 TextMeshProUGUI です。")]
         [SerializeField]
         private TextMeshProUGUI hudText;
+
+        /// <summary>
+        /// 左下の操作説明用。Awake で既存 hudText と同 Canvas 配下へ生成します。
+        /// </summary>
+        private TextMeshProUGUI helpText;
 
         private void Awake()
         {
@@ -38,7 +53,10 @@ namespace FightingGameTrial.DebugTools
             if (hudText == null)
             {
                 Debug.LogError("DebugHudView: TextMeshProUGUI が未設定です。");
+                return;
             }
+
+            EnsureSplitHudLayout();
         }
 
         private void Update()
@@ -54,14 +72,123 @@ namespace FightingGameTrial.DebugTools
                 return;
             }
 
-            hudText.text = BuildHudText(timeState);
+            hudText.text = BuildStatusHudText(timeState);
+
+            if (helpText != null)
+            {
+                helpText.text = BuildHelpHudText();
+            }
         }
 
         /// <summary>
-        /// 縦幅節約のため行を統合。追加ラベルは ASCII 優先（TMP欠落回避）。
-        /// 操作説明は増やさない。
+        /// 状態=左上、操作=左下の2ブロック構成にします。
+        /// Font Asset は既存 hudText の参照をコピーするだけで、アセット自体は変更しません。
         /// </summary>
-        private string BuildHudText(SimulationTimeState timeState)
+        private void EnsureSplitHudLayout()
+        {
+            RectTransform statusRect = hudText.rectTransform;
+            Transform canvasTransform = statusRect.parent;
+            if (canvasTransform == null)
+            {
+                Debug.LogError("DebugHudView: hudText の親 Canvas がありません。");
+                return;
+            }
+
+            RectTransform canvasRect = canvasTransform as RectTransform;
+            float canvasHeight = 720f;
+            if (canvasRect != null)
+            {
+                canvasHeight = canvasRect.rect.height;
+                if (canvasHeight < 1f)
+                {
+                    canvasHeight = 720f;
+                }
+            }
+
+            // 左上状態領域: 下端に操作ブロック＋余白分を残し、はみ出しを防ぐ。
+            float statusHeight =
+                canvasHeight
+                - HudMarginPixels
+                - HelpBlockHeightPixels
+                - StatusHelpGapPixels
+                - HudMarginPixels;
+            if (statusHeight < 200f)
+            {
+                statusHeight = 200f;
+            }
+
+            statusRect.anchorMin = new Vector2(0f, 1f);
+            statusRect.anchorMax = new Vector2(0f, 1f);
+            statusRect.pivot = new Vector2(0f, 1f);
+            statusRect.anchoredPosition = new Vector2(HudMarginPixels, -HudMarginPixels);
+            statusRect.sizeDelta = new Vector2(statusRect.sizeDelta.x, statusHeight);
+
+            hudText.verticalAlignment = VerticalAlignmentOptions.Top;
+            hudText.overflowMode = TextOverflowModes.Truncate;
+
+            // 既に生成済みなら使い回す（Domain Reload なしの再入対策）。
+            Transform existingHelp = canvasTransform.Find("DebugHudHelpText");
+            GameObject helpObject;
+            if (existingHelp != null)
+            {
+                helpObject = existingHelp.gameObject;
+                helpText = helpObject.GetComponent<TextMeshProUGUI>();
+            }
+            else
+            {
+                helpObject = new GameObject("DebugHudHelpText", typeof(RectTransform));
+                helpObject.transform.SetParent(canvasTransform, false);
+                helpObject.layer = hudText.gameObject.layer;
+                helpText = helpObject.AddComponent<TextMeshProUGUI>();
+            }
+
+            if (helpText == null)
+            {
+                Debug.LogError("DebugHudView: 操作説明用 TextMeshProUGUI を作れませんでした。");
+                return;
+            }
+
+            RectTransform helpRect = helpText.rectTransform;
+            helpRect.anchorMin = new Vector2(0f, 0f);
+            helpRect.anchorMax = new Vector2(0f, 0f);
+            helpRect.pivot = new Vector2(0f, 0f);
+            helpRect.anchoredPosition = new Vector2(HudMarginPixels, HudMarginPixels);
+            helpRect.sizeDelta = new Vector2(
+                statusRect.sizeDelta.x > 1f ? statusRect.sizeDelta.x : 536f,
+                HelpBlockHeightPixels
+            );
+
+            // 見た目は状態表示に合わせる（Font Asset ファイルは触らない）。
+            helpText.font = hudText.font;
+            helpText.fontSharedMaterial = hudText.fontSharedMaterial;
+            helpText.fontSize = hudText.fontSize;
+            helpText.color = hudText.color;
+            helpText.alignment = TextAlignmentOptions.BottomLeft;
+            helpText.verticalAlignment = VerticalAlignmentOptions.Bottom;
+            helpText.overflowMode = TextOverflowModes.Overflow;
+            helpText.enableWordWrapping = true;
+            helpText.raycastTarget = false;
+            helpText.text = BuildHelpHudText();
+        }
+
+        /// <summary>
+        /// 左下固定の操作説明（内容は削除せず、配置だけ分ける）。
+        /// </summary>
+        private string BuildHelpHudText()
+        {
+            string text = "";
+            text = text + "操作:\n";
+            text = text + "Space=Pause切替      .=1Tick送り\n";
+            text = text + "H=HitStop            A=Action開始\n";
+            text = text + "R=Combatリセット     矢印=方向\n";
+            text = text + "J=Attack";
+            return text;
+        }
+
+        /// <summary>
+        /// 左上の状態行のみ。追加ラベルは ASCII 優先（TMP欠落回避）。
+        /// </summary>
+        private string BuildStatusHudText(SimulationTimeState timeState)
         {
             // P1 AttackState を1回だけ取得（攻撃表示の正本。重複取得しない）
             DebugFighterParticipant p1 = simulationSession.ParticipantP1;
@@ -137,9 +264,23 @@ namespace FightingGameTrial.DebugTools
             }
 
             string p2HitLabel = "0";
+            string p2HitStunLabel = "0";
+            string p2StateLabel = "Idle";
+            string p1StateLabel = "Idle";
             if (p2 != null)
             {
                 p2HitLabel = p2.HitCount.ToString();
+                if (p2.HitState != null)
+                {
+                    p2HitStunLabel = p2.HitState.HitStunRemainingFrames.ToString();
+                }
+
+                p2StateLabel = p2.BuildDebugStateLabel(timeState.HitStopRemaining);
+            }
+
+            if (p1 != null)
+            {
+                p1StateLabel = p1.BuildDebugStateLabel(timeState.HitStopRemaining);
             }
 
             string punchPhase = simulationSession.GetPunchPhaseLabel();
@@ -177,12 +318,15 @@ namespace FightingGameTrial.DebugTools
             text = text + "Step           : " + stepLabel + "\n";
             text = text + "LRUD / Atk H/P : " + leftLabel + rightLabel + upLabel + downLabel
                 + " / " + attackHeldLabel + "/" + attackPressedLabel + "\n";
-            text = text + "P1 X/Face      : " + p1XLabel
-                + " / " + p1FacingLabel + "\n";
+            text = text + "P1 X/Face/St   : " + p1XLabel
+                + " / " + p1FacingLabel
+                + " / " + p1StateLabel + "\n";
             text = text + "Sprite         : " + visualLabel + "\n";
             text = text + "P2 X/Face/Hit  : " + p2XLabel
                 + " / " + p2FacingLabel
                 + " / " + p2HitLabel + "\n";
+            text = text + "P2 Stun/State  : " + p2HitStunLabel
+                + " / " + p2StateLabel + "\n";
 
             // Push Box（段階10B-3）: ASCII のみ。常時大量ログは出さず HUD で確認する。
             string pushDistLabel = simulationSession.LastPushCenterDistance.ToString("0.00");
@@ -236,13 +380,7 @@ namespace FightingGameTrial.DebugTools
             text = text + "Punch Phase    : " + punchPhase + "\n";
             text = text + "AttackResult   : " + attackResult + "\n";
             text = text + "PunchHitDone   : " + punchHitDone + "\n";
-            text = text + "Status         : " + statusLabel + "\n";
-            text = text + "\n";
-            text = text + "操作:\n";
-            text = text + "Space=Pause切替      .=1Tick送り\n";
-            text = text + "H=HitStop            A=Action開始\n";
-            text = text + "R=Actionリセット     矢印=方向\n";
-            text = text + "J=Attack";
+            text = text + "Status         : " + statusLabel;
             return text;
         }
     }
