@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## v3.10（Unity段階12A完了・被Hit/HitStun/被Hit表示）
+
+- 段階12A完了を明記。`DebugFighterHitState`（Participant 共通）と HitStun 12CF・被Hit色を Docs に反映
+- HitStop（共有6F）と HitStun（機体ごと）の違い、HitStop中は Stun 非減算、Combat末尾で12→0を明記
+- HitStun中は移動・新規攻撃不可、Push/Facing/Box は維持。TotalHitCount 正本は HitState
+- Reset（R）で両体 Attack/HitState/色と共有 HitStop を初期化。位置/Facing は維持
+- HUD: P2 Stun/State。レイアウトは左上=状態・左下=操作（DebugHudView ランタイム分離、16:9下端切れ解消）
+- 段階12（工程表の被Hit/HitStun/表示）は12Aで充足。次工程は既存計画の段階13（ノックバック／押し戻し／ステージ端）
+- README / `docs/unity_implementation_status.md` / `docs/rules.md` を更新
+
 ## v3.9（Unity段階11B完了・Hit×Hurt 重なり判定）
 
 - 段階11B完了を明記。距離判定から Hit Box × Hurt Box 重なり判定への置換を Docs に反映
