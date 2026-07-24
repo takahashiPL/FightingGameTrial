@@ -1,10 +1,10 @@
-# Unity 実装状況・次工程（段階1〜13A到達後）
+# Unity 実装状況・次工程（段階1〜13B-1到達後）
 
 最終更新: 2026-07-24
 対象ブランチ: `unity`
-最新コミット済み HEAD: **`f102e07`**（Document participant hit stun completion）
-段階12Aまで: **完了・push 済み**
-段階13A（Participant 共通ノックバック基盤）: **検証済み・ドキュメント反映時点では未コミット**（作業ツリー）
+最新コミット済み HEAD: **`43ac815`**（Document participant knockback completion）
+段階13Aまで: **完了・push 済み**
+段階13B-1（ステージ端を考慮した Participant 共通 Push 補正配分）: **検証済み・ドキュメント反映時点では未コミット**（作業ツリー）
 
 このファイルは、Unity 側の**実装済み / 暫定 / 未実装 / 次回候補 / 正式方針**を混同せずに追うための正本です。
 ゲーム仕様そのものの正本は引き続き `docs/rules.md` です。
@@ -23,7 +23,7 @@
 
 ---
 
-## 2. 段階1〜13Aの到達点
+## 2. 段階1〜13B-1の到達点
 
 | 段階 | 内容 | 状態 |
 |---|---|---|
@@ -36,108 +36,110 @@
 | **11B** | Hit×Hurt 重なり判定 | **実装済み・確認済み** |
 | **12A** | Participant 共通の被 Hit 状態・HitStun・被 Hit 表示、HUD 分離 | **実装済み・確認済み** |
 | **13A** | Participant 共通ノックバック基盤（横方向・固定 Combat Frame） | **実装済み・確認済み** |
+| **13B-1** | ステージ端を考慮した Participant 共通 Push 補正配分 | **実装済み・確認済み** |
 
-段階13全体（ノックバック＋押し戻し＋ステージ端）は**未完了**。
-13A で横ノックバック基盤は完了。次は既存計画どおり**段階13B（ステージ端・壁際 Push 配分）**。
+既存工程表の段階13B（ステージ端・壁際 Push 配分）は **13B-1 で充足**。
+段階13計画のうちノックバック基盤＋壁際 Push 再配分は完了。壁バウンド／壁やられ／KB壁停止などは工程番号を新設せず未実装として残す。
+次の番号付き工程は既存計画どおり**段階14**。
 
 ### 2.1 責務分担（要約・維持）
 
 | 入れ物 | 担当 |
 |---|---|
 | **`DebugFighterAttackState`** | 攻撃進行の正本 |
-| **`DebugFighterHitState`** | 被 Hit / HitStun / **ノックバック速度**の正本（段階12A / 13A） |
-| **`DebugFighterMotor`** | LogicalX の書き込み（入力移動・Push・ノックバック共通） |
-| **`SimulationTimeState`** | 共有時間・**共有 HitStop** |
-| **`SimulationSession`** | tick 進行、入力移動→**ノックバック**→Push→Facing→Action→Hit→Visual→HitStun消費 |
+| **`DebugFighterHitState`** | 被 Hit / HitStun / ノックバック速度の正本 |
+| **`DebugFighterMotor`** | LogicalX 書き込み・**TryMoveLogicalXBy（実移動量）** |
+| **`DebugFighterPushResolver`** | 等分 Push ＋壁際未解消の再配分（段階13B-1） |
+| **`SimulationTimeState`** | 共有時間・共有 HitStop |
+| **`SimulationSession`** | tick 進行、入力移動→ノックバック→Push→Facing→Action→Hit→Visual→HitStun |
 
-### 2.2 HitStop と HitStun の違い（段階12A・維持）
+### 2.2 HitStop / HitStun / ノックバック（段階12A / 13A・維持）
 
-| | HitStop | HitStun |
-|---|---|---|
-| 所有者 | `SimulationTimeState`（試合共有） | 各 `Participant.HitState`（機体ごと） |
-| 長さ | Hit 時 **6F**（既存） | 被 Hit 時 **12 Combat Frame**（暫定 `hitStunFrames`） |
-| 効果 | Combat 全体停止（移動・Action・判定も止まる） | 被弾側のみ行動不能（移動入力・新規攻撃不可） |
-| 進行 | SimulationTick 側で残りを減らす | **Combat 末尾**で1減らす。HitStop 中は減らさない |
+HitStop=共有6F、HitStun=機体ごと12CF、ノックバック初速0.18／減速0.015（暫定）。
+HitStop 中は位置・KB速度・Stun すべて維持。HitStop 後の Combat から固定フレーム移動。
+速度正本は HitState、位置は Motor。詳細は段階13A 時点の記載を維持。
 
-### 2.3 HitStop とノックバック開始タイミング（段階13A）
-
-| 時点 | 位置 | knockbackVelocityX | HitStun |
-|---|---|---|---|
-| Hit 成立 CF | **未移動**（初速だけ予約） | 符号付き初速をセット | 12 開始 |
-| HitStop 6F 中 | **不変** | **減衰しない** | **減らない** |
-| HitStop 終了後の各 Combat | `X += velocity` | 毎 CF 0 へ 0.015 減速 | 末尾で1減 |
-
-流れ: Hit成立 → HitStop=6・Stun=12・初速予約（成立CFは移動なし） → HitStop中は位置・速度・Stun維持 → HitStop後の Combat から移動開始 → Stun=0 で残速度クリア・Idle / 通常色。
-
-方向は **Hit 成立時点の LogicalX 比較**（Facing は正本にしない）:
-- `attacker.X < defender.X` → 右（+）
-- `attacker.X > defender.X` → 左（-）
-- 同位置のみ attacker Facing を fallback
-
-### 2.4 段階13Aで確定したノックバック責務
+### 2.3 段階13B-1で確定した壁際 Push 配分
 
 | 入れ物 | 担当 |
 |---|---|
-| **`HitState.knockbackVelocityX`** | 速度の正本（非公開） |
-| **`HitState.IsBeingKnockedBack`** | `velocityX != 0` から導出 |
-| **`Participant.knockbackInitialSpeed`** | 既定 **0.18**（SerializeField・暫定） |
-| **`Participant.knockbackDeceleration`** | 既定 **0.015**（SerializeField・暫定） |
-| **`Motor.SetLogicalX`** | 位置書き込み。Transform 直接書き込みはしない |
+| **`Motor.TryMoveLogicalXBy(deltaX)`** | 要求移動を試み、minX/maxX Clamp 後の**実移動量（signed）**を返す |
+| **`Motor.SetLogicalX`** | 位置の正本書き込み（Transform 直接書き込みはしない） |
+| **`DebugFighterPushResolver`** | 重なり算出・半分要求・実移動取得・未解消の再配分 |
+| **`SimulationSession`** | Resolver 呼び出し、壁際再配分ログの立ち上がり抑制 |
 
-固定フレーム計算（`Time.deltaTime` 不使用）:
-- `X += knockbackVelocityX`
-- 速度を毎 Combat Frame、0 へ deceleration だけ近づける（符号越えは 0 固定）
+左右判定: **LogicalX**（P1/P2 名では分岐しない）。同 X 時は既存どおり呼び出しの A を左扱い。
 
-処理順（採用）:
-入力移動 → **ノックバック移動・減速** → Push → Facing → Action → Hit → Visual → HitStun消費
+計算手順:
+1. 必要分離量 `separationNeeded` を算出
+2. 左へ半分・右へ半分を要求（`TryMoveLogicalXBy`）
+3. 各 Motor の実移動量を取得
+4. 未解消量を**右へ**再配分
+5. さらに残れば**左へ**再配分
+6. 両者とも動けなければ、移動可能範囲で停止
 
-Push との関係:
-- ノックバック後のめり込みは**同フレームの Push**で解消
-- Push Resolver は速度を変更しない
-- 既存 `minX=-7` / `maxX=7` は有効のまま（仕様変更なし）
-- ステージ端・壁際 Push 配分は**今回変更していない**（段階13B）
+通常位置: Clamp が働かないため従来どおり半分ずつ。壁際再配分ログは出ない。
+ステージ端: 端側が動けなかった分を反対側へ再配分。`minX=-7` / `maxX=7` は既存値のまま。
 
-HitStun 終了時: 残速度を 0 へクリア。ノックバックは HitStun 中だけ適用。
-Reset（R）: 上記に加え `knockbackVelocityX=0`。位置・Facing は現行どおり維持。
+Push は LogicalX のみ変更。**KnockbackVelocityX は変更しない**。Facing は Push 後。
+`Time.deltaTime` / Rigidbody / Collider による物理解決は不使用。
 
-### 2.5 HUD（段階12A / 13A）
+ログ: 壁際再配分の**立ち上がり時だけ**
+`[FightDebug] Push wall redistribute left=... right=... overlap=... half=... leftMoved=... rightMoved=... reToRight=... reToLeft=... afterDist=... min=...`
+同一接触中の毎 Frame 大量出力はしない。
 
-- P2 Stun/State、**P2 KB Vx/Act** を状態表示（左上）へ追加
-- 操作説明は左下の別 TMP（ランタイム分離維持）
-- Scene 手動配線不要
+再配分順は現在「右→左」。通常の片側壁際は左右対称に検証済み。両者とも移動余地不足時の公平性・優先順位は今後の判断対象。
 
-### 2.6 確認済みの挙動（段階13A）
+### 2.4 確認済みの挙動（段階13B-1）
 
-- Hit 成立（例 CF 306）: P2 X=3.85、Stun=12、KB Vx=0.180、HitStop=6、位置未移動
-- HitStop 6F: Combat 停止、X=3.85・Vx=0.180・Stun=12 維持
-- HitStop 後最初の Combat（例 CF 307）: X=4.03、Vx=0.165、Stun=11
-- 途中（例 CF 310）: X=4.48、Vx=0.120、Stun=8
-- 終了: X=5.02、Stun=0 / Idle、KB Vx=0 / Active=0、被Hit色解除、HitCount=1 保持
-- 攻撃者から離れる方向。Push Dist 1.00→2.17。Facing P1=R / P2=L 維持。Box 追従
-- 同一攻撃で初速二重設定なし。R Reset で HitCount/Stun/KB/HitStop/色初期化、位置/Facing 維持
-- Error / Warning 0
+**コンパイル**: Error 0 / Warning 0
 
-### 2.7 未実装・未検証（段階13Aは完了扱い、段階13全体は未完了）
+**中央の通常 Push**:
+- 例: P1 X=2.28、P2 X=3.28、Push Dist=1.00
+- `Push correct` ログあり、`Push wall redistribute` なし
+- 半分ずつ補正
 
-- ステージ端・壁、壁際 Push 補正配分（**段階13B**）
-- ノックバック中に既存 minX/maxX へ到達した際の正式仕様
-- 左方向ノックバックの実操作確認
-- P1 が被 Hit する共通経路の実操作確認
-- Y 方向ノックバック、HP / Damage / Guard / Down
-- Character 固有データ化、攻撃データ SO 化
-- Unity Physics は使用していない
+**右端**:
+- 初期テスト: P1=5.8 / P2=6.8 → 最終 P1=6.00 / P2=7.00、Dist=1.00
+- P2 は maxX=7 を越えない
+- ログ例: left=P1 right=P2、overlap=0.050、half=0.025、leftMoved=0.025、rightMoved=0.000、reToRight=0.000、reToLeft=0.025、afterDist=1.000
+- 右側不足分を左側へ再配分
 
-### 2.8 相打ち・キャラ差し替え
+**左端**:
+- 正しい初期テスト: P2=-6.8 / P1=-5.8 → 最終 P2=-7.00 / P1=-6.00、Dist=1.00
+- P2 は minX=-7 を越えない
+- ログ例: left=P2 right=P1、overlap=0.050、half=0.025、leftMoved=0.000、rightMoved=0.025、reToRight=0.025、reToLeft=0.000、afterDist=1.000
+- 左側不足分を右側へ再配分
+- 同一接触中にログが毎 Frame 大量出力されないことを確認
+
+**Stage 13A 回帰**（Scene 初期 P1=0 / P2=3）:
+- Hit: `Punch hit attacker=P1 defender=P2 CombatFrame=381 KB=0.180`
+- HitStop 終了後、最終例: P1 X=2.33、P2 X=4.50、HitCount=1、Stun=0 / Idle、KB Vx/Act=0.000 / 0
+- HitStop / Knockback / HitStun 終了が正常。Push による KnockbackVelocityX 変更なし
+
+テスト注意: 左端の初期案内で P1/P2 配置を一度誤ったが実装不具合ではない。Scene / Font のテスト差分は restore 済み。
+
+### 2.5 未実装・注意（段階13B-1は完了扱い）
+
+- Knockback 中に壁へ到達した際の速度停止仕様
+- 壁バウンド、壁やられ、Corner 専用状態
+- 両者とも移動余地が不足する特殊ケースのゲーム仕様
+- Y 方向 Knockback、ステージ端の視覚表示
+- minX/maxX のデータ化、Character 別 Push 重量
+- HP / Damage / Guard / Down（段階14）
+- 再配分順「右→左」の両者不足時の公平性は今後の判断対象
+
+### 2.6 相打ち・キャラ差し替え
 
 - 相打ち: 両方向判定の土台のみ。P2 Neutral のため実動作確認は未実施
 - キャラ差し替え・複数 Hurt/Hit Box: 未実装
 
 ---
 
-## 3. Facing / Push（維持）
+## 3. Facing / Push（維持・13B-1更新）
 
-Facing 分離・Push 等分分離は実装済み。HitStun / ノックバック中も Push / Facing は維持（段階12A / 13A）。
-壁際の片側補正配分は段階13Bで再検討。
+Facing 分離・Push 等分分離は実装済み。壁際では Motor 実移動量に基づき未解消を反対側へ再配分（段階13B-1）。
+HitStun / ノックバック中も Push / Facing は維持。Push は KB 速度を触らない。
 
 ---
 
@@ -154,14 +156,15 @@ Push / Hurt / Hit の可視化（11A）と Hit×Hurt 重なり判定（11B）は
 | **10A / 10B-2 / 10B-3** | Facing、2体共通化、Push Box | **完了** |
 | **11A / 11B** | Box 可視化、Hit×Hurt 重なり判定 | **完了** |
 | **12 / 12A** | 被 Hit 状態、HitStun、被 Hit 表示 | **完了** |
-| **13A** | Participant 共通ノックバック基盤（横・固定CF） | **完了** |
-| **13B** | ステージ端・壁際 Push 配分（既存工程表の段階13残作業） | **次回候補** |
-| **13**（全体） | ノックバック＋押し戻し＋ステージ端 | **未完了**（13Aのみ充足） |
-| **14** | HP、Damage、KO | 未実装 |
+| **13A** | Participant 共通ノックバック基盤 | **完了** |
+| **13B / 13B-1** | ステージ端・壁際 Push 配分（13B-1で充足） | **完了** |
+| **13**（計画要約） | ノックバック＋壁際 Push 再配分 | **計画項目は充足**（壁バウンド等は未実装のまま残課題） |
+| **14** | HP、Damage、KO | **次回候補** |
 | **15** | 攻撃データ化（Startup/Active/Recovery、Hit Box、Damage、HitStop、HitStun、Knockback） | 未実装 |
 
 その後の候補（順不同・未着手）:
 
+- ノックバック壁到達時の速度停止、壁バウンド、壁やられ、Corner
 - しゃがみ、ジャンプ、空中状態
 - 複数攻撃、入力バッファ、キャンセル
 - ガード、コンボ
@@ -188,8 +191,7 @@ Push / Hurt / Hit の可視化（11A）と Hit×Hurt 重なり判定（11B）は
 
 ## 7. 一言まとめ
 
-- 段階1〜**13A**まで到達（横ノックバック基盤完了。段階13全体は未完了）
-- 最新コミット済み HEAD: `f102e07`。段階13A は検証済み・未コミット
-- HitStop中は位置・KB速度・Stunすべて維持。HitStop後の Combat から固定フレーム移動
-- 速度正本は HitState、位置書き込みは Motor。Push は速度を触らない
-- 次は既存計画どおり段階**13B**（**ステージ端・壁際 Push 配分**）
+- 段階1〜**13B-1**まで到達（壁際 Push 再配分完了。段階13Bは13B-1で充足）
+- 最新コミット済み HEAD: `43ac815`。段階13B-1 は検証済み・未コミット
+- 通常は半分ずつ、壁際は実移動量の不足を反対側へ再配分。Push は KB 速度を触らない
+- 次は既存計画どおり段階**14**（**HP、Damage、KO**）

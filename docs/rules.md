@@ -148,17 +148,16 @@ Unity / UE などのエンジンAPIではなく、**60Hz論理シミュレーシ
 
 Unity デバッグ実装では、Facing と移動入力の分離・相手向き合いは**実装済み**である（段階10A）。
 横方向 Push Box／すり抜け防止も**実装済み**である（段階10B-3）。
-処理順は 入力移動 → ノックバック移動・減速 → Push 補正 → Facing → ActionFrame → Hit → Visual → HitStun消費。接触後の押し分けは双方等分補正の**暫定仕様**。
+処理順は 入力移動 → ノックバック移動・減速 → Push 補正 → Facing → ActionFrame → Hit → Visual → HitStun消費。接触後の押し分けは双方等分補正を基本とし、ステージ端で実移動が足りない分は反対側へ再配分する（段階13B-1）。
 Push / Hurt / Hit Box の **Game ビュー可視化**も**実装済み**である（段階11A）。
 Jパンチ Hit は **Hit Box × Hurt Box の重なり判定**である（段階11B。距離判定は削除済み）。
 被 Hit 後は共有 **HitStop（6F）** のあと、被弾側 **HitStun（暫定12 Combat Frame）** と横ノックバックが続く（段階12A / 13A）。
 HitStop は試合全体の Combat 停止、HitStun は被弾側のみの行動不能である。
 ノックバック初速は Hit 成立時に予約し、**HitStop 中は移動・減衰しない**。HitStop 終了後の Combat Frame から固定量で移動する（`Time.deltaTime` 不使用）。
-方向は Facing ではなく LogicalX 比較で決める。速度の正本は `HitState`、位置書き込みは `Motor.SetLogicalX`。
-HitStun 中も Push / Facing は維持する。ノックバック後のめり込みは同フレームの Push で解消する。
-既存 Motor の minX/maxX は有効のまま。ステージ端専用処理・壁際 Push 配分・HP は未実装（段階13B / 14）。
-縦方向 Push、飛び越え反転は未実装。
-壁際の補正配分はステージ境界実装時に再検討する（段階13B）。
+方向は Facing ではなく LogicalX 比較で決める。速度の正本は `HitState`、位置書き込みは `Motor`（`SetLogicalX` / `TryMoveLogicalXBy`）。
+HitStun 中も Push / Facing は維持する。ノックバック後のめり込みは同フレームの Push で解消する。Push は KnockbackVelocityX を変更しない。
+既存 Motor の minX/maxX（±7）は有効のまま。壁際 Push 再配分は**実装済み**（段階13B-1）。壁バウンド・壁やられ・ノックバック壁停止は未実装。
+縦方向 Push、飛び越え反転、HP は未実装（段階14）。
 
 攻撃状態の正本は各 `DebugFighterParticipant.AttackState` である。
 被 Hit / HitStun / ノックバック速度の正本は各 `DebugFighterParticipant.HitState` である。
@@ -433,8 +432,8 @@ HitStop 残が 0 のときだけ実行する。
 4. 判定箱表示
 5. デバッグHUD初期必須（SimulationTick 等の日本語説明付き）
 
-Unity デバッグ実装の**実際の到達点**（段階1〜13A）と次工程は
+Unity デバッグ実装の**実際の到達点**（段階1〜13B-1）と次工程は
 `docs/unity_implementation_status.md` を正とする。
-（横ノックバック基盤は完了。段階13全体は未完了。次工程は段階13B: ステージ端・壁際 Push 配分。）
+（壁際 Push 再配分は完了。次工程は段階14: HP、Damage、KO。）
 
 本番スプライトシートは未完成。参考画像を完成スプライトとしない。

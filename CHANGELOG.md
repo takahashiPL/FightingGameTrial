@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## v3.12（Unity段階13B-1完了・壁際Push補正配分）
+
+- 段階13B-1完了を明記。`Motor.TryMoveLogicalXBy` と PushResolver の壁際再配分を Docs に反映
+- 通常は左右半分ずつ。端で実移動が足りない分を反対側へ再配分（再配分順は右→左）。同XはAを左扱い
+- PushはLogicalXのみ変更し KnockbackVelocityX は触らない。FacingはPush後。minX/maxX=±7維持
+- 検証: 中央 Dist=1.00・wallログなし、右端/左端で再配分ログと Dist=1.00、13A回帰（HitStop/KB/Stun）正常、Error/Warning 0
+- 段階13B（工程表の壁際Push配分）は13B-1で充足。次工程は既存計画の段階14（HP、Damage、KO）
+- README / `docs/unity_implementation_status.md` / `docs/rules.md` を更新
+
 ## v3.11（Unity段階13A完了・Participant共通ノックバック基盤）
 
 - 段階13A完了を明記。`HitState.knockbackVelocityX` と Participant 暫定初速0.18／減速0.015を Docs に反映
