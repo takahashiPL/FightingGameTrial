@@ -328,6 +328,21 @@ namespace FightingGameTrial.DebugTools
             text = text + "P2 Stun/State  : " + p2HitStunLabel
                 + " / " + p2StateLabel + "\n";
 
+            // Knockback（段階13A）: 1行に Vx / Active を収めて下端切れを避ける。
+            string p2KnockbackVxLabel = "0.000";
+            string p2KnockbackActiveLabel = "0";
+            if (p2 != null)
+            {
+                p2KnockbackVxLabel = p2.KnockbackVelocityX.ToString("0.000");
+                if (p2.IsBeingKnockedBack)
+                {
+                    p2KnockbackActiveLabel = "1";
+                }
+            }
+
+            text = text + "P2 KB Vx/Act   : " + p2KnockbackVxLabel
+                + " / " + p2KnockbackActiveLabel + "\n";
+
             // Push Box（段階10B-3）: ASCII のみ。常時大量ログは出さず HUD で確認する。
             string pushDistLabel = simulationSession.LastPushCenterDistance.ToString("0.00");
             string pushOverlapLabel = simulationSession.LastPushWasOverlapping ? "1" : "0";

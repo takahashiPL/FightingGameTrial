@@ -13,7 +13,8 @@ namespace FightingGameTrial.Fighter
     /// - ゲームプレイ入力を使うか（使わないなら Session が Neutral を渡す）
     /// - 相手 Participant への明示参照を持つ
     /// - 自分専用の DebugFighterAttackState を1つ所有する
-    /// - 自分専用の DebugFighterHitState（被 Hit / HitStun）を所有する（段階12A）
+    /// - 自分専用の DebugFighterHitState（被 Hit / HitStun / ノックバック速度）を所有する（段階12A / 13A）
+    /// - ノックバック初速・減速量の暫定値を持つ（段階13A。攻撃データ化前）
     /// - 横方向 Push Box 半幅を持つ（段階10B-3。重なり解消の計算に使う）
     /// - Push / Hurt / Hit Box のローカル定義を持ち、World Box を計算する（段階11A）
     ///
@@ -25,6 +26,8 @@ namespace FightingGameTrial.Fighter
     /// - 攻撃開始・ActionFrame進行・Hit判定を自分で回さない（状態の所有のみ。進行は Session）
     /// - attacker / defender の選択や Hit 成立判定をしない（Session の責務）
     /// - Push 重なり解消を自分で回さない（Session が DebugFighterPushResolver を呼ぶ）
+    /// - Transform へノックバックを直接書かない（Motor.SetLogicalX 経由。Session が呼ぶ）
+    /// - ステージ端の壁処理・壁際 Push 配分をしない（段階13B 予定）
     /// - Box 枠の描画をしない（DebugFighterBoxView の責務）
     /// - CharacterDefinition を持たない（後段）
     ///
@@ -37,10 +40,10 @@ namespace FightingGameTrial.Fighter
     /// Dummy 専用ロジックだからではなく、Session が Neutral 入力（全 false）を渡すから。
     /// 同じ Motor 処理を通るが、Left/Right が無いので移動しない。
     ///
-    /// 攻撃と被弾（段階10B-2 / 12A）:
+    /// 攻撃と被弾（段階10B-2 / 12A / 13A）:
     /// Participant は自分の AttackState と HitState を所有します。
     /// SimulationSession が attacker / defender を選び Hit を解決し、
-    /// 成立時に defender.ReceiveHit で被弾・HitStun を記録します。
+    /// 成立時に defender.ReceiveHit で被弾・HitStun・ノックバック初速を記録します。
     ///
     /// Box 可視化（段階11A）:
     /// ローカル定義はここが所有し、World 変換もここで行う。
@@ -111,10 +114,26 @@ namespace FightingGameTrial.Fighter
         [Header("HitStun（段階12A・暫定）")]
         [Tooltip(
             "被 Hit 後、HitStop 終了から行動不能となる Combat Frame 数です。"
-            + " 攻撃データ化前の暫定値。ノックバックや HP は扱いません。"
+            + " 攻撃データ化前の暫定値。HP は扱いません。"
         )]
         [SerializeField]
         private int hitStunFrames = 12;
+
+        [Header("ノックバック（段階13A・暫定）")]
+        [Tooltip(
+            "HitStop 終了後、最初の Combat Frame で適用する横移動量の絶対値です。"
+            + " 符号は Session が LogicalX 比較で決めます。Time.deltaTime は使いません。"
+            + " 攻撃データ化前の暫定値。Y 方向・壁処理はしません。"
+        )]
+        [SerializeField]
+        private float knockbackInitialSpeed = 0.18f;
+
+        [Tooltip(
+            "1 Combat Frame ごとにノックバック速度を 0 へ近づける量です。"
+            + " Combat Frame 単位。実時間（deltaTime）には掛けません。"
+        )]
+        [SerializeField]
+        private float knockbackDeceleration = 0.015f;
 
         [Header("Push Box（段階10B-3・判定用半幅）")]
         [Tooltip(
@@ -176,9 +195,9 @@ namespace FightingGameTrial.Fighter
         private DebugFighterAttackState attackState =
             new DebugFighterAttackState();
 
-        [Header("被 Hit 状態（段階12A）")]
+        [Header("被 Hit 状態（段階12A / 13A）")]
         [Tooltip(
-            "この参加者自身の被 Hit / HitStun 状態です。"
+            "この参加者自身の被 Hit / HitStun / ノックバック速度です。"
             + " P1/P2で同じ型を持ち、Sessionから共通処理されます。"
         )]
         [SerializeField]
@@ -322,6 +341,70 @@ namespace FightingGameTrial.Fighter
                 }
 
                 return hitStunFrames;
+            }
+        }
+
+        /// <summary>
+        /// ノックバック初速の絶対値（Combat Frame 単位）。負数は 0 扱い。
+        /// </summary>
+        public float KnockbackInitialSpeed
+        {
+            get
+            {
+                if (knockbackInitialSpeed < 0f)
+                {
+                    return 0f;
+                }
+
+                return knockbackInitialSpeed;
+            }
+        }
+
+        /// <summary>
+        /// 1 Combat Frame あたりのノックバック減速量。負数は 0 扱い。
+        /// </summary>
+        public float KnockbackDeceleration
+        {
+            get
+            {
+                if (knockbackDeceleration < 0f)
+                {
+                    return 0f;
+                }
+
+                return knockbackDeceleration;
+            }
+        }
+
+        /// <summary>
+        /// 現在のノックバック横速度（正本は HitState）。
+        /// </summary>
+        public float KnockbackVelocityX
+        {
+            get
+            {
+                if (hitState == null)
+                {
+                    return 0f;
+                }
+
+                return hitState.KnockbackVelocityX;
+            }
+        }
+
+        /// <summary>
+        /// ノックバック適用中か（速度が 0 でない）。
+        /// </summary>
+        public bool IsBeingKnockedBack
+        {
+            get
+            {
+                if (hitState == null)
+                {
+                    return false;
+                }
+
+                return hitState.IsBeingKnockedBack;
             }
         }
 
@@ -697,32 +780,34 @@ namespace FightingGameTrial.Fighter
         }
 
         /// <summary>
-        /// パンチ Hit を受け取り、被弾記録と HitStun を開始します（段階12A）。
+        /// パンチ Hit を受け取り、被弾記録・HitStun・ノックバック初速を開始します（段階12A / 13A）。
         ///
         /// 何をするか:
-        /// - HitState.BeginHitStun（累計加算・Stun 残り設定）
+        /// - HitState.BeginHitStun（累計加算・Stun 残り・ノックバック初速）
         /// - 実行中の自分の攻撃があれば InterruptByHit（攻撃側の攻撃は触らない）
         /// - 被 Hit 表示色へ切替
         ///
         /// なぜ必要か: Session が defender.ReceiveHit を呼ぶ共通口にするため。
-        /// やらないこと: Hit 判定、HitStop 設定、ノックバック、HP、ログ出力。
+        /// やらないこと: Hit 判定、HitStop 設定、位置移動（Session+Motor）、HP、ログ出力。
+        /// このフレームではノックバック移動しない（Session の移動は Hit より前）。
         /// </summary>
         public void ReceiveHit(int combatFrame)
         {
-            ReceiveHit(combatFrame, HitStunFrames);
+            ReceiveHit(combatFrame, HitStunFrames, 0f);
         }
 
         /// <summary>
-        /// hitStunFrames を明示して被 Hit を受け取ります。
+        /// hitStunFrames とノックバック速度を明示して被 Hit を受け取ります。
+        /// knockbackVelocityX の符号は Session が LogicalX 比較で決めます。
         /// </summary>
-        public void ReceiveHit(int combatFrame, int hitStunFrameCount)
+        public void ReceiveHit(int combatFrame, int hitStunFrameCount, float knockbackVelocityX)
         {
             if (hitState == null)
             {
                 hitState = new DebugFighterHitState();
             }
 
-            hitState.BeginHitStun(hitStunFrameCount, combatFrame);
+            hitState.BeginHitStun(hitStunFrameCount, combatFrame, knockbackVelocityX);
 
             // 被弾側が攻撃中なら即時中断（Hit Box も IsActive で消える）。
             // 実操作未検証でも、P1/P2 共通基盤として持つ。
@@ -737,6 +822,7 @@ namespace FightingGameTrial.Fighter
         /// <summary>
         /// 1 Combat Frame 分の HitStun 消費を Participant に依頼します。
         /// Session が HitStop 外の Combat 末尾で1回だけ呼びます。
+        /// HitStun が 0 になったとき残ノックバック速度も捨てます（段階13A）。
         /// </summary>
         public void TickHitStunForCombatFrame()
         {
@@ -750,8 +836,24 @@ namespace FightingGameTrial.Fighter
 
             if (wasInHitStun && hitState.IsInHitStun == false)
             {
+                // HitStun 終了時に残速度を 0 へ（ノックバックは Stun 中だけ適用）。
+                hitState.ClearKnockback();
                 ApplyDisplayColor();
             }
+        }
+
+        /// <summary>
+        /// ノックバック移動直後に、1 Combat Frame 分だけ速度を減速します。
+        /// Session が HitStop 外・移動適用後に1回だけ呼びます。
+        /// </summary>
+        public void TickKnockbackVelocityForCombatFrame()
+        {
+            if (hitState == null)
+            {
+                return;
+            }
+
+            hitState.TickKnockbackVelocity(KnockbackDeceleration);
         }
 
         /// <summary>
@@ -779,7 +881,8 @@ namespace FightingGameTrial.Fighter
         }
 
         /// <summary>
-        /// HitState / AttackState / 表示色を初期化します（R キー Reset 用）。
+        /// HitState / AttackState / 表示色 / ノックバック速度を初期化します（R キー Reset 用）。
+        /// 位置と Facing は変えません（現行仕様）。
         /// </summary>
         public void ResetCombatDebugState()
         {

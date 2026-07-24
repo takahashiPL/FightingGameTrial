@@ -183,11 +183,11 @@ namespace FightingGameTrial.Fighter
         }
 
         /// <summary>
-        /// Push Box 補正などで、論理 X だけを外部から書き戻します（段階10B-3）。
+        /// Push Box 補正やノックバックなどで、論理 X だけを外部から書き戻します。
         ///
         /// 何をするか: logicalX を更新し、既存の minX/maxX でクランプして Transform へ反映。
-        /// なぜ必要か: 重なり解消は Session / PushResolver が計算し、位置の正本は Motor が持つため。
-        /// Facing は変更しません。
+        /// なぜ必要か: 重なり解消・ノックバックは Session が計算し、位置の正本は Motor が持つため。
+        /// Facing は変更しません。minX/maxX の仕様は変更しません（ステージ端の壁処理は段階13B）。
         /// </summary>
         public void SetLogicalX(float newX)
         {

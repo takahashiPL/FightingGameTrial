@@ -18,8 +18,15 @@ namespace FightingGameTrial.Simulation
     /// - 可視化と同じ EvaluateWorldHitBox / EvaluateWorldHurtBox を実判定でも使う
     /// - 旧 attackRange 距離判定は使用しない
     ///
+    /// 段階13A:
+    /// - Hit 成立時に被弾側へ横ノックバック初速を予約する（LogicalX 比較で符号決定）
+    /// - HitStop 中は移動・減速しない。HitStop 終了後の Combat から固定フレームで移動
+    /// - 入力移動 → ノックバック移動 → Push → Facing → Action → Hit → Visual → HitStun
+    /// - ノックバックは Motor.SetLogicalX 経由。Push 計算内容・minX/maxX は変更しない
+    /// - ステージ端の壁処理・壁際 Push 配分はしない（段階13B 予定）
+    ///
     /// 段階12A:
-    /// - 被弾側 Participant が HitState（HitStun / TotalHitCount）を所有する
+    /// - 被弾側 Participant が HitState（HitStun / TotalHitCount / ノックバック速度）を所有する
     /// - HitStop 中は HitStun を減らさない。Combat 末尾で1回だけ消費する
     /// - HitStun 中は移動・攻撃開始を止め、Push / Facing は維持する
     ///
@@ -46,16 +53,18 @@ namespace FightingGameTrial.Simulation
     /// 4. CombatFrame +1
     /// 5. BeginCombatFrame（P1/P2 被弾旗リセット）
     /// 6. P1/P2 攻撃開始判定
-    /// 7. P1 移動 / P2 移動
-    /// 8. Push Box 重なり解消（Participant 共通）
-    /// 9. P1 Facing / P2 Facing（Push 後の最終位置基準）
-    /// 10. P1/P2 ActionFrame 進行
-    /// 11. P1→P2 Hit / P2→P1 Hit（共通関数）
-    /// 12. Visual 更新（AttackState 反映）
-    /// 13. P1/P2 攻撃終了判定
+    /// 7. P1/P2 入力移動（HitStun 中はスキップ）
+    /// 8. P1/P2 ノックバック移動＋減速（HitStun 中かつ速度あり。1CFに1回）
+    /// 9. Push Box 重なり解消（Participant 共通。速度は触らない）
+    /// 10. P1 Facing / P2 Facing（Push 後の最終位置基準）
+    /// 11. P1/P2 ActionFrame 進行
+    /// 12. P1→P2 Hit / P2→P1 Hit（共通関数。成立時は初速予約のみ）
+    /// 13. Visual 更新（AttackState 反映）
+    /// 14. P1/P2 攻撃終了判定
+    /// 15. HitStun 消費（0 ならノックバック残速度もクリア）
     ///
     /// HitStop中:
-    /// Combat 処理全体をスキップするため、移動も Push も Facing も Action も進めない。
+    /// Combat 処理全体をスキップするため、移動も Push も Facing も Action もノックバックも進めない。
     /// ただし攻撃入力の SampleAttackInput は HitStop 前に行い、
     /// previousAttackHeld 相当の更新だけは維持する（既存仕様）。
     /// Hit 成立 tick では HitStopRemaining を設定するだけで、同じ tick 内では減らさない
@@ -326,38 +335,45 @@ namespace FightingGameTrial.Simulation
             TryStartJPunchForParticipant(participantP1);
             TryStartJPunchForParticipant(participantP2);
 
-            // 9. 両体移動（ワールド X のみ。Facing はここでは変えない）
+            // 9. 両体移動（ワールド X のみ。Facing はここでは変えない。HitStun 中は入力移動スキップ）
             ProcessOneFighterMovement(participantP1, inputP1);
             ProcessOneFighterMovement(participantP2, inputP2);
 
-            // 10. Push Box 重なり解消（移動後・Facing 前。Participant 共通）
+            // 10. ノックバック移動＋減速（段階13A）
+            //     Hit 成立フレームでは速度セットが後段のため、ここではまだ動かない。
+            //     HitStop 終了後の Combat から適用。Time.deltaTime は使わない。
+            //     Push より前に動かし、めり込みは同フレームの Push で解消する。
+            ProcessKnockbackForParticipant(participantP1);
+            ProcessKnockbackForParticipant(participantP2);
+
+            // 11. Push Box 重なり解消（移動後・Facing 前。Participant 共通。ノックバック速度は触らない）
             ResolvePushBoxBetweenParticipants(true);
 
-            // 11. 両体 Facing 確定（Push 後の最終位置基準。Hit 判定より前）
+            // 12. 両体 Facing 確定（Push 後の最終位置基準。Hit 判定より前）
             UpdateFacingTowardOpponent(participantP1);
             UpdateFacingTowardOpponent(participantP2);
 
-            // 12. ActionFrame 進行（Participant 単位）
+            // 13. ActionFrame 進行（Participant 単位）
             AdvanceActionForParticipant(participantP1);
             AdvanceActionForParticipant(participantP2);
 
-            // 13. Hit 判定（attacker / defender 共通。同一tickで両方向を評価してから HitStop）
+            // 14. Hit 判定（attacker / defender 共通。同一tickで両方向を評価してから HitStop）
             TryResolveJPunchHit(participantP1, participantP2);
             TryResolveJPunchHit(participantP2, participantP1);
 
-            // 14. Visual 更新（各 AttackState を反映。HitStun 中は Idle Sprite 優先）
+            // 15. Visual 更新（各 AttackState を反映。HitStun 中は Idle Sprite 優先）
             RefreshFighterVisual();
 
-            // 15. 攻撃終了判定（AttackState 側）
+            // 16. 攻撃終了判定（AttackState 側）
             TryEndJPunchForParticipant(participantP1);
             TryEndJPunchForParticipant(participantP2);
             RefreshFighterVisual();
 
-            // 16. HitStun 消費（Combat Frame 末尾・1回だけ。HitStop 外のみここに到達）
+            // 17. HitStun 消費（Combat Frame 末尾・1回だけ。0 ならノックバック残速度もクリア）
             TickHitStunForParticipant(participantP1);
             TickHitStunForParticipant(participantP2);
 
-            // 17. 状態文 / ログ
+            // 18. 状態文 / ログ
             UpdateStatusMessage();
             WriteConsoleLogIfNeeded();
         }
@@ -477,7 +493,7 @@ namespace FightingGameTrial.Simulation
             }
 
             RefreshFighterVisual();
-            Debug.Log("[FightDebug] Debug combat reset (Attack/HitStun/HitStop)");
+            Debug.Log("[FightDebug] Debug combat reset (Attack/HitStun/Knockback/HitStop)");
         }
 
         /// <summary>
@@ -638,7 +654,7 @@ namespace FightingGameTrial.Simulation
 
         /// <summary>
         /// 参加枠へ 1 CombatFrame 分の移動を依頼します。
-        /// Facing は変えません。HitStun 中は移動入力を適用しません（Push は別経路）。
+        /// Facing は変えません。HitStun 中は移動入力を適用しません（Push / ノックバックは別経路）。
         /// </summary>
         private void ProcessOneFighterMovement(
             DebugFighterParticipant participant,
@@ -654,7 +670,7 @@ namespace FightingGameTrial.Simulation
                 return;
             }
 
-            // HitStun 中は本人の移動だけ無効。Push 補正は後段で双方に効く。
+            // HitStun 中は本人の移動だけ無効。Push / ノックバックは後段で効く。
             if (participant.IsInHitStun)
             {
                 return;
@@ -664,10 +680,61 @@ namespace FightingGameTrial.Simulation
         }
 
         /// <summary>
+        /// HitStun 中のノックバックを 1 Combat Frame 分だけ適用します（段階13A）。
+        ///
+        /// 流れ:
+        /// LogicalX += knockbackVelocityX → 速度を deceleration だけ 0 へ近づける。
+        /// Time.deltaTime は使わない（固定 Combat Frame 単位）。
+        ///
+        /// なぜ Hit 成立フレームでは動かないか:
+        /// このメソッドは Hit 判定より前に走る。成立時にセットされた初速は
+        /// HitStop 終了後の次 Combat から効く。
+        ///
+        /// Motor との責務:
+        /// 速度の正本は HitState。位置書き込みは Motor.SetLogicalX。
+        /// 既存 minX/maxX クランプはそのまま（今回ステージ端仕様は変更しない）。
+        ///
+        /// Push との関係:
+        /// ノックバック後にめり込んだ場合、同フレームの Push で解消する。
+        /// Push は knockbackVelocityX を変更しない。
+        /// </summary>
+        private void ProcessKnockbackForParticipant(DebugFighterParticipant participant)
+        {
+            if (participant == null)
+            {
+                return;
+            }
+
+            if (participant.Motor == null)
+            {
+                return;
+            }
+
+            // ノックバックは HitStun 中だけ適用する。
+            if (participant.IsInHitStun == false)
+            {
+                return;
+            }
+
+            float velocityX = participant.KnockbackVelocityX;
+            if (velocityX == 0f)
+            {
+                return;
+            }
+
+            float newX = participant.Motor.LogicalX + velocityX;
+            participant.Motor.SetLogicalX(newX);
+
+            // 移動した Combat Frame でのみ減速する（HitStop 中はここへ来ない）。
+            participant.TickKnockbackVelocityForCombatFrame();
+        }
+
+        /// <summary>
         /// Combat 末尾で HitStun を1減らします（段階12A）。
         ///
         /// HitStop 中（成立 tick で Remaining を立てた直後を含む）は減らさない。
         /// HitStop 外の Combat にだけ到達し、かつ Remaining==0 のときだけ消費する。
+        /// HitStun が 0 になると Participant 側でノックバック残速度もクリアする（段階13A）。
         /// </summary>
         private void TickHitStunForParticipant(DebugFighterParticipant participant)
         {
@@ -819,12 +886,12 @@ namespace FightingGameTrial.Simulation
         }
 
         /// <summary>
-        /// attacker → defender の Jパンチ Hit を判定します（段階11B）。
+        /// attacker → defender の Jパンチ Hit を判定します（段階11B / 13A）。
         ///
         /// 何をするか:
         /// - 可視化と同じ EvaluateWorldHitBox / EvaluateWorldHurtBox を取得
         /// - DebugPunchHitResolver で Active・未Hit・重なりを評価
-        /// - 成立時に defender.ReceiveHit / attackState.MarkHit / HitStop 設定
+        /// - 成立時に defender.ReceiveHit（HitStun + ノックバック初速）/ MarkHit / HitStop
         ///
         /// なぜ距離判定をやめたか:
         /// 赤い Hit Box と緑の Hurt Box の見た目と結果を一致させるため。
@@ -835,10 +902,12 @@ namespace FightingGameTrial.Simulation
         ///
         /// 1攻撃1Hit:
         /// attackState.HasCurrentJPunchHit が正本。MarkHit 後は同じ攻撃で再Hitしない。
+        /// したがってノックバック初速も同一攻撃で二重にセットされない。
         ///
-        /// HitStop:
-        /// 成立 tick では Remaining を代入するだけ。同じ tick 内では減らさない。
-        /// 次 tick 先頭の HitStop 判定から Combat 停止が始まる（既存仕様）。
+        /// HitStop / ノックバック開始の時間関係:
+        /// 成立 tick では Remaining=6 と初速を入れるだけ。同じ tick では移動しない。
+        /// HitStop 中は Combat スキップのため減速もしない。
+        /// HitStop 終了後の Combat からノックバック移動が始まる。
         ///
         /// 攻撃結果の正本は attacker.AttackState.LastAttackResult のみです。
         /// Miss 確定は攻撃終了時（EndJPunch）で、Hit していなければ Miss（既存フロー）。
@@ -891,9 +960,17 @@ namespace FightingGameTrial.Simulation
                 return false;
             }
 
+            // ノックバック符号は Facing ではなく Hit 成立時点の LogicalX 比較で決める。
+            // 攻撃者から防御者を遠ざける方向。同位置は attacker Facing を fallback。
+            float knockbackVelocityX = ResolveKnockbackVelocityX(attacker, defender);
+
             // 被弾記録は defender（Participant）側が所有する。
-            // HitStun を開始し、被弾側の実行中攻撃があれば中断する（段階12A）。
-            defender.ReceiveHit(timeState.CombatFrame, defender.HitStunFrames);
+            // HitStun 開始・ノックバック初速予約・被弾側攻撃の中断（段階12A / 13A）。
+            defender.ReceiveHit(
+                timeState.CombatFrame,
+                defender.HitStunFrames,
+                knockbackVelocityX
+            );
             RefreshOneFighterVisual(defender);
 
             // 1攻撃1Hit の正本は attacker の AttackState
@@ -907,6 +984,7 @@ namespace FightingGameTrial.Simulation
                 + " attacker=" + attacker.SlotId
                 + " defender=" + defender.SlotId
                 + " CombatFrame=" + timeState.CombatFrame
+                + " KB=" + knockbackVelocityX.ToString("0.000")
                 + " HitBox=[" + hitBox.MinX.ToString("0.00")
                 + ".." + hitBox.MaxX.ToString("0.00")
                 + "," + hitBox.MinY.ToString("0.00")
@@ -922,6 +1000,57 @@ namespace FightingGameTrial.Simulation
             timeState.HitStopRemaining = PunchHitStopFrames;
 
             return true;
+        }
+
+        /// <summary>
+        /// ノックバック初速の符号付き値を決めます（段階13A）。
+        ///
+        /// 正本は Hit 成立時点の LogicalX 比較（Facing だけを正本にしない）。
+        /// attacker.X &lt; defender.X → 右（+初速）
+        /// attacker.X &gt; defender.X → 左（-初速）
+        /// 同位置 → attacker の Facing を fallback（右向きなら +、左向きなら -）
+        /// 大きさは defender の暫定 knockbackInitialSpeed。
+        /// </summary>
+        private static float ResolveKnockbackVelocityX(
+            DebugFighterParticipant attacker,
+            DebugFighterParticipant defender)
+        {
+            float speed = 0f;
+            if (defender != null)
+            {
+                speed = defender.KnockbackInitialSpeed;
+            }
+
+            if (speed == 0f)
+            {
+                return 0f;
+            }
+
+            if (attacker == null || attacker.Motor == null || defender.Motor == null)
+            {
+                return 0f;
+            }
+
+            float attackerX = attacker.Motor.LogicalX;
+            float defenderX = defender.Motor.LogicalX;
+
+            if (attackerX < defenderX)
+            {
+                return speed;
+            }
+
+            if (attackerX > defenderX)
+            {
+                return -speed;
+            }
+
+            // 同位置: Facing を fallback（攻撃者が向いている側へ押し出す）
+            if (attacker.Motor.FacingRight)
+            {
+                return speed;
+            }
+
+            return -speed;
         }
 
         private void UpdateStatusMessage()
