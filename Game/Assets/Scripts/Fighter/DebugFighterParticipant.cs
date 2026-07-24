@@ -44,7 +44,10 @@ namespace FightingGameTrial.Fighter
     ///
     /// Box 可視化（段階11A）:
     /// ローカル定義はここが所有し、World 変換もここで行う。
-    /// 現段階の Hit 判定は距離ベースのまま。Box 重なり判定にはまだ使わない。
+    ///
+    /// Box 判定（段階11B）:
+    /// EvaluateWorldHitBox / EvaluateWorldHurtBox の結果を Session が重なり判定に使う。
+    /// 可視化と同じ経路なので、見た目の枠と実判定がズレない。
     /// </summary>
     public class DebugFighterParticipant : MonoBehaviour
     {

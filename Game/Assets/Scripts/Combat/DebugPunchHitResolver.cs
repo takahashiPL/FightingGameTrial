@@ -1,94 +1,96 @@
+using FightingGameTrial.Fighter;
+
 namespace FightingGameTrial.Combat
 {
     /// <summary>
-    /// Jパンチの Active 判定だけを行う小さな判定役です（段階9）。
+    /// Jパンチ Hit の評価結果ラベルです（HUD 用・段階11B）。
+    /// </summary>
+    public static class DebugPunchHitCheckLabels
+    {
+        public const string Inactive = "Inactive";
+        public const string NoOverlap = "NoOverlap";
+        public const string Hit = "Hit";
+        public const string AlreadyHit = "AlreadyHit";
+    }
+
+    /// <summary>
+    /// Jパンチの Hit 成立条件を純関数で評価します（段階11B）。
     ///
-    /// なぜ Collider ではなく論理座標で判定するか:
-    /// ゲーム仕様の正本は SimulationTick / CombatFrame / ActionFrame です。
-    /// Physics のタイミングに依存すると、Pause / Step / HitStop とズレやすくなります。
+    /// なぜ距離判定をやめたか:
+    /// 可視化した Hit Box / Hurt Box と実判定がズレると学習・確認が難しい。
+    /// 同じ DebugBox2D（World）の重なりで判定し、見た目と結果を一致させる。
     ///
-    /// なぜ Active Frame だけ判定するか:
-    /// Startup は振りかぶり、Recovery は硬直です。
-    /// 見た目が攻撃中でも、仕様上「当たるコマ」は Active に限定します。
+    /// なぜ Unity Physics / Collider を使わないか:
+    /// ゲーム仕様の正本は 60Hz の SimulationTick / CombatFrame です。
+    /// Physics のタイミングに依存すると Pause / Step / HitStop とズレやすい。
     ///
-    /// なぜ向いている側だけ Hit するか:
-    /// 後ろの相手へ手が届くのは不自然です。
-    /// 距離だけでなく Facing 方向を必須条件にします。
+    /// なぜ Active だけか:
+    /// Startup は振りかぶり、Recovery は硬直。当たるコマは Active に限定する。
+    /// Active 範囲そのものは Participant.EvaluateWorldHitBox().IsActive が正本
+    /// （可視化と同じ経路。ここに独自フレーム範囲は持たない）。
     ///
-    /// なぜ 1攻撃 1Hit にするか:
-    /// Active が複数フレームあっても、同じパンチで何度も Hit すると学習用確認が難しくなります。
-    /// HasCurrentJPunchHit で最初の1回だけ成立させます。
+    /// 1攻撃1Hit:
+    /// hasCurrentJPunchHit が true なら AlreadyHit。実際の旗更新は Session の MarkHit。
     ///
-    /// ダメージやノックバックを入れない理由:
-    /// 今回の目的は「Hit 検出 → 既存 HitStop を発生」までの最小確認です。
+    /// 境界接触:
+    /// DebugBox2D.Overlaps は等号あり（接しているだけでも Hit）。
     /// </summary>
     public static class DebugPunchHitResolver
     {
         /// <summary>
-        /// Active かつ未Hit かつ向き込み距離条件を満たすとき true を返します。
+        /// Hit Box × Hurt Box の重なりで Hit 可否を評価します。
+        ///
+        /// 戻り値 true のときだけ Session が MarkHit / ReceiveHit / HitStop を適用します。
+        /// checkLabel は HUD 用（Inactive / NoOverlap / Hit / AlreadyHit）。
         /// </summary>
         public static bool TryResolveHit(
             bool isJPunchAttack,
-            int actionFrame,
-            int activeStartFrame,
-            int activeEndFrame,
             bool hasCurrentJPunchHit,
-            float playerX,
-            bool playerFacingRight,
-            float dummyX,
-            float attackRange)
+            DebugBox2D attackerHitBox,
+            DebugBox2D defenderHurtBox,
+            out string checkLabel,
+            out bool boxesOverlap)
         {
+            checkLabel = DebugPunchHitCheckLabels.Inactive;
+            boxesOverlap = false;
+
             if (isJPunchAttack == false)
             {
                 return false;
             }
 
+            if (attackerHitBox == null || attackerHitBox.IsActive == false)
+            {
+                // Startup / Recovery / Idle、または Hit Box 未評価
+                return false;
+            }
+
             if (hasCurrentJPunchHit)
             {
+                // 同じ攻撃で既に Hit 済み（Active 中に重なり続けても二重 Hit しない）
+                checkLabel = DebugPunchHitCheckLabels.AlreadyHit;
+                if (defenderHurtBox != null && defenderHurtBox.IsActive)
+                {
+                    boxesOverlap = DebugBox2D.Overlaps(attackerHitBox, defenderHurtBox);
+                }
+
                 return false;
             }
 
-            if (actionFrame < activeStartFrame || actionFrame > activeEndFrame)
+            if (defenderHurtBox == null || defenderHurtBox.IsActive == false)
             {
                 return false;
             }
 
-            if (attackRange < 0f)
+            boxesOverlap = DebugBox2D.Overlaps(attackerHitBox, defenderHurtBox);
+            if (boxesOverlap == false)
             {
+                checkLabel = DebugPunchHitCheckLabels.NoOverlap;
                 return false;
             }
 
-            // 向いている側に相手がいて、距離が範囲以内であること
-            if (playerFacingRight)
-            {
-                if (dummyX < playerX)
-                {
-                    return false;
-                }
-
-                float distance = dummyX - playerX;
-                if (distance > attackRange)
-                {
-                    return false;
-                }
-
-                return true;
-            }
-            else
-            {
-                if (dummyX > playerX)
-                {
-                    return false;
-                }
-
-                float distance = playerX - dummyX;
-                if (distance > attackRange)
-                {
-                    return false;
-                }
-
-                return true;
-            }
+            checkLabel = DebugPunchHitCheckLabels.Hit;
+            return true;
         }
     }
 }

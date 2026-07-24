@@ -4,11 +4,11 @@ using UnityEngine;
 namespace FightingGameTrial.Fighter
 {
     /// <summary>
-    /// デバッグ用の軸平行 2D Box です（段階11A）。
+    /// デバッグ用の軸平行 2D Box です（段階11A / 11B）。
     ///
     /// 何を担当するか:
     /// - 中心・半幅・半高・有効フラグを1つにまとめる
-    /// - Min/Max を計算して可視化や将来の重なり判定で使う
+    /// - Min/Max を計算して可視化と重なり判定で共用する
     ///
     /// なぜ Push / Hurt / Hit を分けるか:
     /// - Push … 立ち位置の重なり防止（すり抜け防止）
@@ -16,8 +16,9 @@ namespace FightingGameTrial.Fighter
     /// - Hit  … 攻撃側の攻撃領域（Active 中のみ有効）
     /// 役割が違うため、同じ矩形を使い回さず種類ごとに持つ。
     ///
-    /// 現段階では判定には未使用:
-    /// Hit は従来どおり距離判定。この型は可視化と座標の正本化のための土台です。
+    /// 段階11B:
+    /// Hit 判定は距離ではなく、この型の Overlaps（軸平行矩形の重なり）を使う。
+    /// 可視化（DebugFighterBoxView）と実判定は同じ EvaluateWorld* 結果を参照する。
     /// </summary>
     [Serializable]
     public class DebugBox2D
@@ -110,6 +111,56 @@ namespace FightingGameTrial.Fighter
             bottomRight = new Vector3(MaxX, MinY, 0f);
             topRight = new Vector3(MaxX, MaxY, 0f);
             topLeft = new Vector3(MinX, MaxY, 0f);
+        }
+
+        /// <summary>
+        /// 軸平行 2D 矩形が重なっているか（または境界で接しているか）を返します（段階11B）。
+        ///
+        /// 境界接触も Hit 扱い:
+        /// 格闘ゲームの判定では「線が触れた」時点で接触とみなすのが自然なため、
+        /// Max/Min の比較は等号あり（面積が 0 の接線も true）。
+        ///
+        /// 大きな epsilon は入れない:
+        /// 固定フレームの論理座標で再現性を保つため。必要なら呼び出し側で理由付きに追加する。
+        ///
+        /// IsActive は見ない（幾何のみ）。有効判定は Session / Resolver 側の責務。
+        /// </summary>
+        public bool Overlaps(DebugBox2D other)
+        {
+            return Overlaps(this, other);
+        }
+
+        /// <summary>
+        /// 2つの軸平行 2D 矩形の重なり（境界接触含む）を判定します。
+        /// </summary>
+        public static bool Overlaps(DebugBox2D a, DebugBox2D b)
+        {
+            if (a == null || b == null)
+            {
+                return false;
+            }
+
+            if (a.MaxX < b.MinX)
+            {
+                return false;
+            }
+
+            if (a.MinX > b.MaxX)
+            {
+                return false;
+            }
+
+            if (a.MaxY < b.MinY)
+            {
+                return false;
+            }
+
+            if (a.MinY > b.MaxY)
+            {
+                return false;
+            }
+
+            return true;
         }
     }
 }

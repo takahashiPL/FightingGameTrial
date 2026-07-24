@@ -13,6 +13,11 @@ namespace FightingGameTrial.Simulation
     /// - Facing は Push 補正後の最終位置を基準に更新する
     /// - P1 専用停止ではなく、DebugFighterPushResolver で双方へ等分補正する
     ///
+    /// 段階11B:
+    /// - Jパンチ Hit は距離ではなく Hit Box × Hurt Box の重なりで判定する
+    /// - 可視化と同じ EvaluateWorldHitBox / EvaluateWorldHurtBox を実判定でも使う
+    /// - 旧 attackRange 距離判定は使用しない
+    ///
     /// 段階10B-2（維持）:
     /// - 攻撃状態（入力・開始・ActionFrame・終了・Visual）は各 Participant.AttackState
     /// - Hit 判定は attacker / defender 共通関数で行い、defender.ReceiveHit で被弾を記録する
@@ -78,14 +83,6 @@ namespace FightingGameTrial.Simulation
         [SerializeField]
         private DebugFighterParticipant participantP2;
 
-        [Header("Jパンチ判定（段階9・暫定）")]
-        [Tooltip(
-            "Jパンチの攻撃距離（ワールド単位）です。"
-            + " 向いている側に相手がいて、この距離以内なら Active で Hit します。"
-        )]
-        [SerializeField]
-        private float attackRange = 1.35f;
-
         [Header("時間状態")]
         [Tooltip(
             "SimulationTick / CombatFrame / Pause / HitStop など共有時間状態を保持します。"
@@ -122,6 +119,16 @@ namespace FightingGameTrial.Simulation
         /// </summary>
         private bool previousPushDidCorrect;
 
+        /// <summary>
+        /// HUD 用: 直近の P1→P2 Hit 評価で Box が重なっていたか（段階11B）。
+        /// </summary>
+        private bool lastBoxOverlap;
+
+        /// <summary>
+        /// HUD 用: 直近の P1→P2 Hit 評価ラベル（Inactive / NoOverlap / Hit / AlreadyHit）。
+        /// </summary>
+        private string lastHitCheckLabel = DebugPunchHitCheckLabels.Inactive;
+
         public SimulationTimeState TimeState
         {
             get { return timeState; }
@@ -141,6 +148,30 @@ namespace FightingGameTrial.Simulation
         public bool LastPushWasOverlapping
         {
             get { return lastPushWasOverlapping; }
+        }
+
+        /// <summary>
+        /// HUD 用: 直近 P1→P2 の Hit Box × Hurt Box 重なり。
+        /// </summary>
+        public bool LastBoxOverlap
+        {
+            get { return lastBoxOverlap; }
+        }
+
+        /// <summary>
+        /// HUD 用: 直近 P1→P2 の Hit 評価ラベル。
+        /// </summary>
+        public string LastHitCheckLabel
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(lastHitCheckLabel))
+                {
+                    return DebugPunchHitCheckLabels.Inactive;
+                }
+
+                return lastHitCheckLabel;
+            }
         }
 
         public DebugFighterParticipant ParticipantP1
@@ -723,11 +754,16 @@ namespace FightingGameTrial.Simulation
         }
 
         /// <summary>
-        /// attacker → defender の Jパンチ Hit を判定します（段階10B-2）。
+        /// attacker → defender の Jパンチ Hit を判定します（段階11B）。
         ///
         /// 何をするか:
-        /// - attacker.AttackState と両 Motor の論理座標で距離・向き込み判定
+        /// - 可視化と同じ EvaluateWorldHitBox / EvaluateWorldHurtBox を取得
+        /// - DebugPunchHitResolver で Active・未Hit・重なりを評価
         /// - 成立時に defender.ReceiveHit / attackState.MarkHit / HitStop 設定
+        ///
+        /// なぜ距離判定をやめたか:
+        /// 赤い Hit Box と緑の Hurt Box の見た目と結果を一致させるため。
+        /// 中心距離や Sprite 接触は見ない。隠れた距離 fallback も残さない。
         ///
         /// なぜ attacker / defender 形式か:
         /// P1→P2 と P2→P1 を同じ関数で扱い、専用分岐を増やさないため。
@@ -740,6 +776,7 @@ namespace FightingGameTrial.Simulation
         /// 次 tick 先頭の HitStop 判定から Combat 停止が始まる（既存仕様）。
         ///
         /// 攻撃結果の正本は attacker.AttackState.LastAttackResult のみです。
+        /// Miss 確定は攻撃終了時（EndJPunch）で、Hit していなければ Miss（既存フロー）。
         /// </summary>
         private bool TryResolveJPunchHit(
             DebugFighterParticipant attacker,
@@ -750,29 +787,39 @@ namespace FightingGameTrial.Simulation
                 return false;
             }
 
-            if (attacker.AttackState == null)
+            if (attacker == defender)
             {
                 return false;
             }
 
-            if (attacker.Motor == null || defender.Motor == null)
+            if (attacker.AttackState == null)
             {
                 return false;
             }
 
             DebugFighterAttackState attackState = attacker.AttackState;
 
+            // 可視化（BoxView）と同じ取得経路。独自の Active 範囲や距離式は持たない。
+            DebugBox2D hitBox = attacker.EvaluateWorldHitBox();
+            DebugBox2D hurtBox = defender.EvaluateWorldHurtBox();
+
+            string checkLabel;
+            bool boxesOverlap;
             bool isHit = DebugPunchHitResolver.TryResolveHit(
                 attackState.IsJPunchAttack,
-                attackState.ActionFrame,
-                PunchActiveStartFrame,
-                PunchActiveEndFrame,
                 attackState.HasCurrentJPunchHit,
-                attacker.Motor.LogicalX,
-                attacker.Motor.FacingRight,
-                defender.Motor.LogicalX,
-                attackRange
+                hitBox,
+                hurtBox,
+                out checkLabel,
+                out boxesOverlap
             );
+
+            // HUD は主に P1→P2 を表示（毎フレーム Miss ログは出さない）
+            if (attacker == participantP1 && defender == participantP2)
+            {
+                lastHitCheckLabel = checkLabel;
+                lastBoxOverlap = boxesOverlap;
+            }
 
             if (isHit == false)
             {
@@ -793,6 +840,14 @@ namespace FightingGameTrial.Simulation
                 + " attacker=" + attacker.SlotId
                 + " defender=" + defender.SlotId
                 + " CombatFrame=" + timeState.CombatFrame
+                + " HitBox=[" + hitBox.MinX.ToString("0.00")
+                + ".." + hitBox.MaxX.ToString("0.00")
+                + "," + hitBox.MinY.ToString("0.00")
+                + ".." + hitBox.MaxY.ToString("0.00") + "]"
+                + " HurtBox=[" + hurtBox.MinX.ToString("0.00")
+                + ".." + hurtBox.MaxX.ToString("0.00")
+                + "," + hurtBox.MinY.ToString("0.00")
+                + ".." + hurtBox.MaxY.ToString("0.00") + "]"
             );
 
             // 既存 HitStop を開始（同tickでは減らさない）

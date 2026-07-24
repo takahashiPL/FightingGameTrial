@@ -222,6 +222,17 @@ namespace FightingGameTrial.DebugTools
                 + " / " + hitBoxOnLabel + "\n";
             text = text + "HitBox CenterX : " + hitBoxCenterXLabel + "\n";
 
+            // Hit Box × Hurt Box（段階11B）: ASCII のみ。Miss の毎フレームログは出さない。
+            string boxOverlapLabel = simulationSession.LastBoxOverlap ? "1" : "0";
+            string hitCheckLabel = simulationSession.LastHitCheckLabel;
+            if (string.IsNullOrEmpty(hitCheckLabel))
+            {
+                hitCheckLabel = "Inactive";
+            }
+
+            text = text + "BoxOverlap     : " + boxOverlapLabel + "\n";
+            text = text + "HitCheck       : " + hitCheckLabel + "\n";
+
             text = text + "Punch Phase    : " + punchPhase + "\n";
             text = text + "AttackResult   : " + attackResult + "\n";
             text = text + "PunchHitDone   : " + punchHitDone + "\n";
