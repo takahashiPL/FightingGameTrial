@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## v3.9（Unity段階11B完了・Hit×Hurt 重なり判定）
+
+- 段階11B完了を明記。距離判定から Hit Box × Hurt Box 重なり判定への置換を Docs に反映
+- `DebugBox2D.Overlaps`（境界接触も Hit）。`attackRange` / 距離・Facing距離 fallback は削除済み
+- 可視化と同じ `EvaluateWorldHitBox` / `EvaluateWorldHurtBox` が実判定の正本。Active は AF 4〜6
+- 検証済み: 遠距離 Miss、近距離 Box Hit、1攻撃1Hit、6F HitStop、Pause/Step、Push 非変更、Error/Warning 0
+- 段階11（単一 Push/Hurt/Hit 可視化＋判定基盤）を完了扱い。次工程は既存計画の段階12（被 Hit / HitStun / 被 Hit 表示）
+- README / `docs/unity_implementation_status.md` / `docs/rules.md` を更新
+
 ## v3.8（Unity段階11A完了・Push/Hurt/Hit Box 可視化基盤）
 
 - 段階11A完了を明記。`DebugBox2D` / Participant の Box 定義 / `DebugFighterBoxView`（LineRenderer）を Docs に反映
