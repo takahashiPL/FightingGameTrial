@@ -20,16 +20,16 @@
 
 ## Unity 実装の到達点（要約）
 
-ブランチ `unity` 上で、**段階1〜10B-3まで完了**しています。
-最新全体コミット（HEAD）: **`c22bc2a`**（Keep dynamic font data across builds）
-最新コミット済み実装: **`582619b`**（Move fighter attack and hit state to participants）
-段階10B-3（Push Box）は**検証済み・ドキュメント反映時点では未コミット**（作業ツリー）。
+ブランチ `unity` 上で、**段階1〜11Aまで完了**しています。
+最新コミット済み HEAD: **`40dc1f4`**（Fix push resolver meta whitespace）
+段階10B-3まで: **完了・push 済み**
+段階11A（Box 可視化基盤）は**検証済み・ドキュメント反映時点では未コミット**（作業ツリー）。
 
 | 区分 | 内容 |
 |---|---|
-| **実装済み** | 60Hz SimulationTick、Pause/Step、HUD、HitStop、入力サンプリング、左右移動、Facing分離・相手向き合い、2体共通 Participant / AttackState、横方向 Push Box／すり抜け防止、Jパンチ、attacker/defender 暫定 Hit、1攻撃1Hit、Hit時6F HitStop、A/R→P1 AttackState |
-| **暫定** | 距離ベース Hit（正式 Box ではない）。Push 接触後の等分押し分け。相打ちは両方向判定の土台のみ（P2 は Neutral） |
-| **未実装（正式方針）** | Hurt/Hit Box、Box 可視化、Box 重なり判定、ステージ端・壁際の Push 配分再検討、縦方向 Push |
+| **実装済み** | 60Hz SimulationTick、Pause/Step、HUD、HitStop、入力サンプリング、左右移動、Facing分離・相手向き合い、2体共通 Participant / AttackState、横方向 Push Box／すり抜け防止、Push/Hurt/Hit Box 可視化（LineRenderer）、Jパンチ、attacker/defender 暫定 Hit、1攻撃1Hit、Hit時6F HitStop、A/R→P1 AttackState |
+| **暫定** | 距離ベース Hit（正式 Box 重なりではない）。Push 接触後の等分押し分け。論理接地 Y はデバッグ Sprite pivot から導出。相打ちは両方向判定の土台のみ（P2 は Neutral） |
+| **未実装（正式方針）** | Hit×Hurt 重なり判定（段階11B）、キャラ固有データ化、攻撃データ SO 化、ステージ端・壁際の Push 配分再検討、縦方向 Push |
 
 詳細・次工程は **`docs/unity_implementation_status.md`** を正とする。
 
@@ -83,7 +83,7 @@ Git 管理外: `Game/Library`、`Temp`、`Logs`、`UserSettings`、`obj` など
 
 ## 次の実装候補（要約）
 
-1. **段階11**: Push/Hurt/Hit Box の可視化、または判定基盤（距離判定→Box重なりへ置換）
+1. **段階11B**: Hit Box × Hurt Box の重なり判定基盤、距離判定→Box 判定へ置換
 2. 以降: 被Hit/HitStun、ノックバック、HP、攻撃データ化
 3. ステージ端実装時: Push の壁際補正配分を再検討
 

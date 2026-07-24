@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## v3.8（Unity段階11A完了・Push/Hurt/Hit Box 可視化基盤）
+
+- 段階11A完了を明記。`DebugBox2D` / Participant の Box 定義 / `DebugFighterBoxView`（LineRenderer）を Docs に反映
+- Push/Hurt 常時表示、J Punch Hit は Active（AF 4〜6）のみ。Facing Left は Hit Local X のみ反転（コード確認済み）
+- 論理接地 Y: `boxOriginLocalY = -(sprite.pivot.y / PPU)` を Awake で一度導出。WorldCenterY = LogicalGroundY + LocalCenterY
+- 検証済み: 足元〜頭付近の枠、追従、Active 連動、Pause/Step、距離 Hit / Push Resolver 非変更、Error/Warning 0
+- 未検証として Facing Left 攻撃の実操作表示を残す（11A 未完了にはしない。2P入力/テスト経路追加時の確認項目）
+- Box は可視化専用。次工程を段階11B（Hit×Hurt 重なり判定→距離判定置換）へ更新
+- README / `docs/unity_implementation_status.md` / `docs/rules.md` を更新
+
 ## v3.7（Unity段階10B-3完了・Push Box／すり抜け防止）
 
 - 段階10B-3完了を明記。Participant 共通の横方向 Push Box／すり抜け防止を Docs に反映
