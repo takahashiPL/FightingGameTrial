@@ -1,6 +1,6 @@
 # 2D格闘ゲーム Trial ルール仕様
 
-学習用プロジェクトの**ゲーム仕様の正本**です。  
+学習用プロジェクトの**ゲーム仕様の正本**です。
 Unity / UE などのエンジンAPIではなく、**60Hz論理シミュレーション**上のルールを定義します。
 
 実装時の読みやすさ方針は `docs/learning_and_readability.md` および `README.md` を参照してください。
@@ -141,13 +141,17 @@ Unity / UE などのエンジンAPIではなく、**60Hz論理シミュレーシ
 - 当フレーム途中で位置関係や Facing が変わっても、**そのフレームの入力意味を後から反転しない**
 - 判定箱更新は最終 Facing を反映したあと（§10）
 
-#### 2.3.1 Unityデバッグ実装との関係（2026-07-23）
+#### 2.3.1 Unityデバッグ実装との関係（2026-07-24）
 
-正式方針では、地上では基本的に相手と向き合い、Left/Right 入力は**ワールド移動方向**だけを決める（前進／後退）。  
+正式方針では、地上では基本的に相手と向き合い、Left/Right 入力は**ワールド移動方向**だけを決める（前進／後退）。
 自動振り向きは Push Box（すり抜け防止）とセットで設計する。
 
-一方、現在の `DebugFighterMotor` は操作確認用に **入力方向＝Facing** の**暫定挙動**である（正式ではない）。  
-段階9までの距離＋向き Hit も暫定であり、正式な Push/Hurt/Hit Box 判定ではない。
+Unity デバッグ実装（段階10A）では、Facing と移動入力の分離・相手向き合いは**実装済み**である。
+段階10のうち Push Box / 地上すり抜け防止はまだ未実装。
+
+攻撃状態の正本は各 `DebugFighterParticipant.AttackState` である。
+`SimulationTimeState` は SimulationTick / CombatFrame / Pause / HitStop 等の共有時間状態を持つ。
+距離＋向きの Hit はなお暫定であり、正式な Hurt/Hit Box 判定ではない。
 
 実装済み／暫定／未実装／次工程の一覧は `docs/unity_implementation_status.md` を参照する。
 
@@ -418,8 +422,8 @@ HitStop 残が 0 のときだけ実行する。
 4. 判定箱表示
 5. デバッグHUD初期必須（SimulationTick 等の日本語説明付き）
 
-Unity デバッグ実装の**実際の到達点**（段階1〜9）と次工程は  
-`docs/unity_implementation_status.md` を正とする。  
+Unity デバッグ実装の**実際の到達点**（段階1〜9）と次工程は
+`docs/unity_implementation_status.md` を正とする。
 （段階9の距離 Hit は暫定。正式な判定箱表示・重なり判定は未実装。）
 
 本番スプライトシートは未完成。参考画像を完成スプライトとしない。

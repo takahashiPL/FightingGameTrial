@@ -4,7 +4,7 @@
 
 ## 学習・可読性方針（重要）
 
-このプロジェクトでは、処理効率やコードの短さより、**人間が読んで目的と処理順を追えること**を優先します。  
+このプロジェクトでは、処理効率やコードの短さより、**人間が読んで目的と処理順を追えること**を優先します。
 日本語しか分からない人でも、クラスの責務と「いつ何が起きるか」が分かることを目標にします。
 
 詳細は **`docs/learning_and_readability.md`** を読んでください。要約:
@@ -20,16 +20,16 @@
 
 ## Unity 実装の到達点（要約）
 
-ブランチ `unity` 上で、**段階1〜9まで完了**しています。  
-最新実装コミット: **`0b84a81`**（Add minimal punch hit detection）
+ブランチ `unity` 上で、**段階1〜10B-2まで完了**しています。
+最新実装コミット: **`582619b`**（Move fighter attack and hit state to participants）
 
 | 区分 | 内容 |
 |---|---|
-| **実装済み** | 60Hz SimulationTick、Pause/Step、HUD、HitStop、ActionFrame、入力サンプリング、左右移動、Jパンチ、DebugDummy、暫定 Hit（距離＋向き）、1攻撃1Hit、Hit時6F HitStop |
-| **暫定** | 入力方向で Facing を変える挙動、距離ベース Hit（正式 Box ではない） |
-| **未実装（正式方針）** | 相手向き合いの Facing、Push/Hurt/Hit Box、Box 可視化、Box 重なり判定 |
+| **実装済み** | 60Hz SimulationTick、Pause/Step、HUD、HitStop、入力サンプリング、左右移動、Facing分離・相手向き合い、2体共通 Participant / AttackState、Jパンチ、attacker/defender 暫定 Hit、1攻撃1Hit、Hit時6F HitStop、A/R→P1 AttackState |
+| **暫定** | 距離ベース Hit（正式 Box ではない）。相打ちは両方向判定の土台のみ（P2 は Neutral） |
+| **未実装（正式方針）** | Push/Hurt/Hit Box、Box 可視化、Box 重なり判定、すり抜け防止 |
 
-詳細・次工程（段階10以降）は **`docs/unity_implementation_status.md`** を正とする。
+詳細・次工程は **`docs/unity_implementation_status.md`** を正とする。
 
 ## ブランチ構成
 
@@ -38,17 +38,17 @@
 | `main` | 共通資料（docs / data / schemas / art） |
 | `unity` | 共通資料 + Unity プロジェクト（`Game/`） |
 
-`1f294cc`（Add initial Unity 2D project）は、**Unity プロジェクトを追加したときの基準コミット**です。  
+`1f294cc`（Add initial Unity 2D project）は、**Unity プロジェクトを追加したときの基準コミット**です。
 Universal 2D テンプレートで作成済みです。
 
 ### Git 管理について
 
-Git 管理対象: `Game/Assets`、`Game/Packages`、`Game/ProjectSettings`  
+Git 管理対象: `Game/Assets`、`Game/Packages`、`Game/ProjectSettings`
 Git 管理外: `Game/Library`、`Temp`、`Logs`、`UserSettings`、`obj` など
 
 ## 今回Unityを選定した理由
 
-特定エンジンの継続学習が主目的ではありません。2D座標、固定論理フレーム、入力バッファ、状態遷移、判定箱、CSV駆動を、小規模かつ明示的に実装・可視化しやすいためです。  
+特定エンジンの継続学習が主目的ではありません。2D座標、固定論理フレーム、入力バッファ、状態遷移、判定箱、CSV駆動を、小規模かつ明示的に実装・可視化しやすいためです。
 将来は同仕様を基準に UE 版との比較余地を残します。
 
 ## 正本の優先順位
@@ -64,7 +64,7 @@ Git 管理外: `Game/Library`、`Temp`、`Logs`、`UserSettings`、`obj` など
 
 ### スプライト配置の正本
 
-**`data/sprite_frame_requirements.csv`**  
+**`data/sprite_frame_requirements.csv`**
 `art/spritesheet_layout.csv` と `frames.csv` の sheet 座標はこれに合わせる。参考PNGは配置正本ではない。
 
 ## データの完成状態
@@ -81,9 +81,9 @@ Git 管理外: `Game/Library`、`Temp`、`Logs`、`UserSettings`、`obj` など
 
 ## 次の実装候補（要約）
 
-1. **段階10**: Facing と移動入力の分離、自動向き合い、Push Box、地上すり抜け防止  
-2. **段階11**: Hurt/Hit Box、可視化、距離判定→Box重なりへ置換  
-3. 以降: 被Hit/HitStun、ノックバック、HP、攻撃データ化  
+1. **段階10の残り**: Push Box、地上すり抜け防止（Facing 分離・2体共通化は完了）
+2. **段階11**: Hurt/Hit Box、可視化、距離判定→Box重なりへ置換
+3. 以降: 被Hit/HitStun、ノックバック、HP、攻撃データ化
 
 詳細は `docs/unity_implementation_status.md`。
 
@@ -91,10 +91,10 @@ Git 管理外: `Game/Library`、`Temp`、`Logs`、`UserSettings`、`obj` など
 
 専任デザイナーは不在。ChatGPT 支援を前提に、段階工程で作る。
 
-1. 骨格ポーズ → 単色シルエット → 仮ドット絵 → 前後比較 → Unity連続再生 → 修正 → 本番清書  
-2. いきなり各フレームを独立した完成ドット絵として生成しない  
-3. 最初の試験対象は **Idle** と **StandPunch** のみ  
-4. 現在の参考画像は**完成素材ではない**  
+1. 骨格ポーズ → 単色シルエット → 仮ドット絵 → 前後比較 → Unity連続再生 → 修正 → 本番清書
+2. いきなり各フレームを独立した完成ドット絵として生成しない
+3. 最初の試験対象は **Idle** と **StandPunch** のみ
+4. 現在の参考画像は**完成素材ではない**
 5. 詳細正本は **`docs/production_spritesheet_spec.md`**（状態は `docs/sprite_art_status.md`）
 
 仮素材のまま判定実装を進めてよい。
@@ -129,8 +129,8 @@ Unity_FightingGameTrial
 
 ## 仮値・未確定（要約）
 
-暫定値: JustGuardWindow=3、Damage、Stun、Pushback、Jump移動量、LandingRecoveryフレーム数、デバッグ用 attackRange=1.35 など。  
-未確定: 空中パンチのガード可否、多段技、必殺技、キャラ差、高度な壁際補正。  
+暫定値: JustGuardWindow=3、Damage、Stun、Pushback、Jump移動量、LandingRecoveryフレーム数、デバッグ用 attackRange=1.35 など。
+未確定: 空中パンチのガード可否、多段技、必殺技、キャラ差、高度な壁際補正。
 詳細は `docs/rules.md` §0。
 
 ## 主要仕様（要約）
@@ -141,6 +141,6 @@ Unity_FightingGameTrial
 - Clash は一次分類。Trade は双方向とも Hit のときの複合集約
 - SimulationTick（入力）と CombatFrame / ActionFrame（戦闘）を分離
 - 空中 Pushbox 無効。着地で復活＋等分分離
-- Facing は相手との位置関係を基本とし、移動入力と分離する（正式方針。デバッグ実装は暫定あり → `docs/unity_implementation_status.md`）
+- Facing は相手との位置関係を基本とし、移動入力と分離する（Unity デバッグでは段階10Aで実装済み → `docs/unity_implementation_status.md`）
 - `attack_category` はラベルのみ
 - 必殺技は未実装・非表示

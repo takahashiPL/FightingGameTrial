@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## v3.6（Unity段階10B-2完了・AttackState正本化）
+
+- 段階10A/10B-2完了を明記。最新実装コミット `582619b`（Move fighter attack and hit state to participants）
+- 攻撃状態の正本を各 `DebugFighterParticipant.AttackState` に移したことを Docs に反映
+- `SimulationTimeState` は共有時間・Pause・HitStop 担当と明記（旧攻撃フィールド削除済み）
+- Hit を `TryResolveJPunchHit(attacker, defender)` 共通化。P2 は共通経路を持つが Neutral のため通常攻撃しない
+- `DebugDummyTarget` 廃止を Docs に反映（コード・Scene とも削除済み）
+- Facing 分離・相手向き合いは実装済み。段階10の残りは Push Box・すり抜け防止
+- 相打ちは両方向判定の土台のみ。P2入力/AIによる実動作確認は未実施と明記
+- README / `docs/unity_implementation_status.md` / `docs/rules.md` §2.3.1 を更新
+
 ## v3.5（Unity段階1〜9到達・Facing方針・工程見直し）
 
 - Unity 実装の到達点・暫定/正式・次工程を `docs/unity_implementation_status.md` に集約
