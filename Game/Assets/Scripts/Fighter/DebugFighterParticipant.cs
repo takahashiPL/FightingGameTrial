@@ -1,3 +1,4 @@
+using FightingGameTrial.DebugTools;
 using UnityEngine;
 
 namespace FightingGameTrial.Fighter
@@ -14,6 +15,7 @@ namespace FightingGameTrial.Fighter
     /// - 自分専用の DebugFighterAttackState を1つ所有する
     /// - 自分専用の被弾記録（HitCount 等）を所有する
     /// - 横方向 Push Box 半幅を持つ（段階10B-3。重なり解消の計算に使う）
+    /// - Push / Hurt / Hit Box のローカル定義を持ち、World Box を計算する（段階11A）
     ///
     /// やらないこと:
     /// - Update で移動しない
@@ -23,6 +25,7 @@ namespace FightingGameTrial.Fighter
     /// - 攻撃開始・ActionFrame進行・Hit判定を自分で回さない（状態の所有のみ。進行は Session）
     /// - attacker / defender の選択や Hit 成立判定をしない（Session の責務）
     /// - Push 重なり解消を自分で回さない（Session が DebugFighterPushResolver を呼ぶ）
+    /// - Box 枠の描画をしない（DebugFighterBoxView の責務）
     /// - CharacterDefinition を持たない（後段）
     ///
     /// なぜ Slot とキャラ種類を分けるか:
@@ -38,9 +41,21 @@ namespace FightingGameTrial.Fighter
     /// Participant は自分の AttackState と被弾記録を所有します。
     /// SimulationSession が attacker / defender を選び Hit を解決し、
     /// 成立時に defender.ReceiveHit で被弾を記録します。
+    ///
+    /// Box 可視化（段階11A）:
+    /// ローカル定義はここが所有し、World 変換もここで行う。
+    /// 現段階の Hit 判定は距離ベースのまま。Box 重なり判定にはまだ使わない。
     /// </summary>
     public class DebugFighterParticipant : MonoBehaviour
     {
+        /// <summary>
+        /// Jパンチ Hit Box を表示する Active 区間です。
+        /// SimulationSession の距離 Hit 用 Active（4〜6）と揃えます。
+        /// 可視化側の独自攻撃状態は持たず、AttackState.ActionFrame だけを参照します。
+        /// </summary>
+        private const int JPunchHitBoxActiveStartFrame = 4;
+
+        private const int JPunchHitBoxActiveEndFrame = 6;
         [Header("参加枠（キャラ種類ではない）")]
         [Tooltip("デバッグ用の参加枠 ID です。キャラクター種類の選択ではありません。")]
         [SerializeField]
@@ -83,14 +98,56 @@ namespace FightingGameTrial.Fighter
         [SerializeField]
         private bool usesGameplayInput = true;
 
-        [Header("Push Box（段階10B-3）")]
+        [Header("Push Box（段階10B-3・判定用半幅）")]
         [Tooltip(
             "横方向 Push Box の半幅（ワールド単位）です。"
-            + " 2人の中心間に必要な最小距離 = 双方の半幅の合計です。"
-            + " 縦方向・高さは判定しません。"
+            + " Push Resolver が使う正本。2人の中心間に必要な最小距離 = 双方の半幅の合計。"
+            + " 可視化用ローカル定義の HalfWidth もこの値に合わせます。"
         )]
         [SerializeField]
         private float pushBoxHalfWidth = 0.5f;
+
+        [Header("Box 座標原点（段階11A）")]
+        [Tooltip(
+            "Transform.position.y から論理的な接地位置（足元）へのローカル Y オフセットです。"
+            + " World の Box 原点 Y = Transform.position.y + この値。"
+            + " 現在のデバッグ Sprite は pivot が中央のため、Awake で"
+            + " -(sprite.pivot.y / pixelsPerUnit) を一度だけ入れます。"
+            + " SpriteRenderer.bounds を毎フレームは使いません。"
+        )]
+        [SerializeField]
+        private float boxOriginLocalY = 0f;
+
+        [Tooltip(
+            "true なら Awake 時に SpriteRenderer.sprite の pivot から"
+            + " boxOriginLocalY を自動設定します（Scene 再保存不要）。"
+        )]
+        [SerializeField]
+        private bool deriveBoxOriginLocalYFromSprite = true;
+
+        [Header("Box ローカル定義（段階11A・可視化用。判定未使用）")]
+        [Tooltip(
+            "Push Box のローカル定義です。"
+            + " HalfWidth は pushBoxHalfWidth が正本（Resolver と一致させる）。"
+            + " Center は論理接地位置（足元）からの相対です。"
+        )]
+        [SerializeField]
+        private DebugBox2D pushBoxLocal = new DebugBox2D(0f, 1f, 0.5f, 1f, true);
+
+        [Tooltip(
+            "Hurt Box のローカル定義です。常時存在（可視化は常時）。"
+            + " 現段階では被弾判定には使いません。"
+        )]
+        [SerializeField]
+        private DebugBox2D hurtBoxLocal = new DebugBox2D(0f, 1f, 0.45f, 1f, true);
+
+        [Tooltip(
+            "Jパンチ Hit Box のローカル定義です。"
+            + " Facing Right 基準の Local Center X。Left のときは X だけ符号反転します。"
+            + " Active 中だけ IsActive。距離 Hit 判定にはまだ使いません。"
+        )]
+        [SerializeField]
+        private DebugBox2D jPunchHitBoxLocal = new DebugBox2D(0.75f, 1.25f, 0.55f, 0.35f, false);
 
         [Header("攻撃状態")]
         [Tooltip(
@@ -194,6 +251,46 @@ namespace FightingGameTrial.Fighter
             get { return lastHitCombatFrame; }
         }
 
+        /// <summary>
+        /// Push Box ローカル定義（可視化・Inspector 確認用）。
+        /// </summary>
+        public DebugBox2D PushBoxLocal
+        {
+            get { return pushBoxLocal; }
+        }
+
+        /// <summary>
+        /// Hurt Box ローカル定義（可視化・Inspector 確認用）。
+        /// </summary>
+        public DebugBox2D HurtBoxLocal
+        {
+            get { return hurtBoxLocal; }
+        }
+
+        /// <summary>
+        /// Jパンチ Hit Box ローカル定義（可視化・Inspector 確認用）。
+        /// </summary>
+        public DebugBox2D JPunchHitBoxLocal
+        {
+            get { return jPunchHitBoxLocal; }
+        }
+
+        /// <summary>
+        /// Transform.position.y から論理接地（足元）へのローカル Y オフセットです。
+        /// </summary>
+        public float BoxOriginLocalY
+        {
+            get { return boxOriginLocalY; }
+        }
+
+        /// <summary>
+        /// 論理接地位置の World Y です（Box 共通の Y 原点）。
+        /// </summary>
+        public float LogicalGroundY
+        {
+            get { return transform.position.y + boxOriginLocalY; }
+        }
+
         private void Awake()
         {
             if (motor == null)
@@ -216,6 +313,15 @@ namespace FightingGameTrial.Fighter
                 Debug.LogError("DebugFighterParticipant: Opponent が未設定です。");
             }
 
+            EnsureLocalBoxDefaults();
+            RefreshBoxOriginLocalYIfNeeded();
+
+            // Push Resolver 用半幅を可視化定義へ同期（二重の真実を作らない）。
+            if (pushBoxLocal != null)
+            {
+                pushBoxLocal.HalfWidth = PushBoxHalfWidth;
+            }
+
             // Serializable な通常クラスのため AddComponent は使わない。
             // 参加者ごとに別インスタンスを持ち、P1/P2 で共有しない。
             if (attackState == null)
@@ -231,6 +337,272 @@ namespace FightingGameTrial.Fighter
             lastHitCombatFrame = -1;
 
             ApplyDisplayTint();
+            EnsureBoxView();
+        }
+
+#if UNITY_EDITOR
+        private void OnValidate()
+        {
+            EnsureLocalBoxDefaults();
+            if (pushBoxLocal != null)
+            {
+                // Inspector で pushBoxHalfWidth を変えたとき、可視化定義も追従させる。
+                pushBoxLocal.HalfWidth = pushBoxHalfWidth < 0f ? 0f : pushBoxHalfWidth;
+            }
+        }
+#endif
+
+        /// <summary>
+        /// Box 可視化コンポーネントを同じ GameObject へ自動用意します。
+        /// Scene への手動配線を増やさないための段階11A 方針です。
+        /// </summary>
+        private void EnsureBoxView()
+        {
+            DebugFighterBoxView boxView = GetComponent<DebugFighterBoxView>();
+            if (boxView == null)
+            {
+                boxView = gameObject.AddComponent<DebugFighterBoxView>();
+            }
+
+            boxView.Bind(this);
+        }
+
+        private void EnsureLocalBoxDefaults()
+        {
+            if (pushBoxLocal == null)
+            {
+                pushBoxLocal = new DebugBox2D(0f, 1f, 0.5f, 1f, true);
+            }
+
+            if (hurtBoxLocal == null)
+            {
+                hurtBoxLocal = new DebugBox2D(0f, 1f, 0.45f, 1f, true);
+            }
+
+            if (jPunchHitBoxLocal == null)
+            {
+                jPunchHitBoxLocal = new DebugBox2D(0.75f, 1.25f, 0.55f, 0.35f, false);
+            }
+        }
+
+        /// <summary>
+        /// Push Box の World 座標を返します（段階11A）。
+        ///
+        /// 変換の流れ:
+        /// 1. 原点 X = Motor.LogicalX（位置の正本）
+        /// 2. 原点 Y = 論理接地 Y（Transform.position.y + boxOriginLocalY）
+        /// 3. WorldCenter = 原点 + LocalCenter
+        /// 4. HalfWidth は pushBoxHalfWidth（Resolver と同じ値）
+        ///
+        /// Facing では左右反転しない（体幹の押し合い箱のため）。
+        /// 現段階では可視化専用。Push Resolver は従来どおり半幅だけを使う。
+        /// </summary>
+        public DebugBox2D EvaluateWorldPushBox()
+        {
+            EnsureLocalBoxDefaults();
+
+            DebugBox2D world = new DebugBox2D();
+            float originX;
+            float originY;
+            GetBoxOrigin(out originX, out originY);
+
+            float halfWidth = PushBoxHalfWidth;
+            float halfHeight = pushBoxLocal.HalfHeight;
+            if (halfHeight < 0f)
+            {
+                halfHeight = 0f;
+            }
+
+            world.Set(
+                originX + pushBoxLocal.CenterX,
+                originY + pushBoxLocal.CenterY,
+                halfWidth,
+                halfHeight,
+                true
+            );
+            return world;
+        }
+
+        /// <summary>
+        /// Hurt Box の World 座標を返します（段階11A）。
+        /// 常時有効。Facing 反転なし。被弾判定にはまだ使わない。
+        /// </summary>
+        public DebugBox2D EvaluateWorldHurtBox()
+        {
+            EnsureLocalBoxDefaults();
+
+            DebugBox2D world = new DebugBox2D();
+            float originX;
+            float originY;
+            GetBoxOrigin(out originX, out originY);
+
+            float halfWidth = hurtBoxLocal.HalfWidth;
+            float halfHeight = hurtBoxLocal.HalfHeight;
+            if (halfWidth < 0f)
+            {
+                halfWidth = 0f;
+            }
+
+            if (halfHeight < 0f)
+            {
+                halfHeight = 0f;
+            }
+
+            world.Set(
+                originX + hurtBoxLocal.CenterX,
+                originY + hurtBoxLocal.CenterY,
+                halfWidth,
+                halfHeight,
+                true
+            );
+            return world;
+        }
+
+        /// <summary>
+        /// Jパンチ Hit Box の World 座標を返します（段階11A）。
+        ///
+        /// Facing 反転の考え方:
+        /// - ローカル定義は Facing Right（相手が右）基準
+        /// - Facing Left のときは Local Center X の符号だけ反転する
+        /// - SpriteRenderer.flipX / Scale 反転には依存しない（二重反転を防ぐ）
+        ///
+        /// Active 連動:
+        /// AttackState が Jパンチ再生中かつ ActionFrame が 4〜6 のときだけ IsActive。
+        /// Startup / Recovery / Idle では非表示。距離 Hit 判定自体は変更しない。
+        /// </summary>
+        public DebugBox2D EvaluateWorldHitBox()
+        {
+            EnsureLocalBoxDefaults();
+
+            DebugBox2D world = new DebugBox2D();
+            float originX;
+            float originY;
+            GetBoxOrigin(out originX, out originY);
+
+            bool facingRight = true;
+            if (motor != null)
+            {
+                facingRight = motor.FacingRight;
+            }
+
+            // Facing Right: +LocalX / Facing Left: -LocalX（Y は反転しない）
+            float localCenterX = jPunchHitBoxLocal.CenterX;
+            if (facingRight == false)
+            {
+                localCenterX = -localCenterX;
+            }
+
+            float halfWidth = jPunchHitBoxLocal.HalfWidth;
+            float halfHeight = jPunchHitBoxLocal.HalfHeight;
+            if (halfWidth < 0f)
+            {
+                halfWidth = 0f;
+            }
+
+            if (halfHeight < 0f)
+            {
+                halfHeight = 0f;
+            }
+
+            bool isActive = IsJPunchHitBoxActiveNow();
+
+            world.Set(
+                originX + localCenterX,
+                originY + jPunchHitBoxLocal.CenterY,
+                halfWidth,
+                halfHeight,
+                isActive
+            );
+            return world;
+        }
+
+        /// <summary>
+        /// Sprite 資産の pivot から、Transform → 足元（スプライト矩形下端）への
+        /// ローカル Y オフセットを一度だけ求めます。
+        ///
+        /// 根拠（FightDebugScene / デバッグ PNG meta）:
+        /// - 階層に Visual 子オフセットはない（Participant と同 GO）
+        /// - spritePivot は中央 (0.5, 0.5)、PPU=100、テクスチャ 256 → pivot は中心
+        /// - Transform.position.y は足元ではなくスプライト中心
+        /// - LocalCenterY=1 / HalfHeight=1 は「原点=足元」前提のため、中心を原点にすると枠が上へずれる
+        ///
+        /// bounds は使わない。Sprite.pivot と pixelsPerUnit のみ（資産の静的値）。
+        /// </summary>
+        private void RefreshBoxOriginLocalYIfNeeded()
+        {
+            if (deriveBoxOriginLocalYFromSprite == false)
+            {
+                return;
+            }
+
+            if (spriteRenderer == null || spriteRenderer.sprite == null)
+            {
+                return;
+            }
+
+            Sprite sprite = spriteRenderer.sprite;
+            float pixelsPerUnit = sprite.pixelsPerUnit;
+            if (pixelsPerUnit <= 0f)
+            {
+                return;
+            }
+
+            // Unity の Sprite.pivot は矩形左下からのピクセル位置。
+            // Transform は pivot 位置にあるので、矩形下端（足元側）は
+            // transform.y - (pivot.y / PPU) になる。
+            boxOriginLocalY = -(sprite.pivot.y / pixelsPerUnit);
+        }
+
+        /// <summary>
+        /// いま Jパンチ Hit Box を有効表示すべきか。
+        /// AttackState を正本とし、可視化独自の攻撃進行は持たない。
+        /// </summary>
+        public bool IsJPunchHitBoxActiveNow()
+        {
+            if (attackState == null)
+            {
+                return false;
+            }
+
+            if (attackState.IsJPunchAttack == false)
+            {
+                return false;
+            }
+
+            if (attackState.IsActionPlaying == false)
+            {
+                return false;
+            }
+
+            int frame = attackState.ActionFrame;
+            if (frame < JPunchHitBoxActiveStartFrame)
+            {
+                return false;
+            }
+
+            if (frame > JPunchHitBoxActiveEndFrame)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Box 共通の論理原点を返します（P1/P2 同じ経路）。
+        /// X = Motor.LogicalX（無ければ Transform.x）
+        /// Y = 論理接地 = Transform.position.y + boxOriginLocalY
+        /// （Transform.y を無条件に足元とはみなさない）
+        /// </summary>
+        private void GetBoxOrigin(out float originX, out float originY)
+        {
+            originX = transform.position.x;
+            if (motor != null)
+            {
+                originX = motor.LogicalX;
+            }
+
+            originY = transform.position.y + boxOriginLocalY;
         }
 
         /// <summary>

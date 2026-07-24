@@ -190,6 +190,38 @@ namespace FightingGameTrial.DebugTools
             text = text + "Push Dist/Over : " + pushDistLabel
                 + " / " + pushOverlapLabel + "\n";
 
+            // Box 可視化（段階11A）: P1 の World Box 状態を短く表示。
+            string pushBoxOnLabel = "0";
+            string hurtBoxOnLabel = "0";
+            string hitBoxOnLabel = "0";
+            string hitBoxCenterXLabel = "-";
+            if (p1 != null)
+            {
+                DebugBox2D pushWorld = p1.EvaluateWorldPushBox();
+                DebugBox2D hurtWorld = p1.EvaluateWorldHurtBox();
+                DebugBox2D hitWorld = p1.EvaluateWorldHitBox();
+                if (pushWorld != null && pushWorld.IsActive)
+                {
+                    pushBoxOnLabel = "1";
+                }
+
+                if (hurtWorld != null && hurtWorld.IsActive)
+                {
+                    hurtBoxOnLabel = "1";
+                }
+
+                if (hitWorld != null && hitWorld.IsActive)
+                {
+                    hitBoxOnLabel = "1";
+                    hitBoxCenterXLabel = hitWorld.CenterX.ToString("0.00");
+                }
+            }
+
+            text = text + "Box P/H/Hit    : " + pushBoxOnLabel
+                + " / " + hurtBoxOnLabel
+                + " / " + hitBoxOnLabel + "\n";
+            text = text + "HitBox CenterX : " + hitBoxCenterXLabel + "\n";
+
             text = text + "Punch Phase    : " + punchPhase + "\n";
             text = text + "AttackResult   : " + attackResult + "\n";
             text = text + "PunchHitDone   : " + punchHitDone + "\n";
