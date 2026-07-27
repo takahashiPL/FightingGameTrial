@@ -23,18 +23,19 @@
 実装状況の確認と、Scene / Component の理解は資料を分けています。
 
 1. **`docs/learning_and_readability.md`** … 可読性・学習方針
-2. **`docs/component_and_scene_guide.md`** … FightDebugScene を題材にした Scene / Component / 実行経路の教材
+2. **`docs/component_and_scene_guide.md`** … FightDebugScene を題材にした Scene / Component / Inspector / 実行経路、および Managed Heap / GC / GC.Alloc / Profiler 実習の教材
 3. **`docs/rules.md`** … ゲーム仕様（SimulationTick / HitStop などの意味）
 4. **`docs/unity_implementation_status.md`** … 段階ごとの実装済み・未実装・次工程（状況確認用）
 5. コード … 教材 §13 の推奨順（`DebugAttackData` → 入力 → ClockDriver → Session → …）
 
 「今どこまで実装されたか」を知りたいときは 4。
 「Hierarchy と Inspector とコードを結びたい」ときは 2。
+「GC.Alloc を Profiler でどう見るか」も 2（§16）。実装状況の正本と混同しない。
 
 ## Unity 実装の到達点（要約）
 
 ブランチ `unity` 上で、**段階1〜15まで完了**しています。
-最新コミット済み HEAD: **`de85e52`**（Document J Punch attack data completion）
+最新コミット済み HEAD: **`2341e4c`**（Add component and scene learning guide）
 段階14全体（14A+14B）・段階15（J Punch 攻撃データ化）: **完了・push 済み**（SO 化は見送り）。
 
 | 区分 | 内容 |
@@ -72,7 +73,7 @@ Git 管理外: `Game/Library`、`Temp`、`Logs`、`UserSettings`、`obj` など
 3. `schemas/data_dictionary.md`
 4. `docs/learning_and_readability.md`（実装スタイル）
 5. `docs/unity_implementation_status.md`（Unity実装の到達点・暫定/正式・次工程）
-6. `docs/component_and_scene_guide.md`（Scene / Component 学習教材。仕様正本ではない）
+6. `docs/component_and_scene_guide.md`（Scene / Component / GC.Alloc 学習教材。仕様・実装状況の正本ではない）
 7. `docs/production_spritesheet_spec.md`
 8. `docs/debug_screen_spec.md`
 9. 各種PNG参考画像

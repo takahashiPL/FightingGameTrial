@@ -2,7 +2,7 @@
 
 最終更新: 2026-07-27
 対象ブランチ: `unity`
-対象コミット（資料作成時点）: **`de85e52`**（Document J Punch attack data completion）
+対象コミット（資料作成時点）: **`2341e4c`**（Add component and scene learning guide）
 対象 Scene: `Game/Assets/Scenes/FightDebugScene.unity`
 実装到達点: **Stage 15（J Punch 攻撃データ化）完了後**
 
@@ -14,6 +14,7 @@
 
 Unity の **Scene / GameObject / Component / MonoBehaviour / Inspector 参照** と、
 本プロジェクト（FightingGameTrial）の **コード責務・実行経路** を結びつけて説明します。
+加えて §16 では、**マネージヒープ / GC / GC.Alloc / Profiler 実習** を現在コードと結びつけて扱います。
 題材は現在の `FightDebugScene` です。
 
 読了後に次が追えることを目指します。
@@ -22,6 +23,7 @@ Unity の **Scene / GameObject / Component / MonoBehaviour / Inspector 参照** 
 - Inspector の参照が、どの C# フィールドと対応するか
 - Play 後に「誰の `Update` が何を始め、誰が SimulationTick を進めるか」
 - J キーを押してから Hit / HitStop / HUD 更新までの担当クラス
+- 高頻度経路での割り当て候補を Profiler でどう確認するか（実測は別実習）
 
 ### 実装仕様書との違い
 
@@ -602,7 +604,7 @@ HUD の数字は便利な鏡です。**戦闘データの正本は Session / Par
 |---|---|---|
 | [README.md](../README.md) | 入口・要約・読み順 | 全体の扉 |
 | [docs/learning_and_readability.md](learning_and_readability.md) | 可読性・学習方針 | 「どう書くか」 |
-| [docs/component_and_scene_guide.md](component_and_scene_guide.md) | **Scene/Component 教材（本ファイル）** | Unity 構造と実行経路 |
+| [docs/component_and_scene_guide.md](component_and_scene_guide.md) | **Scene/Component / GC 学習教材（本ファイル）** | Unity 構造・実行経路・GC.Alloc 確認 |
 | [docs/unity_implementation_status.md](unity_implementation_status.md) | 段階到達点・次工程 | 実装状況の正本 |
 | [docs/rules.md](rules.md) | ゲーム仕様 | 仕様の正本 |
 | [docs/debug_screen_spec.md](debug_screen_spec.md) | デバッグ画面の項目方針 | HUD 項目の意図 |
@@ -610,6 +612,252 @@ HUD の数字は便利な鏡です。**戦闘データの正本は Session / Par
 
 **読み分けの目安**
 
-- 「Unity 上で誰が何を持っているか」→ **この資料**
+- 「Unity 上で誰が何を持っているか」→ **この資料 §1〜§15**
+- 「GC.Alloc をどう見るか」→ **この資料 §16**
 - 「Stage 何まで終わったか」→ `unity_implementation_status.md`
 - 「HitStop とは何か」→ `rules.md`
+
+---
+
+## 16. Unity C# のメモリ確保と GC
+
+この章は **Unity一般** の基礎と、**本プロジェクト** の現在コードを分けて書きます。
+「コード上割り当てが起きそう」と「Profiler で実測した」は別です。実測していないものは **未計測** と明記します。
+Editor と Development Build / Player では数値が変わり得ます。
+
+### 16.1 GC とは何か
+
+#### Unity一般
+
+| 用語 | 意味 |
+|---|---|
+| **マネージヒープ** | C# の参照型オブジェクトが置かれるメモリ領域（Unity / .NET ランタイムが管理） |
+| **参照型** | `class`・配列・`string`・`List<T>` など。変数は参照を持ち、実体はヒープ上にあることが多い |
+| **値型** | `struct`・`int`・`float`・`bool`・`Vector2`/`Vector3`/`Rect`/`Color` など。スタックや包含先に直接載ることが多い |
+| **GC（Garbage Collection）** | 参照されなくなったマネージオブジェクトを、ランタイムが後からまとめて回収する仕組み |
+
+要点:
+
+- ゲーム側が「今すぐこのオブジェクトを回収せよ」と完全には制御できない
+- 回収が走るとフレーム時間が乱れることがある（スパイク）
+- **`new` と書いたら必ず GC 対象になるわけではない**（値型の `new Vector3(...)` など）
+- 主なヒープ確保候補: `class` / 配列 / `string` / `List` など
+- 値型でも **boxing**（値型を `object` やジェネリック制約のない参照として扱う）で割り当てが起きることがある
+- Unity の **`Destroy`（GameObject/Component 破棄）と GC は同じ処理ではない**。前者はエンジンオブジェクトの破棄、後者はマネージヒープの回収
+
+#### 本プロジェクトとの対応
+
+戦闘進行の正本は 60Hz の SimulationTick / CombatFrame です（`docs/rules.md`）。
+GC の話は「仕様の正本」ではなく、**実行時コストの学習**です。
+
+### 16.2 なぜゲームでは問題になるのか
+
+#### Unity一般
+
+1回きりの初期化より、次のような **高頻度の小さな確保** が積み上がりやすいです。
+
+- `Update` / `FixedUpdate`
+- 毎フレームの UI 文字列更新
+- 毎フレームの探索・ログ・一時配列
+- 弾・エフェクトの `Instantiate` / `Destroy` の繰り返し
+
+#### 本プロジェクト（高頻度経路の候補）
+
+| 経路 | 誰が回すか | 備考 |
+|---|---|---|
+| 描画 Frame（`Update`） | `DebugGameplayInput` / `DebugPlaybackInput` / `SimulationClockDriver` / `DebugHudView` | 実時間ベース |
+| SimulationTick | `SimulationClockDriver` → `SimulationSession.ProcessOneSimulationTick` | 約 60Hz（Pause 外） |
+| CombatFrame | Session 内（HitStop 中は進まない） | 戦闘進行 |
+| J Punch 処理 | Session + Participant + Resolver | Active 中の Box 評価など |
+| HUD 文字列更新 | `DebugHudView.Update` | 毎描画 Frame |
+| Console ログ | Session の `Debug.Log` 群 | 定期／イベント時 |
+
+これらを「GC.Alloc を最初に疑う場所」として扱います。割り当てが必ず大きい、とは断定しません。
+
+### 16.3 GC を減らす基本手法
+
+| 手法 | 何を防ぐか | 使用例 | 注意点 |
+|---|---|---|---|
+| List / Dictionary / 配列の再利用 | 毎回のコレクション生成 | 一時結果バッファをフィールドに保持 | 使い回し忘れで古い要素が残る |
+| 初期容量指定 | 内部配列の再確保 | `new List<T>(n)` | 過大確保はメモリを食う |
+| `Clear` して再利用 | 新しい List の確保 | 毎 Frame `Clear` → 再充填 | 内部配列はすぐ解放されないことが多い |
+| 戻り値で毎回配列を作らない | 呼び出し側への一時配列 | out 引数や共有バッファ | API 設計が変わる |
+| `static readonly` で固定データ1回生成 | 毎 Hit / 毎 Frame の設定オブジェクト | `DebugAttackData.JPunch` | 可変状態を static に載せない |
+| Object Pool | Instantiate/Destroy の繰り返し | 弾・ヒットエフェクト | 管理コスト・解放漏れ |
+| NonAlloc API | 物理クエリなどの一時配列 | `Overlap*NonAlloc` | バッファサイズ設計が必要 |
+| 文字列更新を値変更時だけ | 毎 Frame の `string` 生成 | 差分があったときだけ HUD 更新 | 差分検知の実装が必要 |
+| `TMP_Text.SetText` 等 | 割り当てを抑えた数値表示 | 可能なら補間より専用 API | すべての文字列が消えるわけではない |
+| `StringBuilder` 再利用 | 連結ごとの中間 `string` | フィールドに保持して `Clear` | 最後の `ToString` で `string` は生成される |
+| 高頻度で LINQ を避ける | イテレータや一時コレクション | 戦闘 tick 内 | Editor ツールや初期化では可読性優先も可 |
+| クロージャ・ラムダの捕捉に注意 | 隠れてのヒープ確保 | イベント購読 | ローカル関数でも捕捉すると確保し得る |
+| boxing を避ける | 値型の箱詰め | 非ジェネリックな API | 見た目は単純でもコストが出る |
+| Component 参照を保持 | 毎回の検索 | Inspector / Awake でキャッシュ | 本プロジェクト方針と一致 |
+| Instantiate/Destroy の繰り返しを避ける | ネイティブ＋マネージ双方の負荷 | Pool | 少量・低頻度なら可読性優先も可 |
+| Coroutine と `WaitForSeconds` | 毎起動の確保 | キャッシュした `WaitForSeconds` | 本プロジェクトは攻撃進行に Coroutine 未使用 |
+| イベント購読の解除 | 購読者の生存による解放阻害 | `-=` / 購読寿命の管理 | 漏れはメモリ増の原因 |
+
+**方針**: すべてを禁止ルールにしない。初期化・低頻度・Editor ツールは可読性優先を許容する。
+**Profiler で問題になった箇所から直す**（`docs/learning_and_readability.md` の「まず読みやすい基準実装」と両立させる）。
+
+### 16.4 FightingGameTrial の現在構成で既に良い点
+
+コードで確認できたものだけ書きます。
+
+| 良い点 | 根拠（コード） |
+|---|---|
+| J Punch 設定を `static readonly` で1回生成 | `DebugAttackData.JPunch`。コメントでも毎 Frame / 毎 Hit `new` しないと明記 |
+| Session は攻撃データの正本を持たず参照する | `SimulationSession` の `JPunchData` |
+| Inspector 参照で Participant / Motor / Visual / Input を保持 | Find 系 API を Scripts 配下で未使用（検索結果なし） |
+| 攻撃進行を Coroutine ではなく整数 Frame 状態で管理 | `DebugFighterAttackState.ActionFrame` 等 |
+| 1攻撃1Hit 用の状態を保持 | `HasCurrentJPunchHit` / `MarkHit` |
+| P2 Neutral 入力を毎 tick `new` しない | Session が `p2NeutralInput` を Awake で1つ保持 |
+| 論理入力は既存インスタンスへ上書き | `SampleCurrentInputFromGameplay` → `CopyFromPhysicalAndCommit`（null 時のみ `new`） |
+| Resolver は static 純関数で一時 List を作らない | `DebugPunchHitResolver` / `DebugFighterPushResolver` |
+| BoxView の `AddComponent` は Awake 時 | `DebugFighterParticipant.EnsureBoxView` |
+| LINQ / Coroutine / `FindObjectOfType` を高頻度経路で使っていない | Scripts 配下に該当 API なし |
+
+補足: `DebugBox2D` は **class**（struct ではない）。「struct だからヒープに載らない」とは言えない。
+`SpriteRenderer.color` の変更自体は、通常はマネージ確保の主因にはならない。
+
+### 16.5 現在の GC.Alloc 候補
+
+以下は **コード上の候補** です。実際に毎 Frame 何バイト確保しているかは **未計測** です。
+
+| 箇所 | コード上の候補 | 実行頻度 | 推定される割り当て種類 | 実測状態 |
+|---|---|---|---|---|
+| `DebugHudView.Update` → `BuildStatusHudText` | 多数の `string` 連結（`text = text + ...`）と `ToString("0.00")` 等 | **毎描画 Frame** | `string`（連結・数値整形） | 未計測 |
+| `DebugHudView.Update` → `BuildHelpHudText` | 操作説明文字列の再構築（内容はほぼ固定） | **毎描画 Frame** | `string` | 未計測 |
+| `DebugHudView` → `hudText.text` / `helpText.text` 代入 | TMP への文字列設定 | 毎描画 Frame | TMP 側の内部処理の可能性（コード外） | 未計測 |
+| `BuildStatusHudText` 内の `EvaluateWorld*Box` | 各評価で `new DebugBox2D()`（class） | HUD 更新ごと（Push/Hurt/Hit） | `DebugBox2D` インスタンス | 未計測 |
+| `DebugFighterParticipant.EvaluateWorldHitBox` 等 | Session の Hit 判定経路でも `new DebugBox2D()` | Active 中の Combat など | `DebugBox2D` | 未計測 |
+| `SimulationSession` の Attack started/ended / Punch hit / KO | `Debug.Log` + 文字列連結・`ToString` | イベント時 | `string`（ログ用） | 未計測 |
+| `WriteConsoleLogIfNeeded` | 長い状態ログの連結 | 既定で **60 SimulationTick ごと** | `string` | 未計測 |
+| Push / wall 再配分ログ | 補正立ち上がり時の `Debug.Log` | 低頻度（立ち上がり時） | `string` | 未計測 |
+| `DebugHudView` で `CurrentInput == null` 時 | `new SimulationInputState()` | 通常は稀（防御コード） | class インスタンス | 未計測 |
+| `DebugFighterBoxView` | 子 GO / `LineRenderer` / `Material` | 主に Awake 周辺 | Unity オブジェクト＋ Material | 未計測 |
+| Input（Gameplay/Playback） | フィールドへの bool 上書きが中心。配列/List 生成なし | 毎描画 Frame | （この範囲では主候補なし） | 未計測 |
+| `SimulationInputState` | **class**。ただし正規経路は再利用 | tick ごと（再利用） | null 時のみ確保 | 未計測 |
+
+**見ていない／断定しないこと**
+
+- Editor の Inspector / Console / Profiler 自身の割り当て
+- TMP パッケージ内部の確保量
+- 「候補がある＝今のフレーム予算を超えている」
+
+### 16.6 DebugHudView を最初に調べる理由
+
+1. **毎描画 Frame** で動く（SimulationTick より高頻度になり得る）
+2. 状態文字列が長く、数値整形と連結が多い
+3. Debug 用途のため、戦闘ロジックと分離して改善しやすい
+4. Hit / KO の仕様を変えずに観察できる
+
+ただし **この資料追加時点ではコード変更をしない**。
+先に Profiler で GC.Alloc を確認し、Editor 由来のノイズと区別します。
+
+### 16.7 Unity Profiler で GC.Alloc を確認する実習
+
+**前提（重要）**: ここで得られる数値は **Unity Editor 上の計測** です。製品性能の最終判断には使いません（§16.8）。
+
+#### 手順
+
+1. `FightDebugScene` を開く
+2. **Window → Analysis → Profiler** を開く
+3. **CPU Usage** モジュールを選ぶ
+4. Play Mode を開始する
+5. 数秒待つ（安定させる）
+6. Editor を Pause する（または Profiler の録画を止める）
+7. Hierarchy 表示で **GC.Alloc** 列を見る
+8. `DebugHudView.Update` を探す
+9. `SimulationClockDriver.Update` を探す
+10. `SimulationSession.ProcessOneSimulationTick`（およびその子）を探す
+11. Console ログが出た Frame を別途見る
+12. 必要なら **Call Stacks** を有効にして割り当て元を辿る
+
+**Deep Profile** は最初から使わない（計測自体が重く、ノイズが増えやすい）。
+
+#### 確認ケース（数値は空欄テンプレート）
+
+| ケース | GC.Alloc / Frame | 主な発生元 | 備考 |
+|---|---|---|---|
+| A. 通常待機 |  |  | Editor 計測 |
+| B. 移動（矢印） |  |  | |
+| C. J Punch Miss |  |  | |
+| D. J Punch Hit |  |  | |
+| E. HitStop 中 |  |  | Combat は止まるが Update は動く |
+| F. KO |  |  | |
+| G. Reset（R） |  |  | |
+| H. Console 閉 / 開の比較 |  |  | Editor ノイズ比較用 |
+
+測定値はまだ記入しない。記入は「次の実習」（§16.12）で行う。
+
+### 16.8 Editor と Development Build の違い
+
+| 環境 | 混ざりやすいもの |
+|---|---|
+| **Editor** | Editor UI、Inspector、Console 描画、Profiler 自体、Domain 関連、TMP の Editor 支援 |
+| **Development Build** | Autoconnect Profiler で Player 側に近い計測が可能 |
+| **Release / 実機** | ログ抑制や最適化の差が出る |
+
+**結論**
+
+- Editor 測定 → **候補発見用**
+- 最終判断 → **Development Build**（必要なら実機）で行う
+
+### 16.9 改善の優先順位（FightingGameTrial 向け）
+
+1. Profiler で待機時 GC.Alloc を確認する
+2. `DebugHudView` の文字列生成を確認する
+3. Console ログ（定期・Hit）の生成頻度を確認する
+4. SimulationTick 内の配列・List・LINQ（現状ほぼ無し）を確認する
+5. 将来の HitEffect / Projectile で Object Pool を検討する
+6. 複数攻撃追加時のデータ生成（毎 Hit `new` しない）を確認する
+7. 必要になったときだけ NativeArray / Jobs / Burst を検討する
+
+**重要**
+
+- NativeArray / Jobs / Burst を最初の対策にしない
+- 現在規模では通常 C# の割り当て整理を優先する
+- **GC.Alloc 0 を目的化しない**
+- フレーム時間と可読性の両方で判断する
+
+### 16.10 よくある誤解
+
+1. `new Vector3` は必ず GC ではない
+2. `Clear()` で必ず内部配列が解放されるわけではない
+3. Incremental GC は「割り当てそのもの」を消さない
+4. `GC.Collect()` を頻繁に呼べばよいわけではない
+5. Object Pool は何にでも使えばよいわけではない
+6. static にすれば GC 問題が解決するわけではない
+7. キャッシュしすぎると解放されない（寿命が延びる）
+8. LINQ は常に禁止ではない（高頻度経路で測って判断）
+9. Coroutine は常に悪いわけではない（本プロジェクトの攻撃進行には未使用）
+10. `StringBuilder` でも `ToString` 時に `string` が生成される
+11. Profiler で GC.Alloc が見えないから永久に割り当てゼロとは限らない
+12. Editor 計測だけで製品性能を断定しない
+
+### 16.11 本プロジェクト向け暫定ルール（学習用）
+
+- 高頻度経路では不要な参照型生成を避ける
+- 固定データは初期化時に1回だけ作る（例: `DebugAttackData.JPunch`）
+- List / 配列は必要に応じて再利用する
+- 毎 Frame の文字列生成は Profiler 確認対象にする
+- ログは開発用として Release で抑制可能にする余地を残す
+- Instantiate / Destroy を大量に繰り返す機能では Pool を検討する
+- 物理検索を高頻度で行う場合は NonAlloc 版を検討する
+- LINQ / closure / boxing は測定して判断する
+- 可読性を壊す最適化は、効果を測定してから行う
+- 最適化前後で GC.Alloc と Frame Time を比較する
+
+これらは学習用方針です。実装状況の正本（何が Stage 完了か）は `docs/unity_implementation_status.md` です。
+
+### 16.12 次の実習候補: FightingGameTrial の GC.Alloc 基準測定
+
+コード変更前の **Baseline 測定** を次作業候補とします。
+
+1. Editor で §16.7 のケース A〜H を記録する（表の空欄を埋める）
+2. 待機時に `DebugHudView.Update` が主因かを Call Stacks で確認する
+3. Development Build でも同ケースを取り、Editor との差を見る
+4. 結果を Docs（本資料または測定メモ）へ記録する
+5. **実測後にのみ** 改善案（HUD 差分更新、ログ抑制、Box 再利用など）を決める
+
+この段階では、まだ最適化パッチを入れない。
