@@ -346,7 +346,9 @@ HitStun / KO 表示色もコード側 SerializeField。Scene YAML には未保�
 | Move Units Per Combat Frame | float | `0.05` | 1 CombatFrame の移動量 |
 | Min X / Max X | float | `-7` / `7` | ステージ端 Clamp |
 | Sprite Renderer | SpriteRenderer | 自分 | flipX 等 |
-| Faces Right By Default | bool | true | 初期 Facing |
+| Faces Right By Default | bool | true | 素材の初期向き |
+
+実行時のみ（Inspector 非表示）: `logicalX`（位置の正本）、`initialLogicalX`（Scene 開始時の論理 X。Training Reset 用）。詳細は §17.7。
 
 ### DebugFighterVisual（両体とも Scene 値は同一）
 
@@ -606,13 +608,14 @@ HUD の数字は便利な鏡です。**戦闘データの正本は Session / Par
 ### ゲーム機能として未実装（Stage 15 時点・実装状況 Docs と一致）
 
 - 対戦モード進行（Round / 勝敗 / WIN・LOSE / タイマー等）。FightDebugScene は練習モード
-- Training Reset の位置・向き初期復帰（HP/KO 等の Reset は確認済み）
 - HP バー・Guard
 - 攻撃データの ScriptableObject 化 / Inspector 編集
 - 複数攻撃・コンボ・Cancel・Counter Hit
 - 2P 実操作（現在 P2 は Neutral）
 - 壁バウンド・壁やられ など
 - Idle / Walk の Visual State 整理、歩行 Animation、K Kick、Animator、ジャンプ／空中
+
+Training Reset の位置・向き復帰は **実装済み**（§17.7）。未確認項目は同節。
 
 詳細は `docs/unity_implementation_status.md`（モード責務は §1.1）。概念図は本資料 §17。
 
@@ -634,6 +637,7 @@ HUD の数字は便利な鏡です。**戦闘データの正本は Session / Par
 
 - 「Unity 上で誰が何を持っているか」→ **この資料 §1〜§15**
 - 「モード／Visual State／Sprite・Animator」→ **この資料 §17**
+- 「Training Reset の処理順」→ **この資料 §17.7**
 - 「GC.Alloc をどう見るか」→ **この資料 §16**
 - 「Stage 何まで終わったか」→ `unity_implementation_status.md`
 - 「HitStop とは何か」→ `rules.md`
@@ -1005,18 +1009,17 @@ GC の話は「仕様の正本」ではなく、**実行時コストの学習**�
 ### 17.2 実装済み（現状）
 
 - FightDebugScene 上の戦闘コア（段階15到達時点の機能）
-- R による戦闘状態 Reset（HP / KO / HitStun / Knockback / 攻撃 / HitStop 等）
+- R による **Training Reset**: 戦闘状態＋論理位置 X・Facing の Scene 開始時復帰（§17.7）
 - Idle / Punch の **Sprite 直接差し替え**（`DebugFighterVisual`）
 - 単独 256×256 デバッグ画像の Sprite Mode **`Single`**
 
 ### 17.3 将来構想（方針確定・未実装）
 
 - 対戦モード用 Scene / Controller / HUD
-- Training Reset の**位置・向き初期復帰**（論理座標を正本として戻す。Transform 直書きだけにしない）
 - Visual State 経由の見た目（Animator + Animation Clip を含む）
 - Walk / Kick / Jump などの共通キャラクター表現
 
-**Training Reset の位置・向き**: 現行は維持のまま。復帰は未実装。実装済みと書かない。
+（Training Reset の位置・向き復帰は §17.7 で実装済み。ここには含めない。）
 
 ### 17.4 Visual State と前進・後退
 
@@ -1059,3 +1062,65 @@ Sprite 群
 | Animator + Animation Clip | **未実装** | 導入方針あり |
 
 Animator 未導入のまま歩行・キック・ジャンプを「実装済み」としない。
+
+### 17.7 Training Reset（位置・向き復帰・学習用）
+
+正式 Stage 番号は付けない。対戦モード実装ではない。仕様の正本は docs/rules.md §15.4、到達点は docs/unity_implementation_status.md §1.1。
+
+#### なぜ論理座標を正本にするか
+
+戦闘の位置正本は DebugFighterMotor.logicalX である。Transform は表示への写し。
+Session が 	ransform.position を直接戻すと、正本と表示がずれやすい。
+そのため Reset では **論理 X を戻し、既存の SetLogicalX がクランプと Transform 同期を行う**。
+
+| やり方 | 本プロジェクト |
+|---|---|
+| Transform を直接初期位置へ代入 | **しない**（Session / Participant からも直書きしない） |
+| logicalX を初期値へ戻す → SetLogicalX | **する** |
+| Y / Z | **変更しない**（復帰対象外） |
+
+#### Motor 側
+
+1. Awake: Scene の 	ransform.position.x → logicalX。同値を initialLogicalX に保存。Facing / Transform 同期。
+2. ResetLogicalXToInitial(): SetLogicalX(initialLogicalX) のみ呼ぶ（Facing は触らない）。
+3. SetLogicalX: minX/maxX でクランプし、ApplyLogicalPositionToTransform で表示 X を合わせる。
+
+#### Session 側の処理順（ResetTestActionForP1）
+
+学習用に順序を固定して読む。
+
+`	ext
+1. participantP1.ResetCombatDebugState()   … HP/KO/攻撃/HitStun 等（位置・Facing なし）
+2. participantP2.ResetCombatDebugState()   … 同上
+3. P1 Motor.ResetLogicalXToInitial()       … 論理 X → 初期値（SetLogicalX 経由）
+4. P2 Motor.ResetLogicalXToInitial()       … 同上
+5. ApplyInitialFacingTowardOpponents()     … 両位置が戻ったあと、位置関係で Facing
+6. HitStopRemaining = 0 / メッセージ更新
+7. RefreshFighterVisual()                  … Idle 等
+`
+
+ログ例: [FightDebug] Training reset (Attack/HitStun/Knockback/HitStop/HP/KO/LogicalX/Facing)
+
+Facing は Slot 固定で決め打ちしない。P1 が左・P2 が右なら、既存の向き合い更新と同じく互いに向き合う。
+
+#### Editor Play Mode 実測例（確認済み）
+
+| 時点 | P1X | P2X | Facing | その他 |
+|---|---:|---:|---|---|
+| 初期 | 0.00 | 3.00 | P1 true / P2 false | |
+| 壁際 | 6.00 | 7.00 | （移動後） | Push wall redistribute 確認 |
+| KO 後 | — | — | — | P2 HP=0、KO=1、HitCount=10、AttackResult=Hit |
+| R 後 | 0.00 | 3.00 | P1 true / P2 false | HP=100、Alive、HitCount=0、AttackResult=None、Idle、HitStop=0 |
+
+確認済み: 壁際→初期位置、KO 後 Reset、論理 X と Transform 表示の一致、向きの復帰、既存 Push/Hit/HitStop/KO 維持、Compile Error なし（既知 CS0618 以外の新規警告なし）。
+
+#### この資料では未確認
+
+- Pause 中に R Reset できるか
+- Reset 直後に移動と J Punch を再実行したか
+- Development Build
+- P2 が P1 より左側に配置された別 Scene 構成
+- Y/Z 位置の復帰
+- 複数の初期配置プリセット
+
+推測で確認済みとしない。

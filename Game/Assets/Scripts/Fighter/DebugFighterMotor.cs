@@ -8,6 +8,7 @@ namespace FightingGameTrial.Fighter
     ///
     /// 責務:
     /// - 論理位置 logicalX を保持する（位置の正本）
+    /// - Scene 開始時の初期論理 X を保持し、Training Reset で戻せるようにする
     /// - 1 CombatFrame 分の左右移動を行う（ワールド X のみ）
     /// - 外部から指定された Facing を SpriteRenderer.flipX へ反映する
     /// - Transform へ表示位置を反映する
@@ -21,6 +22,7 @@ namespace FightingGameTrial.Fighter
     /// - Input System（Keyboard.current）を直接読まない
     /// - Pause / Step / HitStop の判断をしない（呼ぶ側＝SimulationSession の責務）
     /// - SpriteRenderer.color を触らない（色違いは Participant の Tint）
+    /// - Training Reset の Facing 再適用をしない（Session が位置復帰後に行う）
     ///
     /// なぜ P1/P2 で同じ Motor を使うか:
     /// 戦闘上の位置・Facing は参加枠に依存しない共通処理だからです。
@@ -74,6 +76,12 @@ namespace FightingGameTrial.Fighter
         private float logicalX;
 
         /// <summary>
+        /// Scene 開始時（Awake）に取り込んだ論理 X の初期値です。
+        /// Training Reset（R）でここへ戻します。Transform を直接戻す正本にはしません。
+        /// </summary>
+        private float initialLogicalX;
+
+        /// <summary>
         /// 見た目として右を向いているか。
         /// 入力では変えず、SimulationSession が相手位置から SetFacingRight で設定します。
         /// </summary>
@@ -107,9 +115,21 @@ namespace FightingGameTrial.Fighter
 
             // Scene配置の X を論理位置の初期値にする（Y/Zは以後も Transform の値を維持）
             logicalX = transform.position.x;
+            initialLogicalX = logicalX;
             facingRight = true;
             ApplyFacingToSprite();
             ApplyLogicalPositionToTransform();
+        }
+
+        /// <summary>
+        /// Training Reset 用: 論理 X を Scene 開始時の初期値へ戻します。
+        ///
+        /// SetLogicalX 経由で minX/maxX クランプと Transform 反映を行います。
+        /// Facing は変更しません（Session が位置復帰後に向き合いを再適用します）。
+        /// </summary>
+        public void ResetLogicalXToInitial()
+        {
+            SetLogicalX(initialLogicalX);
         }
 
         /// <summary>

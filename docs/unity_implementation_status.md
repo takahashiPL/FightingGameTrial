@@ -2,9 +2,10 @@
 
 最終更新: 2026-07-27
 対象ブランチ: `unity`
-最新コミット済み HEAD: **`dfcb9e0`**（Reduce status HUD allocations）
+最新コミット済み HEAD: **`f051464`**（Document training and versus mode boundaries）
 段階14全体（14A+14B）・段階15（攻撃データ化）: **完了・push 済み**
 GC-1 / GC-2（補助改善・正式 Stage ではない）: **完了・push 済み**
+Training Reset 位置・向き復帰: **実装・Editor 確認済み**（正式 Stage 番号なし。Docs 反映時点ではコード未コミットの場合あり）
 正式な次工程番号: **未定義**（新 Stage 番号は作らない）
 
 このファイルは、Unity 側の**実装済み / 暫定 / 未実装 / 次回候補 / 正式方針**を混同せずに追うための正本です。
@@ -46,25 +47,42 @@ GC-1 / GC-2（補助改善・正式 Stage ではない）: **完了・push 済�
 
 共通側は KO 成立という**戦闘結果**まで。KO 後に何をするかは**モード側**が決める。
 
-### Training Reset（方針と現状）
+### Training Reset（実装済み・Editor 確認済み）
 
-現在の R Reset を、練習モードの正式な **Training Reset** として整理する（名称・責務の方針確定）。
+練習モードの正式な **Training Reset**（R）。従来は戦闘状態のみ戻し、**位置・Facing は維持**していた。今回、論理位置と Facing の初期復帰を追加した（正式 Stage 番号は付けない）。
 
-**方針上、R で初期化する項目**
+**R で初期化する項目**
 
-- P1 / P2 位置、向き
+- P1 / P2 論理位置 X、向き（位置関係から再計算）
 - HP、KO、HitCount、HitStun、Knockback
 - 攻撃状態、HitStop、AttackResult
-- 入力の押下残り
+- 入力の押下残り（既存経路）
 
-**位置の戻し方（方針）**: Transform だけを直接戻さず、戦闘で使う**論理座標**を初期値へ戻し、通常の表示同期経路から Transform へ反映する。
+**位置の戻し方**: Transform を Session から直接書き換えない。Motor が保持する **論理座標**を Scene 開始時の初期値へ戻し、`SetLogicalX` 経由でクランプと Transform 同期する。
 
-| 項目 | 現状（段階15到達後） |
+| 項目 | 状態 |
 |---|---|
-| HP / KO / HitCount / HitStun / Knockback / 攻撃状態 / HitStop / AttackResult 等 | **確認済み**（R で初期化される） |
-| 位置・向きの初期位置復帰 | **未実装**（現行は位置・Facing を維持。コードコメント・検証メモとも一致） |
+| HP / KO / HitCount / HitStun / Knockback / 攻撃 / HitStop / AttackResult | **実装済み・Editor 確認済み** |
+| 論理位置 X・Facing の初期復帰 | **実装済み・Editor 確認済み**（壁際・KO 後） |
+| Pause 中の R、Reset 直後の再移動／再攻撃、Development Build | **未確認** |
+| Y/Z 復帰、複数初期配置プリセット、P2 が左側の別 Scene | **未確認／対象外** |
 
-位置・向き復帰を実装済みと扱わない。
+**実装構造（要約）**
+
+1. `DebugFighterMotor`: `Awake` で Scene の Transform X → `logicalX`、同値を `initialLogicalX` に保存。`ResetLogicalXToInitial()` → `SetLogicalX(initialLogicalX)`
+2. `SimulationSession.ResetTestActionForP1()`: 戦闘状態 Reset → P1/P2 論理 X 復帰 → `ApplyInitialFacingTowardOpponents()` → HitStop 0 → Visual
+3. `Participant.ResetCombatDebugState()`: 戦闘状態のみ（位置・Facing は触らない）
+
+**Editor Play Mode 実測例（FightDebugScene）**
+
+| 時点 | P1X | P2X | P1FacingRight | P2FacingRight | 備考 |
+|---|---:|---:|---|---|---|
+| 初期 | 0.00 | 3.00 | true | false | |
+| 壁際 | 6.00 | 7.00 | （移動後） | （移動後） | Push wall redistribute 確認 |
+| KO 後 | — | — | — | — | P2 HP=0、KO=1、HitCount=10、AttackResult=Hit |
+| R 後 | 0.00 | 3.00 | true | false | HP=100、Alive、HitCount=0、AttackResult=None、Idle、HitStop=0 |
+
+詳細は §2.3、教材 §17.7、`docs/rules.md` §15.4。
 
 キャラクターの前進・後退・Idle・歩行表現・ジャンプ・キック・Punch・HitStun・Knockback・KO・アニメーション状態は、**練習専用ではなく練習／対戦共通のキャラクター機能**とする方針。見た目は戦闘処理がコマを直接決めず、戦闘状態→ Visual State → Animator または Sprite 差し替え、とする（詳細は `docs/rules.md` / 教材 §17）。
 
@@ -103,7 +121,7 @@ Round 終了・勝敗判定は工程表上の段階14/15には含まれず、**�
 | **`DebugFighterAttackState`** | 攻撃進行の正本（ActionFrame / HasCurrentJPunchHit 等） |
 | **`DebugFighterHitState`** | 被 Hit / HitStun / ノックバック速度（HP・KO・攻撃データは持たない） |
 | **`DebugFighterParticipant`** | **HP 正本** + **KO 正本**（`isKnockedOut`）。local→world Hit Box 変換・Facing 反転 |
-| **`DebugFighterMotor`** | LogicalX・TryMoveLogicalXBy（攻撃データ非所有） |
+| **`DebugFighterMotor`** | LogicalX・`initialLogicalX`・TryMoveLogicalXBy・Training Reset 時の論理 X 復帰（攻撃データ非所有） |
 | **`DebugFighterPushResolver`** | 等分 Push ＋壁際再配分（攻撃データ非所有） |
 | **`DebugPunchHitResolver`** | world Hit×Hurt 重なり判定（攻撃全体の設定正本にはしない） |
 | **`SimulationTimeState`** | 共有時間・共有 HitStop |
@@ -149,7 +167,12 @@ KO 後もその最後の一撃の Knockback / HitStun は処理される。HitSt
 
 **ログ**: 初回のみ `Fighter KO`。Punch hit に `KO=0/1`。Reset に `/KO`。
 
-**Reset（Training Reset・現状）**: HP 最大 + KO 解除 + 既存 Attack/HitCount/HitStun/Knockback/HitStop 等は**確認済み**。位置・Facing は**維持**（初期位置復帰は**未実装**。§1.1）。
+**Reset（Training Reset）**:
+
+- **従来（段階12A〜位置復帰追加前）**: HP 最大 + KO 解除 + Attack/HitCount/HitStun/Knockback/HitStop 等。**位置・Facing は維持**していた。
+- **現在**: 上記に加え、P1/P2 の論理 X を Scene 開始時へ戻し、両者復帰後に位置関係から Facing を再計算する（**実装済み**。正式 Stage 番号なし）。
+- **Editor 確認済み**: 壁際（P1X=6.00 / P2X=7.00）→ R → 0.00 / 3.00、Facing 初期どおり。KO 後も R で Alive/100・HitCount=0。Push / Hit / HitStop / KO 回帰維持。Compile Error なし（既知 CS0618 以外の新規警告なし）。
+- **未確認**: Pause 中 R、Reset 直後の再移動／再 J Punch、Development Build、Y/Z 復帰、P2 左側配置の別 Scene。詳細は §1.1。
 
 ### 2.4 段階15で確定した攻撃データ化
 
@@ -237,7 +260,7 @@ ScriptableObject 化、Inspector 編集、Character 別攻撃データ、複数�
 
 **G. KO 表示回帰修正**: 最終 Hit で赤→その後 KO 暗色を目視確認。通常 Hit の赤維持。KO 後追加 Hit は赤なし。Reset で Alive 色。戦闘処理・Scene/Prefab 変更なし。
 
-**H. Reset**: 両体 100/Alive、HitCount=0、Stun/KB/HitStop=0、AttackResult=None。位置と Facing 維持。
+**H. Reset（段階15時点の記録）**: 当時は両体 100/Alive、HitCount=0、Stun/KB/HitStop=0、AttackResult=None。**位置と Facing は維持**（当時仕様）。位置復帰は後続の Training Reset 拡張で追加（§1.1・§2.3）。
 
 **I. Stage 13・14 回帰**: 中央 Push・右端再配分・Dist=1.00・Clamp・HP Clamp・KO 追加 Hit 拒否・Reset 維持。
 
@@ -265,7 +288,6 @@ ScriptableObject 化、Inspector 編集、Character 別攻撃データ、複数�
 
 **練習モード／共通まわりの候補**
 
-- Training Reset の位置・向き初期復帰（方針確定・**未実装**）
 - KO 専用アニメ、Down 物理、HP バー、Guard
 - Character 別 KO / 攻撃データ、KO 演出制御
 - 壁バウンド等（工程番号なし残課題）
@@ -273,6 +295,8 @@ ScriptableObject 化、Inspector 編集、Character 別攻撃データ、複数�
 - 複数攻撃、弱/中/強、技コマンド、コンボ、Cancel、Counter Hit
 - Idle / WalkForward / WalkBackward の Visual State、歩行 Animation、K Kick、Animator、ジャンプ／空中（いずれも未実装）
 - 練習用将来候補: ダミー回復、自動回復、ガード設定、行動記録、判定表示、フレーム表示など
+
+（Training Reset の位置・向き復帰は **§1.1 で実装済み**。未実装候補からは外す。）
 
 ### 2.10 相打ち・キャラ差し替え
 
@@ -306,7 +330,6 @@ Push / Hurt / Hit 可視化（11A）と Hit×Hurt 重なり判定（11B）は完
 
 その後の候補（順不同・未着手。**新工程番号は作らない**。正式な次 Stage も未定義）:
 
-- Training Reset で位置・向きを初期位置へ戻す（論理座標正本。現状未実装）
 - Idle / WalkForward / WalkBackward の Visual State 整理、歩行用複数 Sprite または Animation Clip
 - K Kick、Animator 導入、ジャンプ／空中状態（未実装）
 - 対戦モード用 Scene / Controller / HUD（Round / 勝敗 / タイマー / リザルト等。FightDebugScene とは分離）
@@ -318,7 +341,7 @@ Push / Hurt / Hit 可視化（11A）と Hit×Hurt 重なり判定（11B）は完
 - 複数 Hurt / Hit Box、キャラ固有データ化
 - 練習モード将来候補: ダミー回復、自動回復、ガード設定、行動記録、判定／フレーム表示など
 
-モード責務の方針は §1.1。Round/勝敗は**対戦モード固有**であり、練習 Scene の次必須工程としては未確定。
+Training Reset の位置・向き復帰は完了（§1.1）。モード責務の方針も同節。Round/勝敗は**対戦モード固有**であり、練習 Scene の次必須工程としては未確定。
 
 ---
 
@@ -374,8 +397,8 @@ Round / Guard / 複数攻撃などの**機能 Stage とは別枠**。番号「GC
 ## 7. 一言まとめ
 
 - 段階1〜**15**まで到達。工程表の段階14（HP/Damage/KO）と段階15（攻撃データ化）は完了
-- 最新コミット済み HEAD: `dfcb9e0`。GC-1 / GC-2 は補助改善・正式 Stage ではない
+- 最新コミット済み HEAD: `f051464`（モード境界 Docs）。Training Reset 位置・向き復帰はコード実装済み（Docs 反映時点では未コミットの場合あり）。正式 Stage 番号なし
 - `FightDebugScene` は**練習・検証モード**（対戦進行なし）。戦闘コアは共通、KO 後処理はモード側（§1.1）
-- Training Reset（R）: HP/KO 等は確認済み。**位置・向きの初期復帰は未実装**
+- Training Reset（R）: 戦闘状態＋論理 X・Facing を Scene 開始時へ復帰（壁際・KO 後 Editor 確認済み）。Pause 中 R / Dev Build は未確認
 - J Punch 設定正本は `DebugAttackData.JPunch`。Visual 優先は HitStun 赤 > KO 暗色 > 通常 Tint
-- 正式な次 Stage 番号は未定義。候補は順不同（Training Reset 位置復帰、Visual State、Kick、Animator、対戦モード分離など）
+- 正式な次 Stage 番号は未定義。候補は順不同（Visual State、Kick、Animator、対戦モード分離など）

@@ -495,15 +495,17 @@ namespace FightingGameTrial.Simulation
         }
 
         /// <summary>
-        /// Rキー用: デバッグ戦闘状態を初期化します（段階12A）。
+        /// Rキー用: 練習モードの Training Reset（段階12A＋位置・向き復帰）。
         ///
         /// 何をするか:
-        /// - P1/P2 の AttackState・HitState・表示色を Reset
+        /// - P1/P2 の AttackState・HitState・HP・KO・表示色を Reset
+        /// - P1/P2 の論理位置 X を Scene 開始時の初期値へ戻す（Motor）
+        /// - 初期配置に基づき互いに向き合う Facing を再適用
         /// - 共有 HitStopRemaining を 0
         /// - Visual を Idle へ即時更新
         ///
         /// SimulationTick は進めません。Pause 中でも呼べます。
-        /// 位置・Facing の Scene 初期化は従来どおり Play 再開に任せます（R では動かさない）。
+        /// Transform を直接初期化せず、論理座標を正本として戻し、既存同期経路で反映します。
         /// </summary>
         public void ResetTestActionForP1()
         {
@@ -521,14 +523,33 @@ namespace FightingGameTrial.Simulation
                 participantP2.ResetCombatDebugState();
             }
 
+            // 位置を先に戻し、その配置から Facing を決め直す（Training Reset）。
+            ResetParticipantLogicalXToInitial(participantP1);
+            ResetParticipantLogicalXToInitial(participantP2);
+            ApplyInitialFacingTowardOpponents();
+
             if (timeState != null)
             {
                 timeState.HitStopRemaining = 0;
-                timeState.LastStatusMessage = "Debug combat reset";
+                timeState.LastStatusMessage = "Training reset";
             }
 
             RefreshFighterVisual();
-            Debug.Log("[FightDebug] Debug combat reset (Attack/HitStun/Knockback/HitStop/HP/KO)");
+            Debug.Log("[FightDebug] Training reset (Attack/HitStun/Knockback/HitStop/HP/KO/LogicalX/Facing)");
+        }
+
+        /// <summary>
+        /// Participant の Motor 論理 X を Scene 開始時の初期値へ戻します。
+        /// Facing は触りません。
+        /// </summary>
+        private void ResetParticipantLogicalXToInitial(DebugFighterParticipant participant)
+        {
+            if (participant == null || participant.Motor == null)
+            {
+                return;
+            }
+
+            participant.Motor.ResetLogicalXToInitial();
         }
 
         /// <summary>

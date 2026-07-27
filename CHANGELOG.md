@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## Training Reset の位置・向き復帰
+
+- 正式 Stage 番号なし（段階15完了状態は維持）。練習モードの Training Reset 拡張
+- `DebugFighterMotor`: Scene 開始時の `initialLogicalX` を保存。`ResetLogicalXToInitial()` → `SetLogicalX` で論理座標を正本として復帰（Transform 直書きしない。Y/Z・移動範囲・速度は変更なし）
+- `SimulationSession.ResetTestActionForP1`: 戦闘状態 Reset 後に P1/P2 論理 X を戻し、`ApplyInitialFacingTowardOpponents()` で Facing を再計算（Slot 固定の決め打ちなし）
+- `Participant.ResetCombatDebugState` は戦闘状態のみ。位置・Facing は Session 経路
+- Editor Play Mode 確認済み: 壁際 P1X=6.00 / P2X=7.00 → R → 0.00 / 3.00・Facing 初期どおり。KO 後も Alive/100・HitCount=0
+- 未確認: Pause 中 R、Reset 直後の再移動／再攻撃、Development Build
+- Scene / Prefab / Sprite / Animator / Font 変更なし
+- Docs: README / `unity_implementation_status.md` §1.1・§2.3 / `rules.md` §15.4 / `component_and_scene_guide.md` §17.7
+- コードと Docs を同一コミットにまとめる予定（本作業では Cursor は commit しない）
+
 ## 練習モードと対戦モードの責務整理（Docs）
 
 - Docs 更新のみ。コード / Scene / Prefab / Font Asset / Animator / Animation Clip / Sprite の追加・変更なし

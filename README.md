@@ -36,18 +36,20 @@ GC-2（Editor）: `DebugHudView.Update` 約17.2 KB → 約3.2 KB / frame。Devel
 ## Unity 実装の到達点（要約）
 
 ブランチ `unity` 上で、**段階1〜15まで完了**しています。
-最新コミット済み HEAD: **`dfcb9e0`**（Reduce status HUD allocations）
+最新コミット済み HEAD: **`f051464`**（Document training and versus mode boundaries）
 段階14全体（14A+14B）・段階15（J Punch 攻撃データ化）: **完了・push 済み**（SO 化は見送り）。
 GC-1 / GC-2（補助改善・正式 Stage ではない）: **完了・push 済み**。
+Training Reset 位置・向き復帰: **実装・Editor 確認済み**（正式 Stage 番号なし）。
 正式な次工程番号は**未定義**（新 Stage 番号は作らない）。
 
 | 区分 | 内容 |
 |---|---|
-| **実装済み** | 60Hz SimulationTick、Pause/Step、HUD（左上状態／左下操作・JPunch Data）、HitStop、入力、左右移動、Facing分離、2体共通 Participant / AttackState / HitState、Push Box、壁際 Push 再配分、Box 可視化、Hit×Hurt 重なり判定、Jパンチ、1攻撃1Hit、Hit時6F HitStop、HitStun 12CF・被Hit表示、横ノックバック、HP/Damage（max100・J Punch10）、**KO状態・遷移（Life表示）**、**`DebugAttackData.JPunch` による攻撃設定正本**、R による練習用戦闘状態初期化（HP全回復・KO解除など。位置・向きの初期復帰は未実装） |
+| **実装済み** | 60Hz SimulationTick、Pause/Step、HUD（左上状態／左下操作・JPunch Data）、HitStop、入力、左右移動、Facing分離、2体共通 Participant / AttackState / HitState、Push Box、壁際 Push 再配分、Box 可視化、Hit×Hurt 重なり判定、Jパンチ、1攻撃1Hit、Hit時6F HitStop、HitStun 12CF・被Hit表示、横ノックバック、HP/Damage（max100・J Punch10）、**KO状態・遷移（Life表示）**、**`DebugAttackData.JPunch` による攻撃設定正本**、**Training Reset（R）: 戦闘状態＋論理位置 X・Facing を Scene 開始時へ復帰**（論理座標正本。Editor で壁際・KO 後確認済み） |
 | **暫定** | Push 等分＋壁際再配分。攻撃数値はコード内不変データ（SO 未使用）。KO 視覚は色変更のみ（優先: HitStun赤 > KO暗色 > 通常Tint）。Motor minX/maxX（±7）。相打ちは両方向判定の土台のみ（P2 は Neutral）。見た目は Idle/Punch の Sprite 直接差し替え |
-| **未実装（方針確定含む）** | 対戦モード進行（Round/勝敗/WIN・LOSE/タイマー等）、Training Reset の位置・向き初期復帰、HPバー、Guard、壁バウンド等、歩行・キック・ジャンプの Visual/Animation、Animator + Animation Clip、複数 Hurt/Hit Box、攻撃データ SO 化（要否は後続判断）、複数攻撃・コンボ・Cancel |
+| **未実装（方針確定含む）** | 対戦モード進行（Round/勝敗/WIN・LOSE/タイマー等）、HPバー、Guard、壁バウンド等、歩行・キック・ジャンプの Visual/Animation、Animator + Animation Clip、複数 Hurt/Hit Box、攻撃データ SO 化（要否は後続判断）、複数攻撃・コンボ・Cancel |
 
 詳細・次工程は **`docs/unity_implementation_status.md`** を正とする。
+Training Reset の詳細・未確認項目（Pause 中 R、Development Build 等）も同ファイルおよび教材 §17.7。
 
 ### FightDebugScene の位置づけ（方針確定）
 
@@ -114,14 +116,13 @@ Git 管理外: `Game/Library`、`Temp`、`Logs`、`UserSettings`、`obj` など
 
 正式な優先順位・次工程番号は**未決定**（順不同・新 Stage 番号は作らない）。
 
-1. Training Reset で位置・向きを初期位置へ戻す（論理座標を正本として復帰）
-2. Idle / WalkForward / WalkBackward の Visual State 整理、歩行用複数 Sprite または Animation Clip
-3. K Kick 追加、Animator 導入、ジャンプ／空中状態（いずれも未実装）
-4. 対戦モード用 Scene / Controller / HUD（FightDebugScene とは分離）
-5. 既存残課題: KB壁停止、壁バウンド、壁やられ、Corner、HPバー、Guard、複数攻撃・バッファ・Cancel、攻撃データ SO 化（必要時）
-6. 2P入力/AI時の実操作確認（KO中移動・攻撃禁止、P1被Hit・左方向KB・Facing Left 攻撃など）
+1. Idle / WalkForward / WalkBackward の Visual State 整理、歩行用複数 Sprite または Animation Clip
+2. K Kick 追加、Animator 導入、ジャンプ／空中状態（いずれも未実装）
+3. 対戦モード用 Scene / Controller / HUD（FightDebugScene とは分離）
+4. 既存残課題: KB壁停止、壁バウンド、壁やられ、Corner、HPバー、Guard、複数攻撃・バッファ・Cancel、攻撃データ SO 化（必要時）
+5. 2P入力/AI時の実操作確認（KO中移動・攻撃禁止、P1被Hit・左方向KB・Facing Left 攻撃など）
 
-詳細は `docs/unity_implementation_status.md`。
+Training Reset の位置・向き復帰は**実装済み**（未実装候補からは外す）。詳細は `docs/unity_implementation_status.md`。
 
 ## スプライト制作方針（要約）
 

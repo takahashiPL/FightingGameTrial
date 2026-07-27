@@ -164,7 +164,7 @@ Participant 共通の **HP / Damage** は**実装済み**である（段階14A�
 最後の一撃の HitStop / HitStun / Knockback は通常どおり成立し、HitStun 終了後も KO は Reset まで維持する。
 KO 中は本人の入力移動と新規攻撃を禁止し、KO 済み防御者への追加 Hit は成立させない。
 表示色の現在仕様は **HitStun 被 Hit 表示 > KO 暗色 > 通常 Tint**（段階15で回帰修正。KO 状態の開始時点は変えない）。
-Reset（R）は練習モードの **Training Reset** として整理する（§15）。HP は最大へ全回復し、KO も解除する（確認済み）。位置・向きの初期復帰は**未実装**（現行は維持）。HP バー・Guard は未実装。Round 終了・勝敗判定は**対戦モード固有・未実装**であり、FightDebugScene（練習）には混在させない。
+Reset（R）は練習モードの **Training Reset** である（§15.4）。HP は最大へ全回復し、KO も解除する。加えて P1/P2 の**論理位置 X**を Scene 開始時へ戻し、両者の位置復帰後に位置関係から Facing を再計算する（**実装済み・Editor 確認済み**。Transform 直書きではない）。Y/Z は復帰対象外。Pause 中 R・Development Build は未確認。HP バー・Guard は未実装。Round 終了・勝敗判定は**対戦モード固有・未実装**であり、FightDebugScene（練習）には混在させない。
 
 Jパンチの **攻撃設定値の正本**は `DebugAttackData.JPunch` である（段階15。ScriptableObject ではない読み取り専用データ）。
 Startup/Active/Recovery・Damage・HitStop・HitStun・Knockback・local Hit Box をここから参照する。
@@ -481,13 +481,25 @@ Unity デバッグ実装の**実際の到達点**（段階1〜15）と次工程�
 
 ### 15.4 Training Reset
 
-現在の R Reset を練習モードの正式な Training Reset として整理する。
+練習モードの正式な Training Reset（R）。従来は戦闘状態のみ戻し位置・Facing を維持していたが、**論理位置と Facing の初期復帰を追加した**（正式 Stage 番号は付けない。対戦モード実装ではない）。
 
-**方針上の初期化対象**: P1/P2 位置・向き、HP、KO、HitCount、HitStun、Knockback、攻撃状態、HitStop、AttackResult、入力の押下残り。
+**初期化対象**: P1/P2 論理位置 X・向き、HP、KO、HitCount、HitStun、Knockback、攻撃状態、HitStop、AttackResult、入力の押下残り。
 
-**位置の正本**: Transform だけを直接戻さず、戦闘で使う**論理座標**を初期値へ戻し、通常の表示同期経路から Transform へ反映する。
+**位置の正本**: Transform を Session / Participant から直接書き換えない。Motor が保持する**論理座標**を初期値へ戻し、`SetLogicalX` 経由でクランプと Transform 同期する。Y/Z は変更しない。
 
-**現状**: HP・KO・HitCount 等の Reset は確認済み。位置・向きの初期位置復帰は**未実装または未確認扱いとし、実装済みにしない**（現行コードは位置・Facing を維持する）。
+**Facing**: Slot（P1/P2）で向きを決め打ちしない。P1/P2 **両方の論理位置を戻したあと**、既存の `ApplyInitialFacingTowardOpponents()` で位置関係から互いに向き合う向きを再計算する。
+
+**責務分担**
+
+| 担当 | 内容 |
+|---|---|
+| `DebugFighterMotor` | Scene 開始時の初期論理 X（`initialLogicalX`）を保持。`ResetLogicalXToInitial()` で復帰 |
+| `DebugFighterParticipant.ResetCombatDebugState` | 戦闘状態（HP/KO/攻撃/HitStun 等）のみ。位置・Facing は触らない |
+| `SimulationSession.ResetTestActionForP1` | Reset **順序**の管理: 戦闘状態 → 両体の論理 X → Facing → HitStop / Visual |
+
+将来の対戦モードでも、位置・Facing を含む共通 Reset 処理を再利用しうる。**現在の実装入口は Training Reset（練習モード）**である。
+
+**確認状況**: 壁際・KO 後の Editor Play Mode で復帰を確認済み。Pause 中 R、Reset 直後の再攻撃、Development Build、Y/Z 復帰、複数初期配置プリセットは**未確認**。
 
 ### 15.5 キャラクター機能と Visual State
 
