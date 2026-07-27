@@ -159,12 +159,15 @@ HitStun 中も Push / Facing は維持する。ノックバック後のめり込
 既存 Motor の minX/maxX（±7）は有効のまま。壁際 Push 再配分は**実装済み**（段階13B-1）。壁バウンド・壁やられ・ノックバック壁停止は未実装。
 縦方向 Push、飛び越え反転は未実装。
 Participant 共通の **HP / Damage** は**実装済み**である（段階14A。最大HP暫定100、Jパンチ Damage 暫定10）。
-有効 Hit 成立時に1回だけ減算し、0 未満にはしない。**0HP でも段階14A では KO せず戦闘継続**する（暫定。KO は段階14B）。
-Reset（R）で HP は最大へ全回復する。HP バー・Guard・Round 終了は未実装。
+有効 Hit 成立時に1回だけ減算し、0 未満にはしない。
+**HP が 0 になると KO 状態へ一度だけ遷移**する（段階14B）。段階14Aの「0HPでも戦闘継続」暫定は終了した。
+最後の一撃の HitStop / HitStun / Knockback は通常どおり成立し、HitStun 終了後も KO は Reset まで維持する。
+KO 中は本人の入力移動と新規攻撃を禁止し、KO 済み防御者への追加 Hit は成立させない。
+Reset（R）で HP は最大へ全回復し、KO も解除する。HP バー・Guard・Round 終了・勝敗判定は未実装。
 
 攻撃状態の正本は各 `DebugFighterParticipant.AttackState` である。
 被 Hit / HitStun / ノックバック速度の正本は各 `DebugFighterParticipant.HitState` である。
-HP の正本は各 `DebugFighterParticipant`（HitState には持たせない）。
+HP と KO の正本は各 `DebugFighterParticipant`（HitState には持たせない）。
 `SimulationTimeState` は SimulationTick / CombatFrame / Pause / HitStop 等の共有時間状態を持つ。
 
 実装済み／暫定／未実装／次工程の一覧は `docs/unity_implementation_status.md` を参照する。
@@ -436,8 +439,8 @@ HitStop 残が 0 のときだけ実行する。
 4. 判定箱表示
 5. デバッグHUD初期必須（SimulationTick 等の日本語説明付き）
 
-Unity デバッグ実装の**実際の到達点**（段階1〜14A）と次工程は
+Unity デバッグ実装の**実際の到達点**（段階1〜14B）と次工程は
 `docs/unity_implementation_status.md` を正とする。
-（HP/Damage 基盤は完了。段階14全体は未完了。次工程は段階14B: KO 状態・KO 遷移。）
+（工程表の段階14: HP/Damage/KO は完了。次工程は段階15: 攻撃データ化。）
 
 本番スプライトシートは未完成。参考画像を完成スプライトとしない。

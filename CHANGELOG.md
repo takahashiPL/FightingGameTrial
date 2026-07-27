@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## v3.14（Unity段階14B完了・Participant共通KO状態・KO遷移）
+
+- 段階14B完了を明記。KO正本は Participant.isKnockedOut。API: TryEnterKnockout / ClearKnockoutForReset / BuildLifeLabel
+- 処理順 ReceiveHit→ApplyDamage→TryEnterKnockout→MarkHit→HitStop。最後の一撃の HitStop/Stun/KB は維持
+- KO中は入力移動・新規攻撃禁止、KO済み防御者への追加Hit拒否（DefenderKO）。視覚優先 KO>HitStun>通常
+- HUDに P1/P2 Life。検証: 10HitでKO、追加攻撃はMiss、ResetでAlive/100、Stage13/14A回帰正常
+- 未直接検証: P2 Dummyのため KO側の実操作入力禁止はコード経路のみ
+- 工程表の段階14（HP/Damage/KO）は14A+14Bで完了。次工程は既存計画の段階15（攻撃データ化）
+- README / `docs/unity_implementation_status.md` / `docs/rules.md` を更新
+
 ## v3.13（Unity段階14A完了・Participant共通HP・Damage基盤）
 
 - 段階14A完了を明記。HP正本は Participant（maxHitPoints=100、currentは実行時）。HitStateはHP非所有
