@@ -20,17 +20,17 @@
 
 ## Unity 実装の到達点（要約）
 
-ブランチ `unity` 上で、**段階1〜14Bまで完了**しています。
-最新コミット済み HEAD: **`d3692aa`**（Document participant health and damage completion）
-段階14Aまで: **完了・push 済み**
-段階14B（Participant 共通 KO 状態・KO 遷移）は**検証済み・ドキュメント反映時点では未コミット**（作業ツリー）。
-工程表の段階14（HP・Damage・KO）は **14A+14B で完了**。
+ブランチ `unity` 上で、**段階1〜15まで完了**しています。
+最新コミット済み HEAD: **`0a53e8e`**（Document participant knockout completion）
+段階14全体（14A+14B）: **完了・push 済み**
+段階15（J Punch 攻撃データ化）は**検証済み・ドキュメント反映時点では未コミット**（作業ツリー）。
+工程表の段階14（HP・Damage・KO）と段階15（攻撃データ化）は **完了**（SO 化は見送り）。
 
 | 区分 | 内容 |
 |---|---|
-| **実装済み** | 60Hz SimulationTick、Pause/Step、HUD（左上状態／左下操作）、HitStop、入力、左右移動、Facing分離、2体共通 Participant / AttackState / HitState、Push Box、壁際 Push 再配分、Box 可視化、Hit×Hurt 重なり判定、Jパンチ、1攻撃1Hit、Hit時6F HitStop、HitStun 12CF・被Hit表示、横ノックバック、HP/Damage（max100・J Punch10）、**KO状態・遷移（暗いグレー、Life表示）**、Rで戦闘デバッグ初期化（HP全回復・KO解除含む） |
-| **暫定** | Push 等分＋壁際再配分。HitStun / KB / maxHP / PunchDamage は暫定値。KO 視覚は色変更のみ。Motor minX/maxX（±7）。相打ちは両方向判定の土台のみ（P2 は Neutral） |
-| **未実装（正式方針）** | Round/勝敗、HPバー、Guard、壁バウンド等、複数 Hurt/Hit Box、キャラ固有データ化、攻撃データ SO 化（段階15） |
+| **実装済み** | 60Hz SimulationTick、Pause/Step、HUD（左上状態／左下操作・JPunch Data）、HitStop、入力、左右移動、Facing分離、2体共通 Participant / AttackState / HitState、Push Box、壁際 Push 再配分、Box 可視化、Hit×Hurt 重なり判定、Jパンチ、1攻撃1Hit、Hit時6F HitStop、HitStun 12CF・被Hit表示、横ノックバック、HP/Damage（max100・J Punch10）、**KO状態・遷移（Life表示）**、**`DebugAttackData.JPunch` による攻撃設定正本**、Rで戦闘デバッグ初期化（HP全回復・KO解除含む） |
+| **暫定** | Push 等分＋壁際再配分。攻撃数値はコード内不変データ（SO 未使用）。KO 視覚は色変更のみ（優先: HitStun赤 > KO暗色 > 通常Tint）。Motor minX/maxX（±7）。相打ちは両方向判定の土台のみ（P2 は Neutral） |
+| **未実装（正式方針）** | Round/勝敗、HPバー、Guard、壁バウンド等、複数 Hurt/Hit Box、キャラ固有データ化、攻撃データ SO 化（後続で要否判断）、複数攻撃・コンボ・Cancel |
 
 詳細・次工程は **`docs/unity_implementation_status.md`** を正とする。
 
@@ -84,8 +84,8 @@ Git 管理外: `Game/Library`、`Temp`、`Logs`、`UserSettings`、`obj` など
 
 ## 次の実装候補（要約）
 
-1. **段階15**: 攻撃データ化（Startup/Active/Recovery、Hit Box、Damage、HitStop、HitStun、Knockback・既存工程表）
-2. 残課題（工程番号なし）: Round/勝敗、KB壁停止、壁バウンド、壁やられ、Corner
+1. 残課題（工程番号なし・順不同）: Round/勝敗、KB壁停止、壁バウンド、壁やられ、Corner、HPバー、Guard
+2. 複数攻撃・入力バッファ・キャンセル、攻撃データの SO 化（必要時）
 3. 2P入力/AI時: KO中の移動・攻撃禁止の実操作確認、HitStun行動制限・P1被Hit・左方向KB・Facing Left 攻撃
 
 詳細は `docs/unity_implementation_status.md`。

@@ -1,10 +1,21 @@
 # CHANGELOG
 
+## v3.15（Unity段階15完了・J Punch攻撃データ化）
+
+- 段階15完了を明記。`DebugAttackData.JPunch`（static readonly）が J Punch 設定正本。SO/Inspector 化は見送り
+- S/A/R=3/3/6・Total=12・Damage=10・HitStop=6・HitStun=12・KB=0.180/減速0.015・local Hit Box をデータへ集約
+- Session は進行と Hit 適用のみ。Participant が local→world / Facing。PunchHitResolver は重なりのみ。Frame境界・1攻撃1Hit・KO処理順は維持
+- HUD: `JPunch Data`（データから生成）。Truncate 非表示を P2 KB 直後配置＋HelpBlock 高さ調整で修正（Scene 変更なし）
+- KO表示回帰: 14B時点の KO>HitStun を履歴として残し、現在仕様は HitStun赤>KO暗色>通常Tint（ApplyDisplayColor のみ）
+- 検証: Miss/1Hit/Frame境界/KO/Reset/Stage13・14回帰、Error 0・既存 CS0618 Warning 1
+- 工程表の段階15は完了。次は既存計画の後続候補（Round/勝敗、Guard、複数攻撃、SO化の要否など・順不同）
+- README / `docs/unity_implementation_status.md` / `docs/rules.md` を更新
+
 ## v3.14（Unity段階14B完了・Participant共通KO状態・KO遷移）
 
 - 段階14B完了を明記。KO正本は Participant.isKnockedOut。API: TryEnterKnockout / ClearKnockoutForReset / BuildLifeLabel
 - 処理順 ReceiveHit→ApplyDamage→TryEnterKnockout→MarkHit→HitStop。最後の一撃の HitStop/Stun/KB は維持
-- KO中は入力移動・新規攻撃禁止、KO済み防御者への追加Hit拒否（DefenderKO）。視覚優先 KO>HitStun>通常
+- KO中は入力移動・新規攻撃禁止、KO済み防御者への追加Hit拒否（DefenderKO）。視覚優先 KO>HitStun>通常（段階15で HitStun>KO へ回帰修正）
 - HUDに P1/P2 Life。検証: 10HitでKO、追加攻撃はMiss、ResetでAlive/100、Stage13/14A回帰正常
 - 未直接検証: P2 Dummyのため KO側の実操作入力禁止はコード経路のみ
 - 工程表の段階14（HP/Damage/KO）は14A+14Bで完了。次工程は既存計画の段階15（攻撃データ化）

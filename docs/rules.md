@@ -151,24 +151,28 @@ Unity デバッグ実装では、Facing と移動入力の分離・相手向き�
 処理順は 入力移動 → ノックバック移動・減速 → Push 補正 → Facing → ActionFrame → Hit → Visual → HitStun消費。接触後の押し分けは双方等分補正を基本とし、ステージ端で実移動が足りない分は反対側へ再配分する（段階13B-1）。
 Push / Hurt / Hit Box の **Game ビュー可視化**も**実装済み**である（段階11A）。
 Jパンチ Hit は **Hit Box × Hurt Box の重なり判定**である（段階11B。距離判定は削除済み）。
-被 Hit 後は共有 **HitStop（6F）** のあと、被弾側 **HitStun（暫定12 Combat Frame）** と横ノックバックが続く（段階12A / 13A）。
+被 Hit 後は共有 **HitStop（6F）** のあと、被弾側 **HitStun（12 Combat Frame）** と横ノックバックが続く（段階12A / 13A。数値の正本は段階15の攻撃データ）。
 HitStop は試合全体の Combat 停止、HitStun は被弾側のみの行動不能である。
 ノックバック初速は Hit 成立時に予約し、**HitStop 中は移動・減衰しない**。HitStop 終了後の Combat Frame から固定量で移動する（`Time.deltaTime` 不使用）。
 方向は Facing ではなく LogicalX 比較で決める。速度の正本は `HitState`、位置書き込みは `Motor`（`SetLogicalX` / `TryMoveLogicalXBy`）。
 HitStun 中も Push / Facing は維持する。ノックバック後のめり込みは同フレームの Push で解消する。Push は KnockbackVelocityX を変更しない。
 既存 Motor の minX/maxX（±7）は有効のまま。壁際 Push 再配分は**実装済み**（段階13B-1）。壁バウンド・壁やられ・ノックバック壁停止は未実装。
 縦方向 Push、飛び越え反転は未実装。
-Participant 共通の **HP / Damage** は**実装済み**である（段階14A。最大HP暫定100、Jパンチ Damage 暫定10）。
+Participant 共通の **HP / Damage** は**実装済み**である（段階14A。最大HP暫定100。Jパンチ Damage=10 は段階15で攻撃データ化）。
 有効 Hit 成立時に1回だけ減算し、0 未満にはしない。
 **HP が 0 になると KO 状態へ一度だけ遷移**する（段階14B）。段階14Aの「0HPでも戦闘継続」暫定は終了した。
 最後の一撃の HitStop / HitStun / Knockback は通常どおり成立し、HitStun 終了後も KO は Reset まで維持する。
 KO 中は本人の入力移動と新規攻撃を禁止し、KO 済み防御者への追加 Hit は成立させない。
+表示色の現在仕様は **HitStun 被 Hit 表示 > KO 暗色 > 通常 Tint**（段階15で回帰修正。KO 状態の開始時点は変えない）。
 Reset（R）で HP は最大へ全回復し、KO も解除する。HP バー・Guard・Round 終了・勝敗判定は未実装。
 
+Jパンチの **攻撃設定値の正本**は `DebugAttackData.JPunch` である（段階15。ScriptableObject ではない読み取り専用データ）。
+Startup/Active/Recovery・Damage・HitStop・HitStun・Knockback・local Hit Box をここから参照する。
 攻撃状態の正本は各 `DebugFighterParticipant.AttackState` である。
 被 Hit / HitStun / ノックバック速度の正本は各 `DebugFighterParticipant.HitState` である。
 HP と KO の正本は各 `DebugFighterParticipant`（HitState には持たせない）。
 `SimulationTimeState` は SimulationTick / CombatFrame / Pause / HitStop 等の共有時間状態を持つ。
+`SimulationSession` は攻撃進行と Hit 適用を行うが、Jパンチ固定値の正本にはならない。
 
 実装済み／暫定／未実装／次工程の一覧は `docs/unity_implementation_status.md` を参照する。
 
@@ -439,8 +443,8 @@ HitStop 残が 0 のときだけ実行する。
 4. 判定箱表示
 5. デバッグHUD初期必須（SimulationTick 等の日本語説明付き）
 
-Unity デバッグ実装の**実際の到達点**（段階1〜14B）と次工程は
+Unity デバッグ実装の**実際の到達点**（段階1〜15）と次工程は
 `docs/unity_implementation_status.md` を正とする。
-（工程表の段階14: HP/Damage/KO は完了。次工程は段階15: 攻撃データ化。）
+（工程表の段階14: HP/Damage/KO、段階15: 攻撃データ化 は完了。SO 化は見送り。後続は Round/勝敗・Guard・複数攻撃など順不同。）
 
 本番スプライトシートは未完成。参考画像を完成スプライトとしない。

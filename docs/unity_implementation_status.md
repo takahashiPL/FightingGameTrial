@@ -1,10 +1,10 @@
-# Unity 実装状況・次工程（段階1〜14B到達後）
+# Unity 実装状況・次工程（段階1〜15到達後）
 
 最終更新: 2026-07-27
 対象ブランチ: `unity`
-最新コミット済み HEAD: **`d3692aa`**（Document participant health and damage completion）
-段階14Aまで: **完了・push 済み**
-段階14B（Participant 共通 KO 状態・KO 遷移）: **検証済み・ドキュメント反映時点では未コミット**（作業ツリー）
+最新コミット済み HEAD: **`0a53e8e`**（Document participant knockout completion）
+段階14全体（14A+14B）: **完了・push 済み**
+段階15（J Punch 攻撃データ化）: **検証済み・ドキュメント反映時点では未コミット**（作業ツリー）
 
 このファイルは、Unity 側の**実装済み / 暫定 / 未実装 / 次回候補 / 正式方針**を混同せずに追うための正本です。
 ゲーム仕様そのものの正本は引き続き `docs/rules.md` です。
@@ -23,7 +23,7 @@
 
 ---
 
-## 2. 段階1〜14Bの到達点
+## 2. 段階1〜15の到達点
 
 | 段階 | 内容 | 状態 |
 |---|---|---|
@@ -39,32 +39,35 @@
 | **13B-1** | ステージ端を考慮した Participant 共通 Push 補正配分 | **実装済み・確認済み** |
 | **14A** | Participant 共通 HP・Damage 基盤 | **実装済み・確認済み** |
 | **14B** | Participant 共通 KO 状態・KO 遷移 | **実装済み・確認済み** |
+| **15** | J Punch 攻撃データ化（固定値の参照元整理） | **実装済み・確認済み** |
 
 既存工程表の段階14（**HP、Damage、KO**）は **14A + 14B で充足・完了**。
-Round 終了・勝敗判定は工程表上の段階14には含まれず、後続候補として残す。
-次の番号付き工程は既存計画どおり**段階15**。
+既存工程表の段階15（**攻撃データ化**）は **完了**（ScriptableObject 化は見送り。コード内の読み取り専用データ）。
+Round 終了・勝敗判定は工程表上の段階14/15には含まれず、後続候補として残す。
 
 段階14Aの暫定「0HPでも戦闘継続」は**終了**。段階14Bから 0HP 到達で KO へ遷移する。
 
-### 2.1 責務分担（要約）
+### 2.1 責務分担（要約・段階15後）
 
 | 入れ物 | 担当 |
 |---|---|
-| **`DebugFighterAttackState`** | 攻撃進行の正本 |
-| **`DebugFighterHitState`** | 被 Hit / HitStun / ノックバック速度（HP・KO は持たない） |
-| **`DebugFighterParticipant`** | **HP 正本** + **KO 正本**（`isKnockedOut`） |
-| **`DebugFighterMotor`** | LogicalX・TryMoveLogicalXBy |
-| **`DebugFighterPushResolver`** | 等分 Push ＋壁際再配分 |
+| **`DebugAttackData` / `DebugAttackData.JPunch`** | **J Punch 攻撃設定値の正本**（進行状態は持たない） |
+| **`DebugFighterAttackState`** | 攻撃進行の正本（ActionFrame / HasCurrentJPunchHit 等） |
+| **`DebugFighterHitState`** | 被 Hit / HitStun / ノックバック速度（HP・KO・攻撃データは持たない） |
+| **`DebugFighterParticipant`** | **HP 正本** + **KO 正本**（`isKnockedOut`）。local→world Hit Box 変換・Facing 反転 |
+| **`DebugFighterMotor`** | LogicalX・TryMoveLogicalXBy（攻撃データ非所有） |
+| **`DebugFighterPushResolver`** | 等分 Push ＋壁際再配分（攻撃データ非所有） |
+| **`DebugPunchHitResolver`** | world Hit×Hurt 重なり判定（攻撃全体の設定正本にはしない） |
 | **`SimulationTimeState`** | 共有時間・共有 HitStop |
-| **`SimulationSession`** | tick 進行、有効 Hit / Damage / KO 遷移 |
+| **`SimulationSession`** | tick 進行、攻撃開始/終了、Hit 適用、HitStop 開始、KO 接続（数値の正本にはしない） |
 
 ### 2.2 段階14A（HP / Damage・維持）
 
 - HP 正本: Participant（maxHitPoints=100、current は実行時）
-- J Punch Damage 暫定 10。有効 Hit 1回につき 1 Damage（MarkHit ガード）
+- J Punch Damage は段階15以降 **攻撃データ**（値は従来どおり 10）。有効 Hit 1回につき 1 Damage（MarkHit ガード）
 - 0 未満 Clamp。Reset で全回復
 
-### 2.3 段階14Bで確定した KO
+### 2.3 段階14Bで確定した KO（維持）
 
 | 項目 | 内容 |
 |---|---|
@@ -73,21 +76,26 @@ Round 終了・勝敗判定は工程表上の段階14には含まれず、後続
 | **遷移条件** | 有効 Hit → ApplyDamage 後 `CurrentHitPoints <= 0` かつ未 KO |
 | **TryEnterKnockout** | 初回のみ true。進行中 Attack は `InterruptByHit` |
 
-**処理順（最後の一撃）**:
+**処理順（最後の一撃・段階15でも維持）**:
 `ReceiveHit` → `ApplyDamage` → `TryEnterKnockout` → `MarkHit` → HitStop 開始
 
 ReceiveHit 時点で HitCount / HitStun / Knockback は設定済み。
 最後の一撃の Damage / HitCount / HitStop / HitStun / Knockback は通常どおり成立。
 KO 後もその最後の一撃の Knockback / HitStun は処理される。HitStun 終了後も KO は解除しない（Reset まで維持）。
 
-**KO 中の制御**:
+**KO 中の制御**（戦闘処理は段階15で変更なし）:
 - 入力移動禁止: `ProcessOneFighterMovement` 先頭（Knockback は別経路で継続）
 - 新規攻撃禁止: `TryStartJPunchForParticipant` 先頭
 - KO 済み防御者への追加 Hit 拒否: `TryResolveJPunchHit` 冒頭
   → Damage / HitCount / HitStop / HitStun / Knockback 再設定なし
   → 攻撃側 Action は開始・終了し結果は Miss。HUD ラベル `DefenderKO`
 
-**KO 視覚**: 暗いグレー。優先 **KO > HitStun > 通常 Tint**（最後の一撃の HitStun 中も KO 色）。Scene 変更なし。
+**KO 視覚（履歴と現在仕様）**:
+- 段階14B 時点の記録: 優先 **KO > HitStun > 通常 Tint**（最後の一撃の HitStun 中も KO 色）。Scene 変更なし。
+- **段階15 検証中の回帰修正後（現在仕様の正本）**: 優先 **HitStun 被 Hit 表示 > KO 暗色 > 通常 Tint**。
+  - `ApplyDisplayColor` のみ変更。`hitState.IsInHitStun` を既存どおり使用。
+  - KO 状態（`isKnockedOut`）の開始時点・`TryEnterKnockout` 処理順は変更していない。
+  - 最後の一撃でも赤表示のあと HitStun 終了で KO 暗色へ移行。KO 後追加 Hit では赤にならない。
 
 **HUD**: `P1 Life` / `P2 Life`（Alive / KO）。HP・HitCount・Stun・KB と併記。
 
@@ -95,21 +103,97 @@ KO 後もその最後の一撃の Knockback / HitStun は処理される。HitSt
 
 **Reset**: HP 最大 + KO 解除 + 既存 Attack/HitCount/HitStun/Knockback/HitStop。位置・Facing 維持。
 
-### 2.4 確認済みの挙動（段階14B）
+### 2.4 段階15で確定した攻撃データ化
 
-**コンパイル・初期**: Error 0 / Warning 0。両体 HP=100、Life=Alive、HitCount=0。
+**目的**: J Punch 固有の固定値を Session 等へ散在させず、1つの読み取り専用攻撃データから参照する。
 
-**9Hit**: HP=10、Life=Alive、HitCount=9、ログ `KO=0`。未 KO。
+| 項目 | 内容 |
+|---|---|
+| **型** | `Game/Assets/Scripts/Combat/DebugAttackData.cs` |
+| **性質** | MonoBehaviour ではない / ScriptableObject ではない |
+| **保持内容** | 攻撃の設定値のみ（実行中の攻撃進行は持たない） |
+| **正本** | `static readonly DebugAttackData.JPunch`（`CreateJPunch()` で1回生成） |
+| **Session 参照** | `private static readonly DebugAttackData JPunchData` |
+| **生成頻度** | 毎 Frame / 毎 Hit で `new` しない |
 
-**10Hit目 KO**（例 CF 1352）: HP=0、Life=KO、HitCount=10。
-`Fighter KO` 1回。Punch hit `Damage=10 actual=10 HP=0/100 KO=1 KB=0.180`。
-HitStop → HitStun/KB 開始 → 終了後も Life=KO・KO 色維持。
+**`DebugAttackData.JPunch` の値**:
 
-**KO 後の追加攻撃**: Attack started/ended あり、AttackResult=Miss。新規 Punch hit / KO ログなし。HP/HitCount 不変。HitStop/Stun/KB 再設定なし。
+| 項目 | 値 |
+|---|---|
+| AttackId | JPunch |
+| StartupFrames | 3 |
+| ActiveFrames | 3 |
+| RecoveryFrames | 6 |
+| TotalFrames | 12 |
+| Damage | 10 |
+| HitStopFrames | 6 |
+| HitStunFrames | 12 |
+| KnockbackInitialVelocityX | 0.180 |
+| KnockbackDecelerationPerCombatFrame | 0.015 |
+| Hit Box local CenterX / CenterY | 0.75 / 1.25 |
+| Hit Box HalfWidth / HalfHeight | 0.55 / 0.35 |
 
-**Reset**: 両体 100/Alive、HitCount=0、Stun/KB/HitStop=0。位置例 P1=6.00 / P2=7.00、Facing R/L 維持。
+**Frame 境界（既存実装を移しただけ。境界自体は変更なし）**:
 
-### 2.5 未直接検証（実装済み・P2 実操作未確認）
+| 区間 | ActionFrame |
+|---|---|
+| Startup | 1〜3 |
+| Active | 4〜6 |
+| Recovery | 7〜12 |
+| 攻撃終了 | `ActionFrame >= TotalFrames`（12） |
+
+**データ参照へ置換した内容**:
+Startup / Active / Recovery 判定、TotalFrame と攻撃終了、Damage、HitStop、HitStun、Knockback 初速・減速、local Hit Box、Attack started ログ、Punch hit の値、HUD の JPunch Data。
+
+**1攻撃1Hit**: 従来どおり `HasCurrentJPunchHit` + `MarkHit`。Active 3Frame でも 1攻撃1Damage。処理変更なし。
+
+**ScriptableObject 化を見送った理由**:
+- 今回は固定値の参照元整理が目的
+- Inspector 編集や Asset 依存を増やす前段階
+- 複数攻撃・Character 別データがまだない
+- SO 化は後続で必要性を判断する
+- 当面はコード内の不変データとして保持
+
+**段階15で実装していないこと**:
+ScriptableObject 化、Inspector 編集、Character 別攻撃データ、複数攻撃、弱/中/強、技コマンド、コンボ、Guard、Counter Hit、攻撃キャンセル、アニメーションイベント、JSON/CSV、Round/勝敗/Result、KO 専用アニメ、HP バー。
+
+### 2.5 HUD / ログ（段階15）
+
+**HUD（攻撃データから生成。固定値の再記述なし）**:
+`JPunch Data : S/A/R 3/3/6 Dmg 10 HStop 6 HStun 12 KB 0.180`
+
+- 初回配置は状態 HUD 末尾付近にあり、`Truncate` と高さ制限で非表示だった
+- 修正（HUD のみ・Scene 変更なし）:
+  - `JPunch Data` 行を `P2 KB Vx/Act` 直後へ移動
+  - `HelpBlockHeightPixels` 120→92（ランタイム `EnsureSplitHudLayout`）
+- 操作説明の欠け・重なりなしを確認
+
+**ログ**:
+- Attack started: `[FightDebug] Attack started slot=P1 attack=JPunch S/A/R=3/3/6 Damage=10 HitStop=6 HitStun=12 KB=0.180`
+- Attack ended: `[FightDebug] Attack ended slot=P1 attack=JPunch`
+- Punch hit: 既存項目を維持し、値は `DebugAttackData.JPunch` から参照
+
+### 2.6 確認済みの挙動（段階15）
+
+**A. コンパイル**: Error 0。Warning 1（既存 CS0618: `TMP_Text.enableWordWrapping`。Stage 15 由来の新規 Warning なし）。
+
+**B. 初期**: 両体 HP=100、Life=Alive、HitCount=0、Stun=0、KB=0、HitStop=0。JPunch Data HUD 表示確認。
+
+**C. 遠距離 Miss**: Attack started/ended、`attack=JPunch`、S/A/R=3/3/6。P2 HP/HitCount 不変、HitStop=0、AttackResult=Miss。
+
+**D. 1Hit**: Damage=10、HP=90、HitCount=1、KO=0、KB=0.180。HitStop 6Frame（SimulationTick と CombatFrame の差で確認）。Active 3Frame でも 1Hit のみ。HitStun 終了後 Idle、KB→0。
+
+**E. Frame 境界**: Startup 1〜3 / Active 4〜6 / Recovery 7〜12。Recovery 中 AF7/8/10 ログ確認。HitStop 中 ActionFrame 停止。AF>=12 で終了。既存境界維持。
+
+**F. KO 回帰**: 9Hit で HP=10 Alive HitCount=9。10Hit で HP=0 Life=KO HitCount=10、KO ログ1回。最後の一撃の HitStop/Stun/KB 維持。KO 後暗色維持。
+
+**G. KO 表示回帰修正**: 最終 Hit で赤→その後 KO 暗色を目視確認。通常 Hit の赤維持。KO 後追加 Hit は赤なし。Reset で Alive 色。戦闘処理・Scene/Prefab 変更なし。
+
+**H. Reset**: 両体 100/Alive、HitCount=0、Stun/KB/HitStop=0、AttackResult=None。位置と Facing 維持。
+
+**I. Stage 13・14 回帰**: 中央 Push・右端再配分・Dist=1.00・Clamp・HP Clamp・KO 追加 Hit 拒否・Reset 維持。
+
+### 2.7 未直接検証（実装済み・P2 実操作未確認）
 
 現在 P2 は Dummy（Neutral）のため、次は**コード経路確認済み／P2 実操作では未検証**:
 - KO した Participant 自身の左右入力禁止
@@ -117,20 +201,21 @@ HitStop → HitStun/KB 開始 → 終了後も Life=KO・KO 色維持。
 
 将来 2P 入力 / AI 時に共通経路を実操作確認する。検証済みとは書かない。
 
-### 2.6 Stage 13・14A 回帰（段階14B 検証時）
+### 2.8 段階14B 時点の確認メモ（履歴・上書きしない）
 
-- 1攻撃1Damage、HP Clamp、HitStop / HitStun / Knockback 維持
-- 中央 Push・右端 Push 再配分・Push Dist=1.00、Reset 全回復正常
+段階14B 検証時: 10Hit で KO、追加攻撃は Miss、Reset で Alive/100、Stage 13/14A 回帰正常。
+当時の Visual 優先は **KO > HitStun**（段階15 で現在仕様へ修正。§2.3 参照）。
 
-### 2.7 未実装（段階14計画外・後続候補）
+### 2.9 未実装（段階15計画外・後続候補）
 
 - Round 終了、勝敗判定、WIN/LOSE、KO 後時間停止、リザルト、ラウンド再開始
 - KO 専用アニメ、Down 物理、複数ラウンド、タイマー、HP バー、Guard
-- Character 別 KO、KO 演出制御
+- Character 別 KO / 攻撃データ、KO 演出制御
 - 壁バウンド等（工程番号なし残課題）
-- 攻撃データ化（段階15）
+- 攻撃データの ScriptableObject 化 / Inspector 編集 / JSON・CSV
+- 複数攻撃、弱/中/強、技コマンド、コンボ、Cancel、Counter Hit
 
-### 2.8 相打ち・キャラ差し替え
+### 2.10 相打ち・キャラ差し替え
 
 - 相打ち: 両方向判定の土台のみ。P2 Neutral のため実動作確認は未実施
 - キャラ差し替え・複数 Hurt/Hit Box: 未実装
@@ -139,13 +224,14 @@ HitStop → HitStun/KB 開始 → 終了後も Life=KO・KO 色維持。
 
 ## 3. Facing / Push（維持）
 
-Facing 分離・壁際 Push 再配分は実装済み。Push は HP / KO / KB 速度に触れない。
+Facing 分離・壁際 Push 再配分は実装済み。Push は HP / KO / KB 速度に触れない。攻撃データも持たない。
 
 ---
 
 ## 4. 判定箱方針（維持）
 
 Push / Hurt / Hit 可視化（11A）と Hit×Hurt 重なり判定（11B）は完了。
+段階15: local Hit Box 定義は攻撃データ、world 変換・Facing 反転は Participant、重なりは PunchHitResolver。
 
 ---
 
@@ -157,15 +243,16 @@ Push / Hurt / Hit 可視化（11A）と Hit×Hurt 重なり判定（11B）は完
 | **14A** | Participant 共通 HP・Damage 基盤 | **完了** |
 | **14B** | Participant 共通 KO 状態・KO 遷移 | **完了** |
 | **14**（全体） | HP、Damage、KO（工程表どおり） | **完了**（14A+14Bで充足） |
-| **15** | 攻撃データ化（Startup/Active/Recovery、Hit Box、Damage、HitStop、HitStun、Knockback） | **次回候補** |
+| **15** | 攻撃データ化（Startup/Active/Recovery、Hit Box、Damage、HitStop、HitStun、Knockback） | **完了**（コード内不変データ。SO 化は見送り） |
 
-その後の候補（順不同・未着手）:
+その後の候補（順不同・未着手・既存計画どおり。新工程番号は作らない）:
 
 - Round 終了、勝敗、Down、HP バー、Guard
 - ノックバック壁到達時の速度停止、壁バウンド、壁やられ、Corner
 - しゃがみ、ジャンプ、空中状態
 - 複数攻撃、入力バッファ、キャンセル
 - Animation 本接続
+- 攻撃データの ScriptableObject 化（必要になったとき）
 - 2P 入力 / CPU（KO 中移動・攻撃禁止の実操作確認、P1被Hit・左方向KB・Facing Left 攻撃を含む）
 - 複数 Hurt / Hit Box、キャラ固有データ化
 
@@ -186,7 +273,8 @@ Push / Hurt / Hit 可視化（11A）と Hit×Hurt 重なり判定（11B）は完
 
 ## 7. 一言まとめ
 
-- 段階1〜**14B**まで到達。工程表の段階14（HP/Damage/KO）は完了
-- 最新コミット済み HEAD: `d3692aa`。段階14B は検証済み・未コミット
-- HP 0 で一度だけ KO。最後の一撃の HitStop/Stun/KB は維持。Reset まで KO 解除しない
-- 次は既存計画どおり段階**15**（**攻撃データ化**）
+- 段階1〜**15**まで到達。工程表の段階14（HP/Damage/KO）と段階15（攻撃データ化）は完了
+- 最新コミット済み HEAD: `0a53e8e`。段階15 は検証済み・未コミット
+- J Punch 設定正本は `DebugAttackData.JPunch`。Session は進行と適用のみ
+- KO 処理順・1攻撃1Hit・Frame 境界は維持。Visual 優先は HitStun 赤 > KO 暗色 > 通常 Tint
+- 次は既存計画の後続候補（Round/勝敗、Guard、複数攻撃、SO 化の要否判断など。順不同）
