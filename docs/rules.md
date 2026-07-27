@@ -164,7 +164,7 @@ Participant 共通の **HP / Damage** は**実装済み**である（段階14A�
 最後の一撃の HitStop / HitStun / Knockback は通常どおり成立し、HitStun 終了後も KO は Reset まで維持する。
 KO 中は本人の入力移動と新規攻撃を禁止し、KO 済み防御者への追加 Hit は成立させない。
 表示色の現在仕様は **HitStun 被 Hit 表示 > KO 暗色 > 通常 Tint**（段階15で回帰修正。KO 状態の開始時点は変えない）。
-Reset（R）で HP は最大へ全回復し、KO も解除する。HP バー・Guard・Round 終了・勝敗判定は未実装。
+Reset（R）は練習モードの **Training Reset** として整理する（§15）。HP は最大へ全回復し、KO も解除する（確認済み）。位置・向きの初期復帰は**未実装**（現行は維持）。HP バー・Guard は未実装。Round 終了・勝敗判定は**対戦モード固有・未実装**であり、FightDebugScene（練習）には混在させない。
 
 Jパンチの **攻撃設定値の正本**は `DebugAttackData.JPunch` である（段階15。ScriptableObject ではない読み取り専用データ）。
 Startup/Active/Recovery・Damage・HitStop・HitStun・Knockback・local Hit Box をここから参照する。
@@ -175,6 +175,7 @@ HP と KO の正本は各 `DebugFighterParticipant`（HitState には持たせ�
 `SimulationSession` は攻撃進行と Hit 適用を行うが、Jパンチ固定値の正本にはならない。
 
 実装済み／暫定／未実装／次工程の一覧は `docs/unity_implementation_status.md` を参照する。
+モード構成・Visual State・Sprite 方針は **§15**。
 
 ---
 
@@ -445,6 +446,82 @@ HitStop 残が 0 のときだけ実行する。
 
 Unity デバッグ実装の**実際の到達点**（段階1〜15）と次工程は
 `docs/unity_implementation_status.md` を正とする。
-（工程表の段階14: HP/Damage/KO、段階15: 攻撃データ化 は完了。SO 化は見送り。後続は Round/勝敗・Guard・複数攻撃など順不同。）
+（工程表の段階14: HP/Damage/KO、段階15: 攻撃データ化 は完了。SO 化は見送り。正式な次 Stage 番号は未定義。後続候補は順不同。Round/勝敗は対戦モード固有。）
 
 本番スプライトシートは未完成。参考画像を完成スプライトとしない。
+
+---
+
+## 15. モード構成・Training Reset・見た目同期（方針確定）
+
+この節は **2026-07-27 に方針確定**した内容である。実装済みと混同しない。新 Stage 番号は定義しない。
+
+### 15.1 戦闘コアとモード進行の分離
+
+| 層 | 責務 |
+|---|---|
+| **共通戦闘コア** | 入力サンプリング、左右移動、向き、Push / Hurt / Hit Box、Startup / Active / Recovery、Damage、HitStop、HitStun、Knockback、HP、KO 判定、KO 後の追加被弾拒否、攻撃データ、基本的な戦闘状態、戦闘状態から見た目への同期 |
+| **モード側** | KO **成立後**に何をするか（観察継続／ラウンド終了／WIN・LOSE など） |
+
+共通側は「KO が成立した」という戦闘結果までを担当する。
+
+### 15.2 FightDebugScene（練習モード）
+
+- 対戦モードではなく、**正式な練習・検証モード**
+- 詳細 HUD、戦闘ログ、判定確認、KO 観察、R による Training Reset を維持する
+- KO 後に WIN/LOSE やラウンド終了へ進まない
+- **対戦進行を FightDebugScene へ混在させない**
+
+練習固有の例: 勝敗なし、ラウンド管理なし、時間制限なし、WIN/LOSE なし、Training Reset、詳細 Debug HUD。
+
+### 15.3 対戦モード（将来・未実装）
+
+ラウンド開始・終了、勝敗、WIN/LOSE、ラウンド数、タイマー、READY/FIGHT、次ラウンド、Match 終了、リザルト、対戦用 HUD、開始前・終了後の入力制限。
+別モードとして扱う。現時点では未実装。
+
+### 15.4 Training Reset
+
+現在の R Reset を練習モードの正式な Training Reset として整理する。
+
+**方針上の初期化対象**: P1/P2 位置・向き、HP、KO、HitCount、HitStun、Knockback、攻撃状態、HitStop、AttackResult、入力の押下残り。
+
+**位置の正本**: Transform だけを直接戻さず、戦闘で使う**論理座標**を初期値へ戻し、通常の表示同期経路から Transform へ反映する。
+
+**現状**: HP・KO・HitCount 等の Reset は確認済み。位置・向きの初期位置復帰は**未実装または未確認扱いとし、実装済みにしない**（現行コードは位置・Facing を維持する）。
+
+### 15.5 キャラクター機能と Visual State
+
+前進・後退・Idle・歩行表現・ジャンプ・キック・Punch・HitStun・Knockback・KO・アニメーション状態は、**練習専用ではなく練習／対戦共通のキャラクター機能**とする。
+
+見た目側で将来扱う Visual State 候補（方針・未実装含む）:
+
+- Idle、WalkForward、WalkBackward
+- JumpRise、JumpFall、Landing
+- Punch、Kick
+- HitStun、Knockback、KO
+
+戦闘処理が足の角度や Sprite のコマを直接決めない。戦闘状態を Visual State へ変換し、見た目側が Animator または Sprite 差し替えで表現する。
+
+**前進／後退**は左右キーだけで決めない。移動方向と Facing の組み合わせで決める。
+
+| Facing | 移動 | Visual State |
+|---|---|---|
+| 右向き | 右移動 | WalkForward |
+| 右向き | 左移動 | WalkBackward |
+| 左向き | 左移動 | WalkForward |
+| 左向き | 右移動 | WalkBackward |
+
+### 15.6 Sprite と Animation（学習方針）
+
+**現在（実装済みの簡易方式）**: `fighter_idle_00_transparent` / `fighter_attack_punch_transparent` など、1状態1枚の Sprite をコードで差し替える。単独 256×256 画像は Sprite Mode **`Single`** で正しい。
+
+**複数コマの用意**
+
+| 方式 | Sprite Mode | 例 |
+|---|---|---|
+| A. 1コマ1 PNG | 各画像 `Single` | `fighter_walk_forward_00.png` など |
+| B. 1枚のスプライトシート | `Multiple` + Sprite Editor で Slice | 1画像から複数 Sprite |
+
+複数 Sprite を用意しただけではアニメーションしない。必要な構成は **Sprite 群 → Animation Clip → Animator Controller → 状態切替**。
+
+学習中は 1コマ1 PNG が理解しやすい。将来的に Animator + Animation Clip を導入する（現時点では未実装）。

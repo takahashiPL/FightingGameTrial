@@ -2,10 +2,10 @@
 
 最終更新: 2026-07-27
 対象ブランチ: `unity`
-最新コミット済み HEAD: **`20d4a5a`**（Reduce fixed help HUD allocations）
+最新コミット済み HEAD: **`dfcb9e0`**（Reduce status HUD allocations）
 段階14全体（14A+14B）・段階15（攻撃データ化）: **完了・push 済み**
-GC-1（固定 Help 毎 Frame 再構築停止）: **完了・push 済み**（`20d4a5a`）
-GC-2（Status HUD StringBuilder 再利用）: **実装・Editor 実測済み。ドキュメント反映時点ではコード未コミットの場合あり**
+GC-1 / GC-2（補助改善・正式 Stage ではない）: **完了・push 済み**
+正式な次工程番号: **未定義**（新 Stage 番号は作らない）
 
 このファイルは、Unity 側の**実装済み / 暫定 / 未実装 / 次回候補 / 正式方針**を混同せずに追うための正本です。
 ゲーム仕様そのものの正本は引き続き `docs/rules.md` です。
@@ -21,7 +21,52 @@ GC-2（Status HUD StringBuilder 再利用）: **実装・Editor 実測済み。�
 | **暫定実装** | 動くが、正式仕様へ置き換える前提 |
 | **正式方針（未実装）** | 今後そうする、と決めた設計。コード未反映 |
 | **未実装** | まだ作っていない |
-| **次回候補** | 工程上の次ステップ |
+| **次回候補** | 工程上の次ステップ（番号未割当含む） |
+
+---
+
+## 1.1 モード位置づけ（方針確定・実装は段階15到達時点）
+
+`FightDebugScene` は**対戦モードではない**。**正式な練習・検証モード**として扱う。
+
+| 項目 | 状態 |
+|---|---|
+| 詳細 HUD・戦闘ログ・判定／KO 確認・R Reset | **実装済み・維持** |
+| KO 後の WIN/LOSE・ラウンド終了への進行 | **しない**（方針。現コードも対戦進行なし） |
+| KO 状態の観察 | **できる**（確認済み） |
+| 対戦モード（Round / 勝敗 / タイマー等） | **未実装**。FightDebugScene へ混在させない |
+
+### 責務表（方針）
+
+| 層 | 担当 | 備考 |
+|---|---|---|
+| **共通戦闘コア** | 入力サンプリング、左右移動、向き、Push/Hurt/Hit Box、S/A/R、Damage、HitStop、HitStun、Knockback、HP、KO 判定、KO 後の追加被弾拒否、攻撃データ、基本戦闘状態、戦闘状態→見た目同期 | **「KO が成立した」まで**。練習／対戦で共通化する方針 |
+| **練習モード（現 FightDebugScene）** | 勝敗なし、ラウンドなし、時間制限なし、WIN/LOSE なし、Training Reset（R）、詳細 Debug HUD、判定・座標・攻撃・HitStop 等の観察 | KO 後は観察継続。将来候補: ダミー回復、自動回復、ガード設定、行動記録、判定表示、フレーム表示など |
+| **対戦モード（将来・未実装）** | ラウンド開始・終了、勝敗、WIN/LOSE、ラウンド数、タイマー、READY/FIGHT、次ラウンド、Match 終了、リザルト、対戦用 HUD、開始前・終了後の入力制限 | 別 Scene / Controller / HUD を想定。現 Scene に混在させない |
+
+共通側は KO 成立という**戦闘結果**まで。KO 後に何をするかは**モード側**が決める。
+
+### Training Reset（方針と現状）
+
+現在の R Reset を、練習モードの正式な **Training Reset** として整理する（名称・責務の方針確定）。
+
+**方針上、R で初期化する項目**
+
+- P1 / P2 位置、向き
+- HP、KO、HitCount、HitStun、Knockback
+- 攻撃状態、HitStop、AttackResult
+- 入力の押下残り
+
+**位置の戻し方（方針）**: Transform だけを直接戻さず、戦闘で使う**論理座標**を初期値へ戻し、通常の表示同期経路から Transform へ反映する。
+
+| 項目 | 現状（段階15到達後） |
+|---|---|
+| HP / KO / HitCount / HitStun / Knockback / 攻撃状態 / HitStop / AttackResult 等 | **確認済み**（R で初期化される） |
+| 位置・向きの初期位置復帰 | **未実装**（現行は位置・Facing を維持。コードコメント・検証メモとも一致） |
+
+位置・向き復帰を実装済みと扱わない。
+
+キャラクターの前進・後退・Idle・歩行表現・ジャンプ・キック・Punch・HitStun・Knockback・KO・アニメーション状態は、**練習専用ではなく練習／対戦共通のキャラクター機能**とする方針。見た目は戦闘処理がコマを直接決めず、戦闘状態→ Visual State → Animator または Sprite 差し替え、とする（詳細は `docs/rules.md` / 教材 §17）。
 
 ---
 
@@ -45,7 +90,8 @@ GC-2（Status HUD StringBuilder 再利用）: **実装・Editor 実測済み。�
 
 既存工程表の段階14（**HP、Damage、KO**）は **14A + 14B で充足・完了**。
 既存工程表の段階15（**攻撃データ化**）は **完了**（ScriptableObject 化は見送り。コード内の読み取り専用データ）。
-Round 終了・勝敗判定は工程表上の段階14/15には含まれず、後続候補として残す。
+Round 終了・勝敗判定は工程表上の段階14/15には含まれず、**対戦モード側の後続候補**として残す（練習モードである FightDebugScene には混在させない。§1.1）。
+正式な次工程番号は未定義。新 Stage 番号は作らない。
 
 段階14Aの暫定「0HPでも戦闘継続」は**終了**。段階14Bから 0HP 到達で KO へ遷移する。
 
@@ -103,7 +149,7 @@ KO 後もその最後の一撃の Knockback / HitStun は処理される。HitSt
 
 **ログ**: 初回のみ `Fighter KO`。Punch hit に `KO=0/1`。Reset に `/KO`。
 
-**Reset**: HP 最大 + KO 解除 + 既存 Attack/HitCount/HitStun/Knockback/HitStop。位置・Facing 維持。
+**Reset（Training Reset・現状）**: HP 最大 + KO 解除 + 既存 Attack/HitCount/HitStun/Knockback/HitStop 等は**確認済み**。位置・Facing は**維持**（初期位置復帰は**未実装**。§1.1）。
 
 ### 2.4 段階15で確定した攻撃データ化
 
@@ -210,12 +256,23 @@ ScriptableObject 化、Inspector 編集、Character 別攻撃データ、複数�
 
 ### 2.9 未実装（段階15計画外・後続候補）
 
+正式な優先順位・工程番号は未割当（順不同）。
+
+**対戦モード固有（未実装・FightDebugScene に混在させない）**
+
 - Round 終了、勝敗判定、WIN/LOSE、KO 後時間停止、リザルト、ラウンド再開始
-- KO 専用アニメ、Down 物理、複数ラウンド、タイマー、HP バー、Guard
+- 複数ラウンド、タイマー、READY/FIGHT、Match 終了、対戦用 HUD、開始前・終了後の入力制限
+
+**練習モード／共通まわりの候補**
+
+- Training Reset の位置・向き初期復帰（方針確定・**未実装**）
+- KO 専用アニメ、Down 物理、HP バー、Guard
 - Character 別 KO / 攻撃データ、KO 演出制御
 - 壁バウンド等（工程番号なし残課題）
 - 攻撃データの ScriptableObject 化 / Inspector 編集 / JSON・CSV
 - 複数攻撃、弱/中/強、技コマンド、コンボ、Cancel、Counter Hit
+- Idle / WalkForward / WalkBackward の Visual State、歩行 Animation、K Kick、Animator、ジャンプ／空中（いずれも未実装）
+- 練習用将来候補: ダミー回復、自動回復、ガード設定、行動記録、判定表示、フレーム表示など
 
 ### 2.10 相打ち・キャラ差し替え
 
@@ -247,16 +304,21 @@ Push / Hurt / Hit 可視化（11A）と Hit×Hurt 重なり判定（11B）は完
 | **14**（全体） | HP、Damage、KO（工程表どおり） | **完了**（14A+14Bで充足） |
 | **15** | 攻撃データ化（Startup/Active/Recovery、Hit Box、Damage、HitStop、HitStun、Knockback） | **完了**（コード内不変データ。SO 化は見送り） |
 
-その後の候補（順不同・未着手・既存計画どおり。新工程番号は作らない）:
+その後の候補（順不同・未着手。**新工程番号は作らない**。正式な次 Stage も未定義）:
 
-- Round 終了、勝敗、Down、HP バー、Guard
+- Training Reset で位置・向きを初期位置へ戻す（論理座標正本。現状未実装）
+- Idle / WalkForward / WalkBackward の Visual State 整理、歩行用複数 Sprite または Animation Clip
+- K Kick、Animator 導入、ジャンプ／空中状態（未実装）
+- 対戦モード用 Scene / Controller / HUD（Round / 勝敗 / タイマー / リザルト等。FightDebugScene とは分離）
+- Down、HP バー、Guard
 - ノックバック壁到達時の速度停止、壁バウンド、壁やられ、Corner
-- しゃがみ、ジャンプ、空中状態
-- 複数攻撃、入力バッファ、キャンセル
-- Animation 本接続
+- しゃがみ、複数攻撃、入力バッファ、キャンセル
 - 攻撃データの ScriptableObject 化（必要になったとき）
 - 2P 入力 / CPU（KO 中移動・攻撃禁止の実操作確認、P1被Hit・左方向KB・Facing Left 攻撃を含む）
 - 複数 Hurt / Hit Box、キャラ固有データ化
+- 練習モード将来候補: ダミー回復、自動回復、ガード設定、行動記録、判定／フレーム表示など
+
+モード責務の方針は §1.1。Round/勝敗は**対戦モード固有**であり、練習 Scene の次必須工程としては未確定。
 
 ---
 
@@ -312,8 +374,8 @@ Round / Guard / 複数攻撃などの**機能 Stage とは別枠**。番号「GC
 ## 7. 一言まとめ
 
 - 段階1〜**15**まで到達。工程表の段階14（HP/Damage/KO）と段階15（攻撃データ化）は完了
-- 最新コミット済み HEAD: `20d4a5a`（GC-1）。GC-1 / GC-2 は補助改善・正式 Stage ではない
-- GC-2（Editor）: `DebugHudView.Update` 約17.2 → 約3.2 KB / frame。Development Build は未計測
-- J Punch 設定正本は `DebugAttackData.JPunch`。Session は進行と適用のみ
-- KO 処理順・1攻撃1Hit・Frame 境界は維持。Visual 優先は HitStun 赤 > KO 暗色 > 通常 Tint
-- 次は既存計画の後続候補（Round/勝敗、Guard、複数攻撃、SO 化の要否判断など。順不同）
+- 最新コミット済み HEAD: `dfcb9e0`。GC-1 / GC-2 は補助改善・正式 Stage ではない
+- `FightDebugScene` は**練習・検証モード**（対戦進行なし）。戦闘コアは共通、KO 後処理はモード側（§1.1）
+- Training Reset（R）: HP/KO 等は確認済み。**位置・向きの初期復帰は未実装**
+- J Punch 設定正本は `DebugAttackData.JPunch`。Visual 優先は HitStun 赤 > KO 暗色 > 通常 Tint
+- 正式な次 Stage 番号は未定義。候補は順不同（Training Reset 位置復帰、Visual State、Kick、Animator、対戦モード分離など）

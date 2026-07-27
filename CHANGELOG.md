@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## 練習モードと対戦モードの責務整理（Docs）
+
+- Docs 更新のみ。コード / Scene / Prefab / Font Asset / Animator / Animation Clip / Sprite の追加・変更なし
+- `FightDebugScene` を正式な**練習・検証モード**として明記（対戦モードではない）
+- 共通戦闘コアは「KO 成立」まで。KO 後の進行はモード側。対戦進行を FightDebugScene へ混在させない
+- Training Reset（R）方針を整理。HP/KO 等の初期化は確認済み。**位置・向きの初期復帰は未実装**（実装完了扱いにしない）
+- Visual State（戦闘状態→見た目）、前進／後退判定、Sprite Single/Multiple、Animator 関係を方針として記載
+- Animator・歩行・キック・ジャンプは**未実装**。正式な次 Stage 番号は作らない（段階15完了状態は維持）
+- 更新: README / `docs/unity_implementation_status.md` §1.1・§5 / `docs/rules.md` §15 / `docs/component_and_scene_guide.md` §2・§17
+
 ## GC-2（補助改善・Status HUD の StringBuilder 再利用）
 
 - 正式 Stage 番号ではない（GC 学習・計測の便宜区分）。機能 Stage（Round/Guard 等）とは別枠

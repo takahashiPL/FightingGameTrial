@@ -3,8 +3,10 @@
 最終更新: 2026-07-27
 対象ブランチ: `unity`
 対象コミット（資料作成時点）: **`2341e4c`**（Add component and scene learning guide）
+方針追記時点の HEAD: **`dfcb9e0`**（Reduce status HUD allocations）※コード変更なしの Docs 追記
 対象 Scene: `Game/Assets/Scenes/FightDebugScene.unity`
 実装到達点: **Stage 15（J Punch 攻撃データ化）完了後**
+Scene の役割: **正式な練習・検証モード**（対戦モードではない。§2・§17）
 
 ---
 
@@ -173,6 +175,18 @@ Unity の **Scene / GameObject / Component / MonoBehaviour / Inspector 参照** 
 ## 2. FightDebugScene 全体像
 
 Scene ファイル `FightDebugScene.unity` から確認した Hierarchy です（GameObject 名は YAML の `m_Name`）。
+
+### 練習モードとしての役割（方針確定）
+
+`FightDebugScene` は**対戦モードではない**。判定・KO・HUD・ログを観察するための**正式な練習・検証モード**である。
+
+| 区分 | 内容 | 状態 |
+|---|---|---|
+| 詳細 HUD・戦闘ログ・判定／KO 確認・R Reset | 練習用途として維持 | **実装済み** |
+| KO 後の WIN/LOSE・ラウンド進行 | 行わない（KO を観察できる） | **方針どおり・対戦進行コードなし** |
+| 対戦モード（Round / 勝敗 / タイマー等） | 将来の別モード | **未実装**。本 Scene に混在させない |
+
+共通戦闘コア・Training Mode・Versus Mode の概念、Visual State、Sprite / Animator の関係は **§17**。
 
 ```text
 FightDebugScene
@@ -461,6 +475,7 @@ P2 が動かないのは「Dummy 専用コード」ではなく、**入力が常
 | HP / KO / HitStun 残り | Participant / HitState | HUD や色は**結果の見え方** |
 | SpriteRenderer.color | `ApplyDisplayColor` | 戦闘判定の入力ではない |
 | KO 正本 | `isKnockedOut` | 色が暗いから KO、ではない |
+| Sprite 差し替え（現状） | `DebugFighterVisual.Apply` | Idle / Punch の1枚差し替え。Animator は未使用 |
 
 **現在の色優先（Stage 15 回帰後）**
 
@@ -470,6 +485,8 @@ P2 が動かないのは「Dummy 専用コード」ではなく、**入力が常
 
 最後の一撃では、KO 状態は Hit 成立時点で立つが、**赤表示が終わってから**暗色へ移る。
 表示だけを変えても Damage / HitStop は変わらない（`ApplyDisplayColor` は色設定のみ）。
+
+**方針（将来・§17）**: 戦闘処理がコマを直接決めず、戦闘状態 → Visual State → Animator または Sprite 差し替え。現状の直接差し替えはその簡易版。
 
 ---
 
@@ -588,13 +605,16 @@ HUD の数字は便利な鏡です。**戦闘データの正本は Session / Par
 
 ### ゲーム機能として未実装（Stage 15 時点・実装状況 Docs と一致）
 
-- Round 終了・勝敗・HP バー・Guard
+- 対戦モード進行（Round / 勝敗 / WIN・LOSE / タイマー等）。FightDebugScene は練習モード
+- Training Reset の位置・向き初期復帰（HP/KO 等の Reset は確認済み）
+- HP バー・Guard
 - 攻撃データの ScriptableObject 化 / Inspector 編集
 - 複数攻撃・コンボ・Cancel・Counter Hit
 - 2P 実操作（現在 P2 は Neutral）
 - 壁バウンド・壁やられ など
+- Idle / Walk の Visual State 整理、歩行 Animation、K Kick、Animator、ジャンプ／空中
 
-詳細は `docs/unity_implementation_status.md`。
+詳細は `docs/unity_implementation_status.md`（モード責務は §1.1）。概念図は本資料 §17。
 
 ---
 
@@ -613,6 +633,7 @@ HUD の数字は便利な鏡です。**戦闘データの正本は Session / Par
 **読み分けの目安**
 
 - 「Unity 上で誰が何を持っているか」→ **この資料 §1〜§15**
+- 「モード／Visual State／Sprite・Animator」→ **この資料 §17**
 - 「GC.Alloc をどう見るか」→ **この資料 §16**
 - 「Stage 何まで終わったか」→ `unity_implementation_status.md`
 - 「HitStop とは何か」→ `rules.md`
@@ -950,3 +971,91 @@ GC の話は「仕様の正本」ではなく、**実行時コストの学習**�
 - 小数書式用 `ToString`
 - `DebugBox2D` が class であることによる HUD 確認用 Box 生成
 - TMP 内部処理
+
+---
+
+## 17. モード構成・Visual State・Sprite（方針と現状）
+
+この章は **実装済み** と **将来構想（方針確定・未実装）** を分けて書く。新 Stage 番号は作らない。仕様の正本は `docs/rules.md` §15、到達点は `docs/unity_implementation_status.md` §1.1。
+
+### 17.1 概念図（共通コアとモード）
+
+```text
+┌─────────────────────────────────────────┐
+│           共通戦闘コア（Combat Core）      │
+│  入力 / 移動 / Facing / Box / S・A・R     │
+│  Damage / HitStop / HitStun / Knockback │
+│  HP / KO判定 / KO後追加被弾拒否 / 攻撃データ │
+│  戦闘状態 → 見た目同期（Visual 反映）      │
+│           ※「KOが成立した」まで担当         │
+└──────────────────┬──────────────────────┘
+                   │
+       ┌───────────┴───────────┐
+       ▼                       ▼
+┌──────────────┐       ┌──────────────────┐
+│ Training Mode│       │ Versus Mode      │
+│ (現 FightDebug│       │ （将来・未実装）   │
+│  Scene）      │       │ Round / 勝敗 /    │
+│ 観察・詳細HUD │       │ タイマー / リザルト│
+│ Training Reset│       │ 対戦用 HUD など   │
+│ KO後は観察継続 │       │ KO後はモード進行  │
+└──────────────┘       └──────────────────┘
+```
+
+### 17.2 実装済み（現状）
+
+- FightDebugScene 上の戦闘コア（段階15到達時点の機能）
+- R による戦闘状態 Reset（HP / KO / HitStun / Knockback / 攻撃 / HitStop 等）
+- Idle / Punch の **Sprite 直接差し替え**（`DebugFighterVisual`）
+- 単独 256×256 デバッグ画像の Sprite Mode **`Single`**
+
+### 17.3 将来構想（方針確定・未実装）
+
+- 対戦モード用 Scene / Controller / HUD
+- Training Reset の**位置・向き初期復帰**（論理座標を正本として戻す。Transform 直書きだけにしない）
+- Visual State 経由の見た目（Animator + Animation Clip を含む）
+- Walk / Kick / Jump などの共通キャラクター表現
+
+**Training Reset の位置・向き**: 現行は維持のまま。復帰は未実装。実装済みと書かない。
+
+### 17.4 Visual State と前進・後退
+
+戦闘処理が足の角度や Sprite コマを直接決めない。戦闘状態を Visual State へ変換し、見た目側が表現する（方針）。
+
+Visual State 候補（将来）: Idle、WalkForward、WalkBackward、JumpRise、JumpFall、Landing、Punch、Kick、HitStun、Knockback、KO。
+
+前進／後退は左右キーだけで決めない。**移動方向 × Facing**。
+
+| Facing | 移動 | Visual State |
+|---|---|---|
+| 右 | 右 | WalkForward |
+| 右 | 左 | WalkBackward |
+| 左 | 左 | WalkForward |
+| 左 | 右 | WalkBackward |
+
+### 17.5 Sprite Mode Single / Multiple
+
+| 方式 | Sprite Mode | 説明 |
+|---|---|---|
+| 1コマ1 PNG | 各画像 **`Single`** | 例: `fighter_walk_forward_00.png`。学習中は理解しやすい |
+| 1枚スプライトシート | **`Multiple`** + Sprite Editor で Slice | 1画像から複数 Sprite を生成 |
+
+現在の単独 Idle / Punch PNG は **`Single` で正しい**。
+
+### 17.6 Sprite・Animation Clip・Animator Controller
+
+複数 Sprite を用意しただけではアニメーションしない。
+
+```text
+Sprite 群
+  → Animation Clip（コマ順・タイミング）
+    → Animator Controller（状態と遷移）
+      → 実行時の状態切替（Visual State に対応）
+```
+
+| 方式 | いま | 将来 |
+|---|---|---|
+| コードで Sprite を直接差し替え | **実装済み**（Idle / Punch） | 学習用の簡易経路として理解する |
+| Animator + Animation Clip | **未実装** | 導入方針あり |
+
+Animator 未導入のまま歩行・キック・ジャンプを「実装済み」としない。
