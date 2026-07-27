@@ -20,17 +20,17 @@
 
 ## Unity 実装の到達点（要約）
 
-ブランチ `unity` 上で、**段階1〜13B-1まで完了**しています。
-最新コミット済み HEAD: **`43ac815`**（Document participant knockback completion）
-段階13Aまで: **完了・push 済み**
-段階13B-1（ステージ端を考慮した Push 補正配分）は**検証済み・ドキュメント反映時点では未コミット**（作業ツリー）。
-段階13計画のノックバック基盤＋壁際 Push 再配分は充足（壁バウンド等は未実装の残課題）。
+ブランチ `unity` 上で、**段階1〜14Aまで完了**しています。
+最新コミット済み HEAD: **`0230f2b`**（Document stage edge push redistribution）
+段階13B-1まで: **完了・push 済み**
+段階14A（Participant 共通 HP・Damage 基盤）は**検証済み・ドキュメント反映時点では未コミット**（作業ツリー）。
+段階14全体（KO 含む）は**未完了**。
 
 | 区分 | 内容 |
 |---|---|
-| **実装済み** | 60Hz SimulationTick、Pause/Step、HUD（左上状態／左下操作）、HitStop、入力、左右移動、Facing分離、2体共通 Participant / AttackState / HitState、Push Box、**壁際 Push 再配分（TryMoveLogicalXBy）**、Box 可視化、Hit×Hurt 重なり判定、Jパンチ、1攻撃1Hit、Hit時6F HitStop、HitStun 12CF・被Hit表示、横ノックバック（固定CF・初速0.18/減速0.015）、Rで戦闘デバッグ初期化 |
-| **暫定** | Push 等分＋壁際再配分（再配分順は右→左）。論理接地 Y はデバッグ Sprite pivot から導出。HitStun / ノックバック数値は Participant 暫定値。Motor minX/maxX（±7）。相打ちは両方向判定の土台のみ（P2 は Neutral） |
-| **未実装（正式方針）** | HP/Damage（段階14）、壁バウンド／壁やられ／KB壁停止、複数 Hurt/Hit Box、キャラ固有データ化、攻撃データ SO 化 |
+| **実装済み** | 60Hz SimulationTick、Pause/Step、HUD（左上状態／左下操作）、HitStop、入力、左右移動、Facing分離、2体共通 Participant / AttackState / HitState、Push Box、壁際 Push 再配分、Box 可視化、Hit×Hurt 重なり判定、Jパンチ、1攻撃1Hit、Hit時6F HitStop、HitStun 12CF・被Hit表示、横ノックバック、**HP/Damage（max100・J Punch10・0未満Clamp）**、Rで戦闘デバッグ初期化（HP全回復含む） |
+| **暫定** | Push 等分＋壁際再配分。HitStun / KB / maxHP / PunchDamage は暫定値。**0HPでもKOせず戦闘継続（14A限定）**。Motor minX/maxX（±7）。相打ちは両方向判定の土台のみ（P2 は Neutral） |
+| **未実装（正式方針）** | KO（段階14B）、Round/勝敗、HPバー、Guard、壁バウンド等、複数 Hurt/Hit Box、キャラ固有データ化、攻撃データ SO 化 |
 
 詳細・次工程は **`docs/unity_implementation_status.md`** を正とする。
 
@@ -84,7 +84,7 @@ Git 管理外: `Game/Library`、`Temp`、`Logs`、`UserSettings`、`obj` など
 
 ## 次の実装候補（要約）
 
-1. **段階14**: HP、Damage、KO（既存工程表）
+1. **段階14B**: KO 状態・KO 遷移（段階14の残作業・既存工程表）
 2. 以降: 攻撃データ化
 3. 残課題（工程番号なし）: KB壁停止、壁バウンド、壁やられ、Corner
 4. 2P入力/AI時: HitStun 行動制限・P1被Hit・左方向KB・Facing Left 攻撃の実操作確認

@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## v3.13（Unity段階14A完了・Participant共通HP・Damage基盤）
+
+- 段階14A完了を明記。HP正本は Participant（maxHitPoints=100、currentは実行時）。HitStateはHP非所有
+- 有効Hit時のみ ApplyDamage（J Punch暫定10）。接続順 ReceiveHit→ApplyDamage→MarkHit→HitStop。1攻撃1Damage
+- 0未満Clamp。0HPでも14AではKOせず戦闘継続（暫定）。ResetでHP全回復。HUDにP1/P2 HP
+- 検証: 初回90、2回目80、10Hitで0、11Hit以降actual=0、Resetで100、Stage13回帰正常、Error/Warning 0
+- 段階14全体は未完了。次工程は既存計画の段階14B（KO状態・KO遷移）
+- README / `docs/unity_implementation_status.md` / `docs/rules.md` を更新
+
 ## v3.12（Unity段階13B-1完了・壁際Push補正配分）
 
 - 段階13B-1完了を明記。`Motor.TryMoveLogicalXBy` と PushResolver の壁際再配分を Docs に反映
