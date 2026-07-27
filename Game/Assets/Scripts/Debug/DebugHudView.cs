@@ -79,12 +79,11 @@ namespace FightingGameTrial.DebugTools
                 return;
             }
 
+            // 状態 HUD は毎描画 Frame で再構築する（動的値のため。今回の GC 対策対象外）。
             hudText.text = BuildStatusHudText(timeState);
 
-            if (helpText != null)
-            {
-                helpText.text = BuildHelpHudText();
-            }
+            // Help 本文は固定文言のため、EnsureSplitHudLayout（Awake）で1回だけ設定する。
+            // Update で毎 Frame 再構築すると、不要な string 生成と TMP 再代入の候補になる。
         }
 
         /// <summary>
@@ -176,11 +175,13 @@ namespace FightingGameTrial.DebugTools
             helpText.overflowMode = TextOverflowModes.Overflow;
             helpText.enableWordWrapping = true;
             helpText.raycastTarget = false;
+            // 固定 Help 本文の正本設定箇所（Awake → EnsureSplitHudLayout で1回）。
             helpText.text = BuildHelpHudText();
         }
 
         /// <summary>
         /// 左下固定の操作説明（内容は削除せず、配置だけ分ける）。
+        /// 固定文言のため Update では呼ばず、EnsureSplitHudLayout で1回だけ使う。
         /// </summary>
         private string BuildHelpHudText()
         {

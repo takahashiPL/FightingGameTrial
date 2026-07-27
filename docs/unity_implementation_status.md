@@ -2,12 +2,13 @@
 
 最終更新: 2026-07-27
 対象ブランチ: `unity`
-最新コミット済み HEAD: **`0a53e8e`**（Document participant knockout completion）
-段階14全体（14A+14B）: **完了・push 済み**
-段階15（J Punch 攻撃データ化）: **検証済み・ドキュメント反映時点では未コミット**（作業ツリー）
+最新コミット済み HEAD: **`e157b7d`**（Add Unity GC learning guide）
+段階14全体（14A+14B）・段階15（攻撃データ化）: **完了・push 済み**
+GC-1（固定 Help 毎 Frame 再構築停止）: **実装・Editor 実測済み。ドキュメント反映時点ではコード未コミットの場合あり**
 
 このファイルは、Unity 側の**実装済み / 暫定 / 未実装 / 次回候補 / 正式方針**を混同せずに追うための正本です。
 ゲーム仕様そのものの正本は引き続き `docs/rules.md` です。
+「GC-1」等は正式 Stage 番号ではなく、学習・計測用の補助区分である。
 
 ---
 
@@ -258,6 +259,26 @@ Push / Hurt / Hit 可視化（11A）と Hit×Hurt 重なり判定（11B）は完
 
 ---
 
+## 5.1 GC 学習・計測の補助改善（正式 Stage ではない）
+
+Round / Guard / 複数攻撃などの**機能 Stage とは別枠**。番号「GC-1」は便宜名。
+
+### GC-1 Fixed Help Text Allocation Reduction
+
+| 項目 | 内容 |
+|---|---|
+| **実装** | `DebugHudView`: Update から固定 Help の毎 Frame 再構築・再代入を削除。設定は Awake → EnsureSplitHudLayout で1回 |
+| **非対象** | Status HUD（`BuildStatusHudText`）は従来どおり毎 Frame |
+| **実測条件** | Unity 6.3 LTS / Editor Play Mode / FightDebugScene / 通常待機 |
+| **変更前** | フレーム全体 約18.0 KB・69 alloc。`DebugHudView.Update` 約17.8 KB。GC.Collect 0.000 ms |
+| **変更後** | `DebugHudView.Update` 約17.2 KB（約0.6 KB・約3.4%削減）。全体 KB / alloc 回数 / GC.Collect は**未記録** |
+| **回帰** | Help 表示・Status HUD 表示は維持。Compile Error なし。既知 CS0618（enableWordWrapping）1件 |
+| **未実装・未計測** | Status HUD 本体の最適化（**GC-2**: 便宜名・仕様未確定）、Development Build 測定、連結/`ToString`/TMP 内訳 |
+
+詳細な学習用記録は `docs/component_and_scene_guide.md` §16.13。
+
+---
+
 ## 6. 関連ドキュメント
 
 | ファイル | 役割 |
@@ -274,7 +295,7 @@ Push / Hurt / Hit 可視化（11A）と Hit×Hurt 重なり判定（11B）は完
 ## 7. 一言まとめ
 
 - 段階1〜**15**まで到達。工程表の段階14（HP/Damage/KO）と段階15（攻撃データ化）は完了
-- 最新コミット済み HEAD: `0a53e8e`。段階15 は検証済み・未コミット
+- 最新コミット済み HEAD: `e157b7d`（GC 学習資料追加）。GC-1（Help 毎 Frame 停止）は補助改善・正式 Stage ではない
 - J Punch 設定正本は `DebugAttackData.JPunch`。Session は進行と適用のみ
 - KO 処理順・1攻撃1Hit・Frame 境界は維持。Visual 優先は HitStun 赤 > KO 暗色 > 通常 Tint
-- 次は既存計画の後続候補（Round/勝敗、Guard、複数攻撃、SO 化の要否判断など。順不同）
+- 次は既存計画の後続候補（Round/勝敗、Guard、複数攻撃、SO 化の要否判断など。順不同）。GC-2 は未確定

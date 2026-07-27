@@ -725,9 +725,9 @@ GC の話は「仕様の正本」ではなく、**実行時コストの学習**�
 
 | 箇所 | コード上の候補 | 実行頻度 | 推定される割り当て種類 | 実測状態 |
 |---|---|---|---|---|
-| `DebugHudView.Update` → `BuildStatusHudText` | 多数の `string` 連結（`text = text + ...`）と `ToString("0.00")` 等 | **毎描画 Frame** | `string`（連結・数値整形） | 未計測 |
-| `DebugHudView.Update` → `BuildHelpHudText` | 操作説明文字列の再構築（内容はほぼ固定） | **毎描画 Frame** | `string` | 未計測 |
-| `DebugHudView` → `hudText.text` / `helpText.text` 代入 | TMP への文字列設定 | 毎描画 Frame | TMP 側の内部処理の可能性（コード外） | 未計測 |
+| `DebugHudView.Update` → `BuildStatusHudText` | 多数の `string` 連結（`text = text + ...`）と `ToString("0.00")` 等 | **毎描画 Frame** | `string`（連結・数値整形） | 待機時は §16.13 の GC-1 前後で Update 合計を実測。内訳は未計測 |
+| `BuildHelpHudText` / Help の毎 Frame 再代入 | （GC-1 以前）固定文言の再構築と `helpText.text` 代入 | GC-1 で **Update から削除**。初期化時1回のみ | `string` + TMP 代入 | GC-1 で約 0.6 KB/frame 削減を確認（§16.13） |
+| `DebugHudView` → `hudText.text` 代入 | TMP への状態文字列設定 | 毎描画 Frame | TMP 側の内部処理の可能性（コード外） | 未計測（内訳） |
 | `BuildStatusHudText` 内の `EvaluateWorld*Box` | 各評価で `new DebugBox2D()`（class） | HUD 更新ごと（Push/Hurt/Hit） | `DebugBox2D` インスタンス | 未計測 |
 | `DebugFighterParticipant.EvaluateWorldHitBox` 等 | Session の Hit 判定経路でも `new DebugBox2D()` | Active 中の Combat など | `DebugBox2D` | 未計測 |
 | `SimulationSession` の Attack started/ended / Punch hit / KO | `Debug.Log` + 文字列連結・`ToString` | イベント時 | `string`（ログ用） | 未計測 |
@@ -751,8 +751,8 @@ GC の話は「仕様の正本」ではなく、**実行時コストの学習**�
 3. Debug 用途のため、戦闘ロジックと分離して改善しやすい
 4. Hit / KO の仕様を変えずに観察できる
 
-ただし **この資料追加時点ではコード変更をしない**。
-先に Profiler で GC.Alloc を確認し、Editor 由来のノイズと区別します。
+ただし、候補の洗い出しと **最小修正の比較計測**（§16.13 GC-1）を先に行う。
+残る主候補は Status HUD（`BuildStatusHudText`）側である。
 
 ### 16.7 Unity Profiler で GC.Alloc を確認する実習
 
@@ -775,20 +775,18 @@ GC の話は「仕様の正本」ではなく、**実行時コストの学習**�
 
 **Deep Profile** は最初から使わない（計測自体が重く、ノイズが増えやすい）。
 
-#### 確認ケース（数値は空欄テンプレート）
+#### 確認ケース
 
 | ケース | GC.Alloc / Frame | 主な発生元 | 備考 |
 |---|---|---|---|
-| A. 通常待機 |  |  | Editor 計測 |
-| B. 移動（矢印） |  |  | |
-| C. J Punch Miss |  |  | |
-| D. J Punch Hit |  |  | |
-| E. HitStop 中 |  |  | Combat は止まるが Update は動く |
-| F. KO |  |  | |
-| G. Reset（R） |  |  | |
-| H. Console 閉 / 開の比較 |  |  | Editor ノイズ比較用 |
-
-測定値はまだ記入しない。記入は「次の実習」（§16.12）で行う。
+| A. 通常待機 | 変更前フレーム全体 約18.0 KB（69 alloc）。Update 約17.8→約17.2 KB（GC-1後） | `DebugHudView.Update` | Editor 実測。§16.13 |
+| B. 移動（矢印） |  |  | 未計測 |
+| C. J Punch Miss |  |  | 未計測 |
+| D. J Punch Hit |  |  | 未計測 |
+| E. HitStop 中 |  |  | Combat は止まるが Update は動く。未計測 |
+| F. KO |  |  | 未計測 |
+| G. Reset（R） |  |  | 未計測 |
+| H. Console 閉 / 開の比較 |  |  | 未計測 |
 
 ### 16.8 Editor と Development Build の違い
 
@@ -850,14 +848,55 @@ GC の話は「仕様の正本」ではなく、**実行時コストの学習**�
 
 これらは学習用方針です。実装状況の正本（何が Stage 完了か）は `docs/unity_implementation_status.md` です。
 
-### 16.12 次の実習候補: FightingGameTrial の GC.Alloc 基準測定
+### 16.12 次の実習候補
 
-コード変更前の **Baseline 測定** を次作業候補とします。
+1. Development Build で待機時 GC.Alloc を取り、Editor との差を見る（**未計測**）
+2. ケース B〜H の記録（多くは **未計測**）
+3. **GC-2**（便宜名）: `BuildStatusHudText` の動的文字列生成の内訳確認 → 仕様決定は実測後（**未実装・未確定**）
+4. 実測後にのみ改善案を決める（可読性を壊す最適化を先にしない）
 
-1. Editor で §16.7 のケース A〜H を記録する（表の空欄を埋める）
-2. 待機時に `DebugHudView.Update` が主因かを Call Stacks で確認する
-3. Development Build でも同ケースを取り、Editor との差を見る
-4. 結果を Docs（本資料または測定メモ）へ記録する
-5. **実測後にのみ** 改善案（HUD 差分更新、ログ抑制、Box 再利用など）を決める
+### 16.13 GC-1: 固定 Help 本文の毎 Frame 再構築を停止
 
-この段階では、まだ最適化パッチを入れない。
+**名称について**: 「GC-1」は正式な工程表の Stage 番号ではない。GC 改善作業内の**便宜的な区分**である。Round / Guard 等の機能 Stage と混同しない。
+
+#### 問題
+
+固定文面の操作説明（Help）を、`DebugHudView.Update` 内で毎描画 Frame に `BuildHelpHudText()` して `helpText.text` へ代入していた。
+
+#### 修正
+
+- Update から Help の毎 Frame 再構築・再代入を削除
+- Help 本文は従来どおり **Awake → EnsureSplitHudLayout → `helpText.text = BuildHelpHudText()`** で初期化時に1回だけ設定
+- **Status HUD（`BuildStatusHudText` / `hudText.text`）は変更していない**
+- Help 文面・レイアウト・Truncate 設定は未変更
+
+#### 実測条件
+
+- Unity 6.3 LTS / Editor Play Mode / `FightDebugScene`
+- 通常待機 / CPU Usage → Hierarchy / 通常フレームを選択
+- **Editor 上の測定**（Development Build は **未計測**）
+- 製品性能の断定には使わない
+
+#### 変更前後
+
+| 項目 | 変更前 | 変更後 |
+|---|---:|---:|
+| フレーム全体 GC Alloc | 約 18.0 KB / frame | **未記録**（同一条件での再取得なし） |
+| Alloc 回数 | 69 / frame | **未記録** |
+| `DebugHudView.Update` | 約 17.8 KB / frame | 約 17.2 KB / frame |
+| GC.Collect | 0.000 ms | **未記録** |
+| Help 表示 | 正常 | 正常（回帰なし） |
+| Status HUD | 正常 | 正常（更新維持） |
+
+#### 差と解釈
+
+- `DebugHudView.Update` について **約 0.6 KB / frame**、**約 3.4%** の削減を確認
+- 固定 Help の毎 Frame 再構築を外した効果として扱う
+- 待機時の主発生元は引き続き `DebugHudView.Update`（残りの大半は `BuildStatusHudText` 等が候補）
+- 連結・`ToString`・TMP 内部の内訳は **未計測**
+- Compile Error なし。既知 Warning: `TMP_Text.enableWordWrapping` の CS0618 が1件（既存）
+
+#### GC-2（便宜名・未実装）
+
+- 候補: Status HUD 本体（`BuildStatusHudText`）の動的文字列生成の整理
+- **仕様未確定・未実装**。GC-1 の完了をもって GC-2 を完了扱いしない
