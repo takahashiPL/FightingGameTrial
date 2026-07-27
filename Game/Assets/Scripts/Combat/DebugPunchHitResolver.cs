@@ -10,8 +10,9 @@ namespace FightingGameTrial.Combat
         public const string Inactive = "Inactive";
         public const string NoOverlap = "NoOverlap";
         public const string Hit = "Hit";
-        public const string AlreadyHit = "AlreadyHit";
-    }
+            public const string AlreadyHit = "AlreadyHit";
+            public const string DefenderKO = "DefenderKO";
+        }
 
     /// <summary>
     /// Jパンチの Hit 成立条件を純関数で評価します（段階11B）。

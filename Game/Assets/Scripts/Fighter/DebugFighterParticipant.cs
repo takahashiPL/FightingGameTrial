@@ -15,7 +15,8 @@ namespace FightingGameTrial.Fighter
     /// - 自分専用の DebugFighterAttackState を1つ所有する
     /// - 自分専用の DebugFighterHitState（被 Hit / HitStun / ノックバック速度）を所有する（段階12A / 13A）
     /// - ノックバック初速・減速量の暫定値を持つ（段階13A。攻撃データ化前）
-    /// - Participant 共通の最大HP・現在HPを所有する（段階14A。KO 遷移はまだしない）
+    /// - Participant 共通の最大HP・現在HPを所有する（段階14A）
+    /// - Participant 共通の KO 状態を所有する（段階14B。HitState には持たせない）
     /// - 横方向 Push Box 半幅を持つ（段階10B-3。重なり解消の計算に使う）
     /// - Push / Hurt / Hit Box のローカル定義を持ち、World Box を計算する（段階11A）
     ///
@@ -28,7 +29,7 @@ namespace FightingGameTrial.Fighter
     /// - attacker / defender の選択や Hit 成立判定をしない（Session の責務）
     /// - Push 重なり解消を自分で回さない（Session が DebugFighterPushResolver を呼ぶ）
     /// - Transform へノックバックを直接書かない（Motor.SetLogicalX 経由。Session が呼ぶ）
-    /// - KO / Round 終了 / 勝敗判定をしない（段階14A は HP 減算のみ）
+    /// - Round 終了 / 勝敗判定 / WIN表示をしない（段階14B は KO 状態のみ）
     /// - Box 枠の描画をしない（DebugFighterBoxView の責務）
     /// - CharacterDefinition を持たない（後段）
     ///
@@ -41,13 +42,14 @@ namespace FightingGameTrial.Fighter
     /// Dummy 専用ロジックだからではなく、Session が Neutral 入力（全 false）を渡すから。
     /// 同じ Motor 処理を通るが、Left/Right が無いので移動しない。
     ///
-    /// 攻撃と被弾（段階10B-2 / 12A / 13A / 14A）:
-    /// Participant は自分の AttackState・HitState・HP を所有します。
+    /// 攻撃と被弾（段階10B-2 / 12A / 13A / 14A / 14B）:
+    /// Participant は自分の AttackState・HitState・HP・KO を所有します。
     /// SimulationSession が attacker / defender を選び Hit を解決し、
-    /// 成立時に defender.ReceiveHit と defender.ApplyDamage を呼びます。
+    /// 成立時に defender.ReceiveHit / ApplyDamage / TryEnterKnockout を呼びます。
     ///
-    /// HP（段階14A）:
-    /// 正本はここ（HitState には持たせない）。0HP でも今回は KO せず戦闘継続する暫定状態。
+    /// HP / KO（段階14A / 14B）:
+    /// HP と KO は別概念。HP==0 で一度だけ KO へ遷移し、Reset まで維持する。
+    /// HitStun 終了で KO を Idle へ戻さない。
     ///
     /// Box 可視化（段階11A）:
     /// ローカル定義はここが所有し、World 変換もここで行う。
@@ -107,6 +109,13 @@ namespace FightingGameTrial.Fighter
         [SerializeField]
         private Color hitStunDisplayColor = new Color(1f, 0.35f, 0.35f, 1f);
 
+        [Tooltip(
+            "KO 中の表示色です（段階14B）。HitStun 色より優先します。"
+            + " Scene / Prefab 変更なしで既定の暗いグレーを使います。"
+        )]
+        [SerializeField]
+        private Color knockoutDisplayColor = new Color(0.35f, 0.35f, 0.35f, 1f);
+
         [Header("入力")]
         [Tooltip(
             "true なら Session が DebugGameplayInput 由来の入力を渡します。"
@@ -139,11 +148,11 @@ namespace FightingGameTrial.Fighter
         [SerializeField]
         private float knockbackDeceleration = 0.015f;
 
-        [Header("HP（段階14A・暫定）")]
+        [Header("HP / KO（段階14A / 14B）")]
         [Tooltip(
             "最大 Hit Points です。攻撃データ化・キャラ固有化前の暫定値。"
             + " 現在HPは実行時状態で、Inspector からは編集しません。"
-            + " 0HP でも今回は KO 遷移せず戦闘を継続します（段階14A 限定の暫定）。"
+            + " HP が 0 になると段階14B で KO 状態へ遷移します。"
         )]
         [SerializeField]
         private int maxHitPoints = 100;
@@ -153,6 +162,12 @@ namespace FightingGameTrial.Fighter
         /// Inspector 編集対象にしない（SerializeField にしない）。
         /// </summary>
         private int currentHitPoints;
+
+        /// <summary>
+        /// KO 状態の正本（段階14B）。HP 0 到達時に一度だけ true。
+        /// Reset まで解除しない。HitState には持たせない。
+        /// </summary>
+        private bool isKnockedOut;
 
         [Header("Push Box（段階10B-3・判定用半幅）")]
         [Tooltip(
@@ -452,12 +467,21 @@ namespace FightingGameTrial.Fighter
         }
 
         /// <summary>
-        /// 現在 HP が 0 以下か。
-        /// 段階14A では KO 遷移には使わない（導出値の用意のみ）。
+        /// 現在 HP が 0 以下か（数値上の枯渇）。
+        /// KO 遷移済みかどうかは IsKnockedOut を見る（段階14B）。
         /// </summary>
         public bool IsHitPointsDepleted
         {
             get { return currentHitPoints <= 0; }
+        }
+
+        /// <summary>
+        /// KO 状態か（段階14B）。Reset まで維持。
+        /// HP==0 でも、遷移前の一瞬や未遷移時は false のままになり得る。
+        /// </summary>
+        public bool IsKnockedOut
+        {
+            get { return isKnockedOut; }
         }
 
         /// <summary>
@@ -547,8 +571,9 @@ namespace FightingGameTrial.Fighter
 
             hitState.Reset();
 
-            // 段階14A: HP 正本は Participant。開始時は最大へ。
+            // 段階14A / 14B: HP 全回復、KO 解除。
             RestoreHitPointsToMaximum();
+            ClearKnockoutForReset();
 
             baseDisplayTint = displayTint;
             ApplyDisplayColor();
@@ -880,14 +905,10 @@ namespace FightingGameTrial.Fighter
         /// 何をするか:
         /// - damage &lt;= 0 なら何もしない（戻り値 0）
         /// - currentHP = max(0, currentHP - damage)
-        /// - 実際に減った量（要求と実減の小さい方）を返す
+        /// - 実際に減った量を返す
         ///
-        /// なぜ必要か:
-        /// 有効 Hit 成立時に Session が1回だけ呼ぶ共通口。HitState には HP を持たせない。
-        ///
-        /// 暫定仕様（段階14A）:
-        /// HP が 0 になっても KO 状態へ遷移しない。移動・攻撃・HitStun は既存どおり継続する。
-        /// 「0HP だが戦闘継続」は 14A 限定の学習用暫定状態。
+        /// やらないこと: KO 遷移（Session が ApplyDamage 後に TryEnterKnockout）。
+        /// HitState には HP を持たせない。
         /// </summary>
         public int ApplyDamage(int damage)
         {
@@ -920,6 +941,7 @@ namespace FightingGameTrial.Fighter
 
         /// <summary>
         /// 現在 HP を最大へ戻します（Awake / R Reset 用）。
+        /// KO 状態はここでは触らない（ClearKnockoutForReset とセットで呼ぶ）。
         /// </summary>
         public void RestoreHitPointsToMaximum()
         {
@@ -927,9 +949,72 @@ namespace FightingGameTrial.Fighter
         }
 
         /// <summary>
+        /// HP 0 到達後に KO 状態へ一度だけ遷移します（段階14B）。
+        ///
+        /// 戻り値: 今回初めて KO へ入ったら true。既に KO なら false。
+        ///
+        /// 何をするか:
+        /// - isKnockedOut を true にする（Reset まで維持）
+        /// - 自分が攻撃中なら InterruptByHit で中断（新規攻撃禁止の補完）
+        /// - KO 表示色を適用
+        ///
+        /// なぜ HP と別に持つか:
+        /// HP==0 は数値、KO は生命状態。HitStun 終了で Idle 色へ戻しても KO は残す。
+        ///
+        /// 呼び出し側（Session）は、最後の一撃の ReceiveHit / ApplyDamage / HitStop のあとで呼ぶ。
+        /// これにより最後の一撃の HitStun / Knockback / HitStop は失わない。
+        /// </summary>
+        public bool TryEnterKnockout()
+        {
+            if (isKnockedOut)
+            {
+                return false;
+            }
+
+            // 安全側: HP が残っているのに KO しない。
+            if (currentHitPoints > 0)
+            {
+                return false;
+            }
+
+            isKnockedOut = true;
+
+            // KO 時点で自分が攻撃中なら中断（P1/P2 共通。大規模キャンセル機構は持たない）。
+            if (attackState != null && attackState.IsActionPlaying)
+            {
+                attackState.InterruptByHit();
+            }
+
+            ApplyDisplayColor();
+            return true;
+        }
+
+        /// <summary>
+        /// R Reset 用に KO 旗だけ下ろします。HP 回復は RestoreHitPointsToMaximum。
+        /// </summary>
+        public void ClearKnockoutForReset()
+        {
+            isKnockedOut = false;
+        }
+
+        /// <summary>
+        /// HUD 用: Alive / KO。
+        /// </summary>
+        public string BuildLifeLabel()
+        {
+            if (isKnockedOut)
+            {
+                return "KO";
+            }
+
+            return "Alive";
+        }
+
+        /// <summary>
         /// 1 Combat Frame 分の HitStun 消費を Participant に依頼します。
         /// Session が HitStop 外の Combat 末尾で1回だけ呼びます。
         /// HitStun が 0 になったとき残ノックバック速度も捨てます（段階13A）。
+        /// KO 状態はここでは解除しない（段階14B）。
         /// </summary>
         public void TickHitStunForCombatFrame()
         {
@@ -944,6 +1029,7 @@ namespace FightingGameTrial.Fighter
             if (wasInHitStun && hitState.IsInHitStun == false)
             {
                 // HitStun 終了時に残速度を 0 へ（ノックバックは Stun 中だけ適用）。
+                // KO 中でも Stun 終了はするが、isKnockedOut は維持する。
                 hitState.ClearKnockback();
                 ApplyDisplayColor();
             }
@@ -964,8 +1050,9 @@ namespace FightingGameTrial.Fighter
         }
 
         /// <summary>
-        /// HUD 用: Idle / Attack / HitStop / HitStun の短い状態名。
-        /// HitStop は共有残りが >0 かつ自分が HitStun 中のとき。
+        /// HUD 用: Idle / Attack / HitStop / HitStun / KO の短い状態名。
+        /// KO 中でも最後の一撃の HitStop/HitStun 表示は優先（併存確認用）。
+        /// HitStun 終了後は KO を返す。
         /// </summary>
         public string BuildDebugStateLabel(int sharedHitStopRemaining)
         {
@@ -979,6 +1066,11 @@ namespace FightingGameTrial.Fighter
                 return "HitStun";
             }
 
+            if (isKnockedOut)
+            {
+                return "KO";
+            }
+
             if (attackState != null && attackState.IsActionPlaying)
             {
                 return "Attack";
@@ -988,7 +1080,7 @@ namespace FightingGameTrial.Fighter
         }
 
         /// <summary>
-        /// HitState / AttackState / 表示色 / ノックバック速度 / HP を初期化します（R キー Reset 用）。
+        /// HitState / AttackState / 表示色 / ノックバック / HP / KO を初期化します（R キー Reset 用）。
         /// 位置と Facing は変えません（現行仕様）。
         /// </summary>
         public void ResetCombatDebugState()
@@ -1007,6 +1099,7 @@ namespace FightingGameTrial.Fighter
 
             hitState.Reset();
             RestoreHitPointsToMaximum();
+            ClearKnockoutForReset();
             ApplyDisplayColor();
         }
 
@@ -1020,14 +1113,21 @@ namespace FightingGameTrial.Fighter
         }
 
         /// <summary>
-        /// 表示色の正本を反映します（段階12A）。
-        /// 優先: HitStun/HitStop 見た目（IsInHitStun） > 通常 Tint。
+        /// 表示色の正本を反映します（段階12A / 14B）。
+        /// 優先: **KO &gt; HitStun &gt; 通常 Tint**。
+        /// 最後の一撃中も KO 色を優先し、KO 状態を常に見分けられるようにする。
         /// Attack Sprite 切替は Visual 側。色はここが担当。
         /// </summary>
         public void ApplyDisplayColor()
         {
             if (spriteRenderer == null)
             {
+                return;
+            }
+
+            if (isKnockedOut)
+            {
+                spriteRenderer.color = knockoutDisplayColor;
                 return;
             }
 

@@ -18,10 +18,15 @@ namespace FightingGameTrial.Simulation
     /// - 可視化と同じ EvaluateWorldHitBox / EvaluateWorldHurtBox を実判定でも使う
     /// - 旧 attackRange 距離判定は使用しない
     ///
+    /// 段階14B:
+    /// - HP 0 到達時に defender.TryEnterKnockout を一度だけ呼ぶ
+    /// - KO 中は入力移動・新規攻撃・被 Hit（追加 Damage/HitStop 等）を禁止
+    /// - 最後の一撃の HitStop / HitStun / Knockback は通常どおり成立させる
+    /// - Round 終了・勝敗表示はしない
+    ///
     /// 段階14A:
     /// - 有効 Hit 成立時に defender.ApplyDamage を1回だけ呼ぶ（J Punch 暫定 Damage=10）
     /// - HP 正本は各 Participant。HitState / Motor / Push は HP に触れない
-    /// - 0HP でも KO 遷移はしない（戦闘継続の暫定）
     ///
     /// 段階13B-1:
     /// - Push 補正でステージ端（Motor minX/maxX）により片方の実移動が足りないとき、
@@ -68,7 +73,7 @@ namespace FightingGameTrial.Simulation
     /// 9. Push Box 重なり解消（Participant 共通。速度は触らない）
     /// 10. P1 Facing / P2 Facing（Push 後の最終位置基準）
     /// 11. P1/P2 ActionFrame 進行
-    /// 12. P1→P2 Hit / P2→P1 Hit（成立時: Damage / HitStun / KB / HitStop）
+    /// 12. P1→P2 Hit / P2→P1 Hit（成立時: Damage / KO遷移 / HitStun / KB / HitStop）
     /// 13. Visual 更新（AttackState 反映）
     /// 14. P1/P2 攻撃終了判定
     /// 15. HitStun 消費（0 ならノックバック残速度もクリア）
@@ -514,14 +519,14 @@ namespace FightingGameTrial.Simulation
             }
 
             RefreshFighterVisual();
-            Debug.Log("[FightDebug] Debug combat reset (Attack/HitStun/Knockback/HitStop/HP)");
+            Debug.Log("[FightDebug] Debug combat reset (Attack/HitStun/Knockback/HitStop/HP/KO)");
         }
 
         /// <summary>
-        /// 1体分の Visual を AttackState / HitState から反映します。
+        /// 1体分の Visual を AttackState / HitState / KO から反映します。
         ///
-        /// 表示優先: HitStun 中は Idle Sprite（被 Hit 色は Participant.ApplyDisplayColor）。
-        /// color は Visual では触らない。
+        /// 表示優先: KO または HitStun 中は Idle Sprite。色は Participant.ApplyDisplayColor
+        /// （KO &gt; HitStun &gt; 通常）。color は Visual では触らない。
         /// </summary>
         private void RefreshOneFighterVisual(DebugFighterParticipant participant)
         {
@@ -530,8 +535,8 @@ namespace FightingGameTrial.Simulation
                 return;
             }
 
-            // Hit 表示 > Attack 表示 > Idle
-            if (participant.IsInHitStun)
+            // KO / Hit 表示 > Attack 表示 > Idle
+            if (participant.IsKnockedOut || participant.IsInHitStun)
             {
                 participant.Visual.Apply(false, 0, false);
                 participant.ApplyDisplayColor();
@@ -580,11 +585,17 @@ namespace FightingGameTrial.Simulation
 
         /// <summary>
         /// Participant 単位で Jパンチ開始を試みます。
-        /// AttackPressedThisTick かつ未 Action かつ HitStun でないときだけ開始します。
+        /// AttackPressedThisTick かつ未 Action かつ HitStun/KO でないときだけ開始します。
         /// </summary>
         private void TryStartJPunchForParticipant(DebugFighterParticipant participant)
         {
             if (participant == null || participant.AttackState == null)
+            {
+                return;
+            }
+
+            // KO 中は新規攻撃不可（段階14B）
+            if (participant.IsKnockedOut)
             {
                 return;
             }
@@ -675,7 +686,7 @@ namespace FightingGameTrial.Simulation
 
         /// <summary>
         /// 参加枠へ 1 CombatFrame 分の移動を依頼します。
-        /// Facing は変えません。HitStun 中は移動入力を適用しません（Push / ノックバックは別経路）。
+        /// Facing は変えません。HitStun / KO 中は移動入力を適用しません（Push / ノックバックは別経路）。
         /// </summary>
         private void ProcessOneFighterMovement(
             DebugFighterParticipant participant,
@@ -687,6 +698,12 @@ namespace FightingGameTrial.Simulation
             }
 
             if (participant.Motor == null)
+            {
+                return;
+            }
+
+            // KO 中は本人の入力移動だけ無効（段階14B）。最後の一撃のノックバックは後段で効く。
+            if (participant.IsKnockedOut)
             {
                 return;
             }
@@ -922,31 +939,23 @@ namespace FightingGameTrial.Simulation
         }
 
         /// <summary>
-        /// attacker → defender の Jパンチ Hit を判定します（段階11B / 13A / 14A）。
+        /// attacker → defender の Jパンチ Hit を判定します（段階11B / 13A / 14A / 14B）。
         ///
         /// 何をするか:
         /// - 可視化と同じ EvaluateWorldHitBox / EvaluateWorldHurtBox を取得
         /// - DebugPunchHitResolver で Active・未Hit・重なりを評価
-        /// - 成立時に ReceiveHit / ApplyDamage / MarkHit / HitStop
+        /// - 成立時に ReceiveHit / ApplyDamage /（HP0なら）TryEnterKnockout / MarkHit / HitStop
         ///
         /// なぜ距離判定をやめたか:
         /// 赤い Hit Box と緑の Hurt Box の見た目と結果を一致させるため。
-        /// 中心距離や Sprite 接触は見ない。隠れた距離 fallback も残さない。
-        ///
-        /// なぜ attacker / defender 形式か:
-        /// P1→P2 と P2→P1 を同じ関数で扱い、専用分岐を増やさないため。
         ///
         /// 1攻撃1Hit / 1攻撃1Damage:
         /// attackState.HasCurrentJPunchHit が正本。MarkHit 後は同じ攻撃で再Hitしない。
-        /// したがってノックバック初速も Damage も同一攻撃で二重に適用されない。
         ///
-        /// HitStop / ノックバック開始の時間関係:
-        /// 成立 tick では Remaining=6 と初速を入れるだけ。同じ tick では移動しない。
-        /// HitStop 中は Combat スキップのため減速もしない。
-        /// HitStop 終了後の Combat からノックバック移動が始まる。
-        ///
-        /// 攻撃結果の正本は attacker.AttackState.LastAttackResult のみです。
-        /// Miss 確定は攻撃終了時（EndJPunch）で、Hit していなければ Miss（既存フロー）。
+        /// KO（段階14B）:
+        /// - すでに KO の defender へは Hit を成立させない（Damage/HitStop 等なし）
+        /// - 最後の一撃は ReceiveHit→ApplyDamage→KO遷移→HitStop の順で、
+        ///   HitStun / Knockback / HitStop を失わない
         /// </summary>
         private bool TryResolveJPunchHit(
             DebugFighterParticipant attacker,
@@ -964,6 +973,19 @@ namespace FightingGameTrial.Simulation
 
             if (attacker.AttackState == null)
             {
+                return false;
+            }
+
+            // KO 済み防御者への追加 Hit は成立させない（段階14B）。
+            // Damage / HitCount / HitStop / HitStun / Knockback を増やさない。
+            if (defender.IsKnockedOut)
+            {
+                if (attacker == participantP1 && defender == participantP2)
+                {
+                    lastHitCheckLabel = DebugPunchHitCheckLabels.DefenderKO;
+                    lastBoxOverlap = false;
+                }
+
                 return false;
             }
 
@@ -1002,6 +1024,7 @@ namespace FightingGameTrial.Simulation
 
             // 被弾記録は defender（Participant）側が所有する。
             // HitStun 開始・ノックバック初速予約・被弾側攻撃の中断（段階12A / 13A）。
+            // ※ KO へ至る最後の一撃でも、ここで Stun/KB を先にセットする。
             defender.ReceiveHit(
                 timeState.CombatFrame,
                 defender.HitStunFrames,
@@ -1009,10 +1032,27 @@ namespace FightingGameTrial.Simulation
             );
 
             // Damage は有効 Hit 確定時に1回だけ（段階14A）。
-            // Miss / AlreadyHit / NoOverlap ではここに到達しない。
-            // 同一攻撃の二重は MarkHit（直後）と HasCurrentJPunchHit で防ぐ。
             int requestedDamage = PunchDamage;
             int actualDamage = defender.ApplyDamage(requestedDamage);
+
+            // HP 0 なら一度だけ KO（段階14B）。既 KO は上で弾いている。
+            // 最後の一撃の HitStop はこの後で開始するため失わない。
+            bool enteredKnockout = false;
+            if (defender.CurrentHitPoints <= 0)
+            {
+                enteredKnockout = defender.TryEnterKnockout();
+                if (enteredKnockout)
+                {
+                    Debug.Log(
+                        "[FightDebug] Fighter KO"
+                        + " slot=" + defender.SlotId
+                        + " CombatFrame=" + timeState.CombatFrame
+                        + " HP=" + defender.CurrentHitPoints
+                        + "/" + defender.MaxHitPoints
+                    );
+                }
+            }
+
             RefreshOneFighterVisual(defender);
 
             // 1攻撃1Hit の正本は attacker の AttackState
@@ -1020,6 +1060,12 @@ namespace FightingGameTrial.Simulation
 
             timeState.LastStatusMessage =
                 attacker.SlotId.ToString() + " Punch Hit";
+
+            int koFlag = 0;
+            if (defender.IsKnockedOut)
+            {
+                koFlag = 1;
+            }
 
             Debug.Log(
                 "[FightDebug] Punch hit"
@@ -1030,6 +1076,7 @@ namespace FightingGameTrial.Simulation
                 + " actual=" + actualDamage
                 + " HP=" + defender.CurrentHitPoints
                 + "/" + defender.MaxHitPoints
+                + " KO=" + koFlag
                 + " KB=" + knockbackVelocityX.ToString("0.000")
                 + " HitBox=[" + hitBox.MinX.ToString("0.00")
                 + ".." + hitBox.MaxX.ToString("0.00")
@@ -1043,6 +1090,7 @@ namespace FightingGameTrial.Simulation
 
             // 既存 HitStop を開始（同tickでは減らさない）
             // 両方向 Hit でも同じ定数のため、単純代入でよい。
+            // KO へ至る最後の一撃でも HitStop は通常どおり開始する。
             timeState.HitStopRemaining = PunchHitStopFrames;
 
             return true;

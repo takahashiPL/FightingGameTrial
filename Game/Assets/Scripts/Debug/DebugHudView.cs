@@ -330,6 +330,14 @@ namespace FightingGameTrial.DebugTools
             }
 
             text = text + "P1 HP          : " + p1HpLabel + "\n";
+
+            string p1LifeLabel = "-";
+            if (p1 != null)
+            {
+                p1LifeLabel = p1.BuildLifeLabel();
+            }
+
+            text = text + "P1 Life        : " + p1LifeLabel + "\n";
             text = text + "Sprite         : " + visualLabel + "\n";
             text = text + "P2 X/Face/Hit  : " + p2XLabel
                 + " / " + p2FacingLabel
@@ -342,6 +350,14 @@ namespace FightingGameTrial.DebugTools
             }
 
             text = text + "P2 HP          : " + p2HpLabel + "\n";
+
+            string p2LifeLabel = "-";
+            if (p2 != null)
+            {
+                p2LifeLabel = p2.BuildLifeLabel();
+            }
+
+            text = text + "P2 Life        : " + p2LifeLabel + "\n";
             text = text + "P2 Stun/State  : " + p2HitStunLabel
                 + " / " + p2StateLabel + "\n";
 
