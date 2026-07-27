@@ -15,6 +15,7 @@ namespace FightingGameTrial.Fighter
     /// - 自分専用の DebugFighterAttackState を1つ所有する
     /// - 自分専用の DebugFighterHitState（被 Hit / HitStun / ノックバック速度）を所有する（段階12A / 13A）
     /// - ノックバック初速・減速量の暫定値を持つ（段階13A。攻撃データ化前）
+    /// - Participant 共通の最大HP・現在HPを所有する（段階14A。KO 遷移はまだしない）
     /// - 横方向 Push Box 半幅を持つ（段階10B-3。重なり解消の計算に使う）
     /// - Push / Hurt / Hit Box のローカル定義を持ち、World Box を計算する（段階11A）
     ///
@@ -27,7 +28,7 @@ namespace FightingGameTrial.Fighter
     /// - attacker / defender の選択や Hit 成立判定をしない（Session の責務）
     /// - Push 重なり解消を自分で回さない（Session が DebugFighterPushResolver を呼ぶ）
     /// - Transform へノックバックを直接書かない（Motor.SetLogicalX 経由。Session が呼ぶ）
-    /// - ステージ端の壁処理・壁際 Push 配分をしない（段階13B 予定）
+    /// - KO / Round 終了 / 勝敗判定をしない（段階14A は HP 減算のみ）
     /// - Box 枠の描画をしない（DebugFighterBoxView の責務）
     /// - CharacterDefinition を持たない（後段）
     ///
@@ -40,10 +41,13 @@ namespace FightingGameTrial.Fighter
     /// Dummy 専用ロジックだからではなく、Session が Neutral 入力（全 false）を渡すから。
     /// 同じ Motor 処理を通るが、Left/Right が無いので移動しない。
     ///
-    /// 攻撃と被弾（段階10B-2 / 12A / 13A）:
-    /// Participant は自分の AttackState と HitState を所有します。
+    /// 攻撃と被弾（段階10B-2 / 12A / 13A / 14A）:
+    /// Participant は自分の AttackState・HitState・HP を所有します。
     /// SimulationSession が attacker / defender を選び Hit を解決し、
-    /// 成立時に defender.ReceiveHit で被弾・HitStun・ノックバック初速を記録します。
+    /// 成立時に defender.ReceiveHit と defender.ApplyDamage を呼びます。
+    ///
+    /// HP（段階14A）:
+    /// 正本はここ（HitState には持たせない）。0HP でも今回は KO せず戦闘継続する暫定状態。
     ///
     /// Box 可視化（段階11A）:
     /// ローカル定義はここが所有し、World 変換もここで行う。
@@ -134,6 +138,21 @@ namespace FightingGameTrial.Fighter
         )]
         [SerializeField]
         private float knockbackDeceleration = 0.015f;
+
+        [Header("HP（段階14A・暫定）")]
+        [Tooltip(
+            "最大 Hit Points です。攻撃データ化・キャラ固有化前の暫定値。"
+            + " 現在HPは実行時状態で、Inspector からは編集しません。"
+            + " 0HP でも今回は KO 遷移せず戦闘を継続します（段階14A 限定の暫定）。"
+        )]
+        [SerializeField]
+        private int maxHitPoints = 100;
+
+        /// <summary>
+        /// 現在 HP（実行時状態の正本）。Awake / Reset で最大へ戻す。
+        /// Inspector 編集対象にしない（SerializeField にしない）。
+        /// </summary>
+        private int currentHitPoints;
 
         [Header("Push Box（段階10B-3・判定用半幅）")]
         [Tooltip(
@@ -409,6 +428,39 @@ namespace FightingGameTrial.Fighter
         }
 
         /// <summary>
+        /// 最大 HP。1 未満は安全側で 1 として扱う。
+        /// </summary>
+        public int MaxHitPoints
+        {
+            get
+            {
+                if (maxHitPoints < 1)
+                {
+                    return 1;
+                }
+
+                return maxHitPoints;
+            }
+        }
+
+        /// <summary>
+        /// 現在 HP。0 以上・最大以下。
+        /// </summary>
+        public int CurrentHitPoints
+        {
+            get { return currentHitPoints; }
+        }
+
+        /// <summary>
+        /// 現在 HP が 0 以下か。
+        /// 段階14A では KO 遷移には使わない（導出値の用意のみ）。
+        /// </summary>
+        public bool IsHitPointsDepleted
+        {
+            get { return currentHitPoints <= 0; }
+        }
+
+        /// <summary>
         /// Push Box ローカル定義（可視化・Inspector 確認用）。
         /// </summary>
         public DebugBox2D PushBoxLocal
@@ -494,6 +546,9 @@ namespace FightingGameTrial.Fighter
             }
 
             hitState.Reset();
+
+            // 段階14A: HP 正本は Participant。開始時は最大へ。
+            RestoreHitPointsToMaximum();
 
             baseDisplayTint = displayTint;
             ApplyDisplayColor();
@@ -788,7 +843,7 @@ namespace FightingGameTrial.Fighter
         /// - 被 Hit 表示色へ切替
         ///
         /// なぜ必要か: Session が defender.ReceiveHit を呼ぶ共通口にするため。
-        /// やらないこと: Hit 判定、HitStop 設定、位置移動（Session+Motor）、HP、ログ出力。
+        /// やらないこと: Hit 判定、HitStop 設定、位置移動、Damage（Session が ApplyDamage）、ログ。
         /// このフレームではノックバック移動しない（Session の移動は Hit より前）。
         /// </summary>
         public void ReceiveHit(int combatFrame)
@@ -817,6 +872,58 @@ namespace FightingGameTrial.Fighter
             }
 
             ApplyDisplayColor();
+        }
+
+        /// <summary>
+        /// Damage を適用し、実際に減った HP 量を返します（段階14A）。
+        ///
+        /// 何をするか:
+        /// - damage &lt;= 0 なら何もしない（戻り値 0）
+        /// - currentHP = max(0, currentHP - damage)
+        /// - 実際に減った量（要求と実減の小さい方）を返す
+        ///
+        /// なぜ必要か:
+        /// 有効 Hit 成立時に Session が1回だけ呼ぶ共通口。HitState には HP を持たせない。
+        ///
+        /// 暫定仕様（段階14A）:
+        /// HP が 0 になっても KO 状態へ遷移しない。移動・攻撃・HitStun は既存どおり継続する。
+        /// 「0HP だが戦闘継続」は 14A 限定の学習用暫定状態。
+        /// </summary>
+        public int ApplyDamage(int damage)
+        {
+            if (damage <= 0)
+            {
+                return 0;
+            }
+
+            // 万一未初期化でも最大以下に収める。
+            if (currentHitPoints < 0)
+            {
+                currentHitPoints = 0;
+            }
+
+            if (currentHitPoints > MaxHitPoints)
+            {
+                currentHitPoints = MaxHitPoints;
+            }
+
+            int before = currentHitPoints;
+            int after = before - damage;
+            if (after < 0)
+            {
+                after = 0;
+            }
+
+            currentHitPoints = after;
+            return before - after;
+        }
+
+        /// <summary>
+        /// 現在 HP を最大へ戻します（Awake / R Reset 用）。
+        /// </summary>
+        public void RestoreHitPointsToMaximum()
+        {
+            currentHitPoints = MaxHitPoints;
         }
 
         /// <summary>
@@ -881,7 +988,7 @@ namespace FightingGameTrial.Fighter
         }
 
         /// <summary>
-        /// HitState / AttackState / 表示色 / ノックバック速度を初期化します（R キー Reset 用）。
+        /// HitState / AttackState / 表示色 / ノックバック速度 / HP を初期化します（R キー Reset 用）。
         /// 位置と Facing は変えません（現行仕様）。
         /// </summary>
         public void ResetCombatDebugState()
@@ -899,6 +1006,7 @@ namespace FightingGameTrial.Fighter
             }
 
             hitState.Reset();
+            RestoreHitPointsToMaximum();
             ApplyDisplayColor();
         }
 

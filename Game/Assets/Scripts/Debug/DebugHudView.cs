@@ -321,10 +321,27 @@ namespace FightingGameTrial.DebugTools
             text = text + "P1 X/Face/St   : " + p1XLabel
                 + " / " + p1FacingLabel
                 + " / " + p1StateLabel + "\n";
+
+            // HP（段階14A）: ASCII のみ。左上状態領域内。操作説明とは分離済み。
+            string p1HpLabel = "-";
+            if (p1 != null)
+            {
+                p1HpLabel = p1.CurrentHitPoints + " / " + p1.MaxHitPoints;
+            }
+
+            text = text + "P1 HP          : " + p1HpLabel + "\n";
             text = text + "Sprite         : " + visualLabel + "\n";
             text = text + "P2 X/Face/Hit  : " + p2XLabel
                 + " / " + p2FacingLabel
                 + " / " + p2HitLabel + "\n";
+
+            string p2HpLabel = "-";
+            if (p2 != null)
+            {
+                p2HpLabel = p2.CurrentHitPoints + " / " + p2.MaxHitPoints;
+            }
+
+            text = text + "P2 HP          : " + p2HpLabel + "\n";
             text = text + "P2 Stun/State  : " + p2HitStunLabel
                 + " / " + p2StateLabel + "\n";
 

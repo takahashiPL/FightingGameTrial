@@ -18,6 +18,11 @@ namespace FightingGameTrial.Simulation
     /// - 可視化と同じ EvaluateWorldHitBox / EvaluateWorldHurtBox を実判定でも使う
     /// - 旧 attackRange 距離判定は使用しない
     ///
+    /// 段階14A:
+    /// - 有効 Hit 成立時に defender.ApplyDamage を1回だけ呼ぶ（J Punch 暫定 Damage=10）
+    /// - HP 正本は各 Participant。HitState / Motor / Push は HP に触れない
+    /// - 0HP でも KO 遷移はしない（戦闘継続の暫定）
+    ///
     /// 段階13B-1:
     /// - Push 補正でステージ端（Motor minX/maxX）により片方の実移動が足りないとき、
     ///   未解消量をもう片方へ再配分する（DebugFighterPushResolver + TryMoveLogicalXBy）
@@ -63,7 +68,7 @@ namespace FightingGameTrial.Simulation
     /// 9. Push Box 重なり解消（Participant 共通。速度は触らない）
     /// 10. P1 Facing / P2 Facing（Push 後の最終位置基準）
     /// 11. P1/P2 ActionFrame 進行
-    /// 12. P1→P2 Hit / P2→P1 Hit（共通関数。成立時は初速予約のみ）
+    /// 12. P1→P2 Hit / P2→P1 Hit（成立時: Damage / HitStun / KB / HitStop）
     /// 13. Visual 更新（AttackState 反映）
     /// 14. P1/P2 攻撃終了判定
     /// 15. HitStun 消費（0 ならノックバック残速度もクリア）
@@ -82,6 +87,11 @@ namespace FightingGameTrial.Simulation
         private const int PunchActiveStartFrame = 4;
         private const int PunchActiveEndFrame = 6;
         private const int PunchHitStopFrames = 6;
+
+        /// <summary>
+        /// Jパンチの暫定 Damage（段階14A）。攻撃データ化前。
+        /// </summary>
+        private const int PunchDamage = 10;
 
         /// <summary>
         /// selfX と opponentX がほぼ同じときの Facing 維持用しきい値です。
@@ -504,7 +514,7 @@ namespace FightingGameTrial.Simulation
             }
 
             RefreshFighterVisual();
-            Debug.Log("[FightDebug] Debug combat reset (Attack/HitStun/Knockback/HitStop)");
+            Debug.Log("[FightDebug] Debug combat reset (Attack/HitStun/Knockback/HitStop/HP)");
         }
 
         /// <summary>
@@ -912,12 +922,12 @@ namespace FightingGameTrial.Simulation
         }
 
         /// <summary>
-        /// attacker → defender の Jパンチ Hit を判定します（段階11B / 13A）。
+        /// attacker → defender の Jパンチ Hit を判定します（段階11B / 13A / 14A）。
         ///
         /// 何をするか:
         /// - 可視化と同じ EvaluateWorldHitBox / EvaluateWorldHurtBox を取得
         /// - DebugPunchHitResolver で Active・未Hit・重なりを評価
-        /// - 成立時に defender.ReceiveHit（HitStun + ノックバック初速）/ MarkHit / HitStop
+        /// - 成立時に ReceiveHit / ApplyDamage / MarkHit / HitStop
         ///
         /// なぜ距離判定をやめたか:
         /// 赤い Hit Box と緑の Hurt Box の見た目と結果を一致させるため。
@@ -926,9 +936,9 @@ namespace FightingGameTrial.Simulation
         /// なぜ attacker / defender 形式か:
         /// P1→P2 と P2→P1 を同じ関数で扱い、専用分岐を増やさないため。
         ///
-        /// 1攻撃1Hit:
+        /// 1攻撃1Hit / 1攻撃1Damage:
         /// attackState.HasCurrentJPunchHit が正本。MarkHit 後は同じ攻撃で再Hitしない。
-        /// したがってノックバック初速も同一攻撃で二重にセットされない。
+        /// したがってノックバック初速も Damage も同一攻撃で二重に適用されない。
         ///
         /// HitStop / ノックバック開始の時間関係:
         /// 成立 tick では Remaining=6 と初速を入れるだけ。同じ tick では移動しない。
@@ -997,6 +1007,12 @@ namespace FightingGameTrial.Simulation
                 defender.HitStunFrames,
                 knockbackVelocityX
             );
+
+            // Damage は有効 Hit 確定時に1回だけ（段階14A）。
+            // Miss / AlreadyHit / NoOverlap ではここに到達しない。
+            // 同一攻撃の二重は MarkHit（直後）と HasCurrentJPunchHit で防ぐ。
+            int requestedDamage = PunchDamage;
+            int actualDamage = defender.ApplyDamage(requestedDamage);
             RefreshOneFighterVisual(defender);
 
             // 1攻撃1Hit の正本は attacker の AttackState
@@ -1010,6 +1026,10 @@ namespace FightingGameTrial.Simulation
                 + " attacker=" + attacker.SlotId
                 + " defender=" + defender.SlotId
                 + " CombatFrame=" + timeState.CombatFrame
+                + " Damage=" + requestedDamage
+                + " actual=" + actualDamage
+                + " HP=" + defender.CurrentHitPoints
+                + "/" + defender.MaxHitPoints
                 + " KB=" + knockbackVelocityX.ToString("0.000")
                 + " HitBox=[" + hitBox.MinX.ToString("0.00")
                 + ".." + hitBox.MaxX.ToString("0.00")
