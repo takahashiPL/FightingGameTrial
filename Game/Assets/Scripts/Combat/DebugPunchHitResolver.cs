@@ -28,7 +28,7 @@ namespace FightingGameTrial.Combat
     /// なぜ Active だけか:
     /// Startup は振りかぶり、Recovery は硬直。当たるコマは Active に限定する。
     /// Active 範囲そのものは Participant.EvaluateWorldHitBox().IsActive が正本
-    /// （可視化と同じ経路。ここに独自フレーム範囲は持たない）。
+    /// （攻撃データの Active 境界＋AttackState。ここに独自 Frame 定数は持たない）。
     ///
     /// 1攻撃1Hit:
     /// hasCurrentJPunchHit が true なら AlreadyHit。実際の旗更新は Session の MarkHit。

@@ -1,3 +1,4 @@
+using FightingGameTrial.Combat;
 using FightingGameTrial.Fighter;
 using FightingGameTrial.Input;
 using FightingGameTrial.Simulation;
@@ -26,7 +27,13 @@ namespace FightingGameTrial.DebugTools
     public class DebugHudView : MonoBehaviour
     {
         private const float HudMarginPixels = 28f;
-        private const float HelpBlockHeightPixels = 120f;
+
+        /// <summary>
+        /// 操作説明ブロック高さ。1行分（約28px）を状態側へ譲り、
+        /// JPunch Data が Truncate で切れにくくする（Scene は触らない）。
+        /// </summary>
+        private const float HelpBlockHeightPixels = 92f;
+
         private const float StatusHelpGapPixels = 16f;
 
         [Header("参照（Inspectorで接続。自動検索はしません）")]
@@ -106,6 +113,7 @@ namespace FightingGameTrial.DebugTools
             }
 
             // 左上状態領域: 下端に操作ブロック＋余白分を残し、はみ出しを防ぐ。
+            // HelpBlockHeightPixels を抑えた分だけ statusHeight が増える（重ならない）。
             float statusHeight =
                 canvasHeight
                 - HudMarginPixels
@@ -375,6 +383,19 @@ namespace FightingGameTrial.DebugTools
 
             text = text + "P2 KB Vx/Act   : " + p2KnockbackVxLabel
                 + " / " + p2KnockbackActiveLabel + "\n";
+
+            // 段階15: P2 KB の直後（操作説明ブロックの前＝状態 HUD 本文内の早い位置）。
+            // Truncate で末尾行が隠れるため、ここに置く。値は攻撃データから生成する。
+            DebugAttackData jPunchData = DebugAttackData.JPunch;
+            text = text + "JPunch Data    : S/A/R "
+                + jPunchData.StartupFrames
+                + "/" + jPunchData.ActiveFrames
+                + "/" + jPunchData.RecoveryFrames
+                + " Dmg " + jPunchData.Damage
+                + " HStop " + jPunchData.HitStopFrames
+                + " HStun " + jPunchData.HitStunFrames
+                + " KB " + jPunchData.KnockbackInitialVelocityX.ToString("0.000")
+                + "\n";
 
             // Push Box（段階10B-3）: ASCII のみ。常時大量ログは出さず HUD で確認する。
             string pushDistLabel = simulationSession.LastPushCenterDistance.ToString("0.00");

@@ -18,6 +18,11 @@ namespace FightingGameTrial.Simulation
     /// - 可視化と同じ EvaluateWorldHitBox / EvaluateWorldHurtBox を実判定でも使う
     /// - 旧 attackRange 距離判定は使用しない
     ///
+    /// 段階15:
+    /// - J Punch の固定設定（Frame / Damage / HitStop / HitStun / KB / Hit Box local）は
+    ///   DebugAttackData.JPunch が正本。Session は進行と適用のみ行い、数値の正本にしない
+    /// - ScriptableObject / Inspector 編集はまだしない（参照経路の整理が目的）
+    ///
     /// 段階14B:
     /// - HP 0 到達時に defender.TryEnterKnockout を一度だけ呼ぶ
     /// - KO 中は入力移動・新規攻撃・被 Hit（追加 Damage/HitStop 等）を禁止
@@ -25,7 +30,7 @@ namespace FightingGameTrial.Simulation
     /// - Round 終了・勝敗表示はしない
     ///
     /// 段階14A:
-    /// - 有効 Hit 成立時に defender.ApplyDamage を1回だけ呼ぶ（J Punch 暫定 Damage=10）
+    /// - 有効 Hit 成立時に defender.ApplyDamage を1回だけ呼ぶ（Damage は攻撃データ）
     /// - HP 正本は各 Participant。HitState / Motor / Push は HP に触れない
     ///
     /// 段階13B-1:
@@ -88,15 +93,10 @@ namespace FightingGameTrial.Simulation
     /// </summary>
     public class SimulationSession : MonoBehaviour
     {
-        private const int PunchStartupEndFrame = 3;
-        private const int PunchActiveStartFrame = 4;
-        private const int PunchActiveEndFrame = 6;
-        private const int PunchHitStopFrames = 6;
-
         /// <summary>
-        /// Jパンチの暫定 Damage（段階14A）。攻撃データ化前。
+        /// J Punch 設定の参照（正本は DebugAttackData.JPunch。毎 Frame new しない）。
         /// </summary>
-        private const int PunchDamage = 10;
+        private static readonly DebugAttackData JPunchData = DebugAttackData.JPunch;
 
         /// <summary>
         /// selfX と opponentX がほぼ同じときの Facing 維持用しきい値です。
@@ -405,7 +405,15 @@ namespace FightingGameTrial.Simulation
         }
 
         /// <summary>
-        /// HUD互換用: Idle / Startup / Active / Recovery（P1 AttackState 参照）。
+        /// HUD / ログ用: 現在参照している J Punch 攻撃データ。
+        /// </summary>
+        public DebugAttackData JPunchAttackData
+        {
+            get { return JPunchData; }
+        }
+
+        /// <summary>
+        /// HUD互換用: Idle / Startup / Active / Recovery（P1 AttackState + 攻撃データ境界）。
         /// </summary>
         public string GetPunchPhaseLabel()
         {
@@ -421,17 +429,18 @@ namespace FightingGameTrial.Simulation
             }
 
             int frame = attackState.ActionFrame;
-            if (frame >= 1 && frame <= PunchStartupEndFrame)
+            if (JPunchData.IsStartupFrame(frame))
             {
                 return "Startup";
             }
 
-            if (frame >= PunchActiveStartFrame && frame <= PunchActiveEndFrame)
+            if (JPunchData.IsActiveFrame(frame))
             {
                 return "Active";
             }
 
-            if (frame > PunchActiveEndFrame)
+            // 既存どおり Active 終了後は Recovery（AF=0 のみ Idle）
+            if (frame > JPunchData.ActiveEndActionFrame)
             {
                 return "Recovery";
             }
@@ -620,8 +629,17 @@ namespace FightingGameTrial.Simulation
 
             attackState.StartJPunch();
 
+            // 攻撃データは設定正本。進行状態（AF 等）は AttackState。
             Debug.Log(
                 "[FightDebug] Attack started slot=" + participant.SlotId
+                + " attack=" + JPunchData.AttackId
+                + " S/A/R=" + JPunchData.StartupFrames
+                + "/" + JPunchData.ActiveFrames
+                + "/" + JPunchData.RecoveryFrames
+                + " Damage=" + JPunchData.Damage
+                + " HitStop=" + JPunchData.HitStopFrames
+                + " HitStun=" + JPunchData.HitStunFrames
+                + " KB=" + JPunchData.KnockbackInitialVelocityX.ToString("0.000")
             );
         }
 
@@ -655,18 +673,14 @@ namespace FightingGameTrial.Simulation
                 return;
             }
 
-            int endFrame = 12;
-            if (participant.Visual != null)
-            {
-                endFrame = participant.Visual.ActionEndFrame;
-            }
-
-            if (attackState.ActionFrame >= endFrame)
+            // 終了条件の正本は攻撃データ TotalFrames（既存 Visual.ActionEndFrame=12 と同値）。
+            if (JPunchData.IsFinished(attackState.ActionFrame))
             {
                 attackState.EndJPunch();
 
                 Debug.Log(
                     "[FightDebug] Attack ended slot=" + participant.SlotId
+                    + " attack=" + JPunchData.AttackId
                 );
             }
         }
@@ -764,7 +778,10 @@ namespace FightingGameTrial.Simulation
             participant.Motor.SetLogicalX(newX);
 
             // 移動した Combat Frame でのみ減速する（HitStop 中はここへ来ない）。
-            participant.TickKnockbackVelocityForCombatFrame();
+            // 減速量は J Punch 攻撃データ（被弾共通設定ではなく、現状 J Punch 固有値）。
+            participant.TickKnockbackVelocityForCombatFrame(
+                JPunchData.KnockbackDecelerationPerCombatFrame
+            );
         }
 
         /// <summary>
@@ -1023,16 +1040,16 @@ namespace FightingGameTrial.Simulation
             float knockbackVelocityX = ResolveKnockbackVelocityX(attacker, defender);
 
             // 被弾記録は defender（Participant）側が所有する。
-            // HitStun 開始・ノックバック初速予約・被弾側攻撃の中断（段階12A / 13A）。
+            // HitStun / KB 初速の「値」は攻撃データ、適用結果は HitState。
             // ※ KO へ至る最後の一撃でも、ここで Stun/KB を先にセットする。
             defender.ReceiveHit(
                 timeState.CombatFrame,
-                defender.HitStunFrames,
+                JPunchData.HitStunFrames,
                 knockbackVelocityX
             );
 
-            // Damage は有効 Hit 確定時に1回だけ（段階14A）。
-            int requestedDamage = PunchDamage;
+            // Damage は有効 Hit 確定時に1回だけ（段階14A）。値は攻撃データ。
+            int requestedDamage = JPunchData.Damage;
             int actualDamage = defender.ApplyDamage(requestedDamage);
 
             // HP 0 なら一度だけ KO（段階14B）。既 KO は上で弾いている。
@@ -1089,38 +1106,36 @@ namespace FightingGameTrial.Simulation
             );
 
             // 既存 HitStop を開始（同tickでは減らさない）
-            // 両方向 Hit でも同じ定数のため、単純代入でよい。
+            // 両方向 Hit でも同じ攻撃データのため、単純代入でよい。
             // KO へ至る最後の一撃でも HitStop は通常どおり開始する。
-            timeState.HitStopRemaining = PunchHitStopFrames;
+            timeState.HitStopRemaining = JPunchData.HitStopFrames;
 
             return true;
         }
 
         /// <summary>
-        /// ノックバック初速の符号付き値を決めます（段階13A）。
+        /// ノックバック初速の符号付き値を決めます（段階13A / 15）。
         ///
         /// 正本は Hit 成立時点の LogicalX 比較（Facing だけを正本にしない）。
         /// attacker.X &lt; defender.X → 右（+初速）
         /// attacker.X &gt; defender.X → 左（-初速）
         /// 同位置 → attacker の Facing を fallback（右向きなら +、左向きなら -）
-        /// 大きさは defender の暫定 knockbackInitialSpeed。
+        /// 大きさは攻撃データ KnockbackInitialVelocityX（絶対値）。
         /// </summary>
         private static float ResolveKnockbackVelocityX(
             DebugFighterParticipant attacker,
             DebugFighterParticipant defender)
         {
-            float speed = 0f;
-            if (defender != null)
-            {
-                speed = defender.KnockbackInitialSpeed;
-            }
-
+            float speed = JPunchData.KnockbackInitialVelocityX;
             if (speed == 0f)
             {
                 return 0f;
             }
 
-            if (attacker == null || attacker.Motor == null || defender.Motor == null)
+            if (attacker == null
+                || defender == null
+                || attacker.Motor == null
+                || defender.Motor == null)
             {
                 return 0f;
             }

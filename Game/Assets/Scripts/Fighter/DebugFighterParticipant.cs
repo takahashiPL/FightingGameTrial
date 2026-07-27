@@ -1,3 +1,4 @@
+using FightingGameTrial.Combat;
 using FightingGameTrial.DebugTools;
 using UnityEngine;
 
@@ -14,13 +15,14 @@ namespace FightingGameTrial.Fighter
     /// - 相手 Participant への明示参照を持つ
     /// - 自分専用の DebugFighterAttackState を1つ所有する
     /// - 自分専用の DebugFighterHitState（被 Hit / HitStun / ノックバック速度）を所有する（段階12A / 13A）
-    /// - ノックバック初速・減速量の暫定値を持つ（段階13A。攻撃データ化前）
     /// - Participant 共通の最大HP・現在HPを所有する（段階14A）
     /// - Participant 共通の KO 状態を所有する（段階14B。HitState には持たせない）
     /// - 横方向 Push Box 半幅を持つ（段階10B-3。重なり解消の計算に使う）
-    /// - Push / Hurt / Hit Box のローカル定義を持ち、World Box を計算する（段階11A）
+    /// - Push / Hurt Box のローカル定義を持ち、World Box を計算する（段階11A）
+    /// - J Punch Hit Box の World 変換・Facing 反転を行う（local 正本は攻撃データ・段階15）
     ///
     /// やらないこと:
+    /// - 攻撃データの正本を持たない（DebugAttackData.JPunch。段階15）
     /// - Update で移動しない
     /// - Keyboard.current を直接読まない
     /// - SimulationTick を回さない
@@ -60,14 +62,6 @@ namespace FightingGameTrial.Fighter
     /// </summary>
     public class DebugFighterParticipant : MonoBehaviour
     {
-        /// <summary>
-        /// Jパンチ Hit Box を表示する Active 区間です。
-        /// SimulationSession の距離 Hit 用 Active（4〜6）と揃えます。
-        /// 可視化側の独自攻撃状態は持たず、AttackState.ActionFrame だけを参照します。
-        /// </summary>
-        private const int JPunchHitBoxActiveStartFrame = 4;
-
-        private const int JPunchHitBoxActiveEndFrame = 6;
         [Header("参加枠（キャラ種類ではない）")]
         [Tooltip("デバッグ用の参加枠 ID です。キャラクター種類の選択ではありません。")]
         [SerializeField]
@@ -110,7 +104,8 @@ namespace FightingGameTrial.Fighter
         private Color hitStunDisplayColor = new Color(1f, 0.35f, 0.35f, 1f);
 
         [Tooltip(
-            "KO 中の表示色です（段階14B）。HitStun 色より優先します。"
+            "KO 中の表示色です（段階14B）。"
+            + " 被 Hit 表示（HitStun 中）が終わったあとだけ適用します。"
             + " Scene / Prefab 変更なしで既定の暗いグレーを使います。"
         )]
         [SerializeField]
@@ -124,26 +119,24 @@ namespace FightingGameTrial.Fighter
         [SerializeField]
         private bool usesGameplayInput = true;
 
-        [Header("HitStun（段階12A・暫定）")]
+        [Header("HitStun / KB（段階15: J Punch は攻撃データが正本）")]
         [Tooltip(
-            "被 Hit 後、HitStop 終了から行動不能となる Combat Frame 数です。"
-            + " 攻撃データ化前の暫定値。HP は扱いません。"
+            "旧暫定フィールド（段階12A）。J Punch 適用値は DebugAttackData.JPunch.HitStunFrames。"
+            + " Session は攻撃データを参照する。Inspector 互換のため残す。"
         )]
         [SerializeField]
         private int hitStunFrames = 12;
 
-        [Header("ノックバック（段階13A・暫定）")]
         [Tooltip(
-            "HitStop 終了後、最初の Combat Frame で適用する横移動量の絶対値です。"
-            + " 符号は Session が LogicalX 比較で決めます。Time.deltaTime は使いません。"
-            + " 攻撃データ化前の暫定値。Y 方向・壁処理はしません。"
+            "旧暫定フィールド（段階13A）。J Punch 初速は DebugAttackData.JPunch。"
+            + " Session は攻撃データを参照する。Inspector 互換のため残す。"
         )]
         [SerializeField]
         private float knockbackInitialSpeed = 0.18f;
 
         [Tooltip(
-            "1 Combat Frame ごとにノックバック速度を 0 へ近づける量です。"
-            + " Combat Frame 単位。実時間（deltaTime）には掛けません。"
+            "旧暫定フィールド（段階13A）。J Punch 減速は DebugAttackData.JPunch。"
+            + " Session が攻撃データの減速を渡す。Inspector 互換のため残す。"
         )]
         [SerializeField]
         private float knockbackDeceleration = 0.015f;
@@ -213,9 +206,9 @@ namespace FightingGameTrial.Fighter
         private DebugBox2D hurtBoxLocal = new DebugBox2D(0f, 1f, 0.45f, 1f, true);
 
         [Tooltip(
-            "Jパンチ Hit Box のローカル定義です。"
-            + " Facing Right 基準の Local Center X。Left のときは X だけ符号反転します。"
-            + " Active 中だけ IsActive。距離 Hit 判定にはまだ使いません。"
+            "Jパンチ Hit Box のローカル定義ミラーです（Inspector 確認用）。"
+            + " 判定・可視化の正本は DebugAttackData.JPunch の local 値（段階15）。"
+            + " Facing 反転と World 変換は EvaluateWorldHitBox の責務。"
         )]
         [SerializeField]
         private DebugBox2D jPunchHitBoxLocal = new DebugBox2D(0.75f, 1.25f, 0.55f, 0.35f, false);
@@ -619,9 +612,21 @@ namespace FightingGameTrial.Fighter
                 hurtBoxLocal = new DebugBox2D(0f, 1f, 0.45f, 1f, true);
             }
 
+            // Inspector ミラー用。判定の正本は DebugAttackData.JPunch。
+            DebugAttackData jPunch = DebugAttackData.JPunch;
             if (jPunchHitBoxLocal == null)
             {
-                jPunchHitBoxLocal = new DebugBox2D(0.75f, 1.25f, 0.55f, 0.35f, false);
+                jPunchHitBoxLocal = jPunch.CreateLocalHitBoxDefinition(false);
+            }
+            else
+            {
+                jPunchHitBoxLocal.Set(
+                    jPunch.HitBoxLocalCenterX,
+                    jPunch.HitBoxLocalCenterY,
+                    jPunch.HitBoxHalfWidth,
+                    jPunch.HitBoxHalfHeight,
+                    jPunchHitBoxLocal.IsActive
+                );
             }
         }
 
@@ -699,21 +704,19 @@ namespace FightingGameTrial.Fighter
         }
 
         /// <summary>
-        /// Jパンチ Hit Box の World 座標を返します（段階11A）。
+        /// Jパンチ Hit Box の World 座標を返します（段階11A / 15）。
         ///
-        /// Facing 反転の考え方:
-        /// - ローカル定義は Facing Right（相手が右）基準
-        /// - Facing Left のときは Local Center X の符号だけ反転する
-        /// - SpriteRenderer.flipX / Scale 反転には依存しない（二重反転を防ぐ）
+        /// local 定義の正本: DebugAttackData.JPunch（Facing Right 基準）。
+        /// 本メソッドの責務: 原点計算・Facing による LocalX 反転・World 組み立て。
         ///
         /// Active 連動:
-        /// AttackState が Jパンチ再生中かつ ActionFrame が 4〜6 のときだけ IsActive。
-        /// Startup / Recovery / Idle では非表示。距離 Hit 判定自体は変更しない。
+        /// AttackState 再生中かつ攻撃データの Active 区間のときだけ IsActive。
         /// </summary>
         public DebugBox2D EvaluateWorldHitBox()
         {
             EnsureLocalBoxDefaults();
 
+            DebugAttackData attackData = DebugAttackData.JPunch;
             DebugBox2D world = new DebugBox2D();
             float originX;
             float originY;
@@ -726,14 +729,14 @@ namespace FightingGameTrial.Fighter
             }
 
             // Facing Right: +LocalX / Facing Left: -LocalX（Y は反転しない）
-            float localCenterX = jPunchHitBoxLocal.CenterX;
+            float localCenterX = attackData.HitBoxLocalCenterX;
             if (facingRight == false)
             {
                 localCenterX = -localCenterX;
             }
 
-            float halfWidth = jPunchHitBoxLocal.HalfWidth;
-            float halfHeight = jPunchHitBoxLocal.HalfHeight;
+            float halfWidth = attackData.HitBoxHalfWidth;
+            float halfHeight = attackData.HitBoxHalfHeight;
             if (halfWidth < 0f)
             {
                 halfWidth = 0f;
@@ -748,7 +751,7 @@ namespace FightingGameTrial.Fighter
 
             world.Set(
                 originX + localCenterX,
-                originY + jPunchHitBoxLocal.CenterY,
+                originY + attackData.HitBoxLocalCenterY,
                 halfWidth,
                 halfHeight,
                 isActive
@@ -794,8 +797,8 @@ namespace FightingGameTrial.Fighter
         }
 
         /// <summary>
-        /// いま Jパンチ Hit Box を有効表示すべきか。
-        /// AttackState を正本とし、可視化独自の攻撃進行は持たない。
+        /// いま Jパンチ Hit Box を有効にすべきか。
+        /// 進行は AttackState、Active 境界は攻撃データ（可視化独自の進行は持たない）。
         /// </summary>
         public bool IsJPunchHitBoxActiveNow()
         {
@@ -814,18 +817,7 @@ namespace FightingGameTrial.Fighter
                 return false;
             }
 
-            int frame = attackState.ActionFrame;
-            if (frame < JPunchHitBoxActiveStartFrame)
-            {
-                return false;
-            }
-
-            if (frame > JPunchHitBoxActiveEndFrame)
-            {
-                return false;
-            }
-
-            return true;
+            return DebugAttackData.JPunch.IsActiveFrame(attackState.ActionFrame);
         }
 
         /// <summary>
@@ -1038,15 +1030,22 @@ namespace FightingGameTrial.Fighter
         /// <summary>
         /// ノックバック移動直後に、1 Combat Frame 分だけ速度を減速します。
         /// Session が HitStop 外・移動適用後に1回だけ呼びます。
+        /// 減速量は呼び出し側（Session）が攻撃データから渡す（段階15）。
         /// </summary>
-        public void TickKnockbackVelocityForCombatFrame()
+        public void TickKnockbackVelocityForCombatFrame(float decelerationPerCombatFrame)
         {
             if (hitState == null)
             {
                 return;
             }
 
-            hitState.TickKnockbackVelocity(KnockbackDeceleration);
+            float deceleration = decelerationPerCombatFrame;
+            if (deceleration < 0f)
+            {
+                deceleration = 0f;
+            }
+
+            hitState.TickKnockbackVelocity(deceleration);
         }
 
         /// <summary>
@@ -1113,9 +1112,12 @@ namespace FightingGameTrial.Fighter
         }
 
         /// <summary>
-        /// 表示色の正本を反映します（段階12A / 14B）。
-        /// 優先: **KO &gt; HitStun &gt; 通常 Tint**。
-        /// 最後の一撃中も KO 色を優先し、KO 状態を常に見分けられるようにする。
+        /// 表示色の正本を反映します（段階12A / 14B / 15 回帰）。
+        /// 優先: **被 Hit 表示（IsInHitStun）&gt; KO 暗色 &gt; 通常 Tint**。
+        ///
+        /// KO 状態の正本（isKnockedOut）や TryEnterKnockout の呼び出し順は変えない。
+        /// 最後の一撃でも HitStun 中は通常 Hit と同じ赤表示にし、
+        /// HitStun 終了後の ApplyDisplayColor で KO 暗色へ移る（視覚だけ遅延）。
         /// Attack Sprite 切替は Visual 側。色はここが担当。
         /// </summary>
         public void ApplyDisplayColor()
@@ -1125,15 +1127,17 @@ namespace FightingGameTrial.Fighter
                 return;
             }
 
-            if (isKnockedOut)
-            {
-                spriteRenderer.color = knockoutDisplayColor;
-                return;
-            }
-
+            // 既存の通常 Hit と同じ条件（点滅専用フラグは持たない）。
+            // HitStop 中も HitStun 残りが維持されるため、従来どおり赤になる。
             if (hitState != null && hitState.IsInHitStun)
             {
                 spriteRenderer.color = hitStunDisplayColor;
+                return;
+            }
+
+            if (isKnockedOut)
+            {
+                spriteRenderer.color = knockoutDisplayColor;
                 return;
             }
 
