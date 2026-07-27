@@ -23,21 +23,23 @@
 実装状況の確認と、Scene / Component の理解は資料を分けています。
 
 1. **`docs/learning_and_readability.md`** … 可読性・学習方針
-2. **`docs/component_and_scene_guide.md`** … FightDebugScene を題材にした Scene / Component / Inspector / 実行経路、および Managed Heap / GC / GC.Alloc / Profiler 実習の教材（§16.13 に **GC-1 実測記録**あり。GC-1 は正式 Stage ではない）
+2. **`docs/component_and_scene_guide.md`** … FightDebugScene を題材にした Scene / Component / Inspector / 実行経路、および Managed Heap / GC / GC.Alloc / Profiler 実習の教材（§16.13 **GC-1**、§16.14 **GC-2** の実測記録あり。いずれも正式 Stage ではない）
 3. **`docs/rules.md`** … ゲーム仕様（SimulationTick / HitStop などの意味）
-4. **`docs/unity_implementation_status.md`** … 段階ごとの実装済み・未実装・次工程（状況確認用）。補助改善 GC-1 は §5.1
+4. **`docs/unity_implementation_status.md`** … 段階ごとの実装済み・未実装・次工程（状況確認用）。補助改善 GC-1 / GC-2 は §5.1
 5. コード … 教材 §13 の推奨順（`DebugAttackData` → 入力 → ClockDriver → Session → …）
 
 「今どこまで実装されたか」を知りたいときは 4。
 「Hierarchy と Inspector とコードを結びたい」ときは 2。
-「GC.Alloc を Profiler でどう見るか／GC-1 の実測」も 2（§16）。実装状況の正本と混同しない。GC-2 は未実装。
+「GC.Alloc を Profiler でどう見るか／GC-1・GC-2 の実測」も 2（§16）。実装状況の正本と混同しない。
+GC-2（Editor）: `DebugHudView.Update` 約17.2 KB → 約3.2 KB / frame。Development Build は未計測。GC Alloc 0 ではない。
 
 ## Unity 実装の到達点（要約）
 
 ブランチ `unity` 上で、**段階1〜15まで完了**しています。
-最新コミット済み HEAD: **`e157b7d`**（Add Unity GC learning guide）
+最新コミット済み HEAD: **`20d4a5a`**（Reduce fixed help HUD allocations）
 段階14全体（14A+14B）・段階15（J Punch 攻撃データ化）: **完了・push 済み**（SO 化は見送り）。
-GC-1（固定 Help 毎 Frame 停止）は補助改善。コード差分がある場合は未コミットのことがある。
+GC-1（固定 Help 毎 Frame 停止）: **完了・push 済み**。
+GC-2（Status HUD StringBuilder）: 補助改善。コード差分がある場合は未コミットのことがある。
 
 | 区分 | 内容 |
 |---|---|

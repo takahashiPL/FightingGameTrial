@@ -1,3 +1,4 @@
+using System.Text;
 using FightingGameTrial.Combat;
 using FightingGameTrial.Fighter;
 using FightingGameTrial.Input;
@@ -35,6 +36,13 @@ namespace FightingGameTrial.DebugTools
         private const float HelpBlockHeightPixels = 92f;
 
         private const float StatusHelpGapPixels = 16f;
+
+        /// <summary>
+        /// 状態 HUD 本文用の再利用バッファ（GC-2）。
+        /// 毎 Frame new せず、Clear して容量を再利用する。
+        /// 初期容量は現状の HUD 行数を見ての余裕込み。
+        /// </summary>
+        private readonly StringBuilder statusTextBuilder = new StringBuilder(2048);
 
         [Header("参照（Inspectorで接続。自動検索はしません）")]
         [Tooltip("時間状態と P1/P2 Participant 参照へ到達するための SimulationSession です。")]
@@ -79,8 +87,12 @@ namespace FightingGameTrial.DebugTools
                 return;
             }
 
-            // 状態 HUD は毎描画 Frame で再構築する（動的値のため。今回の GC 対策対象外）。
-            hudText.text = BuildStatusHudText(timeState);
+            // 状態 HUD は動的値のため毎描画 Frame で再構築する（表示内容は変えない）。
+            // StringBuilder を Clear 再利用し、中間 string の大量生成を抑える（GC-2）。
+            BuildStatusHudText(timeState);
+            // TMP_Text.SetText(StringBuilder) は導入パッケージに実在する API。
+            // 最終の string をこちらで ToString しない（Editor 内の TMP 処理は別問題）。
+            hudText.SetText(statusTextBuilder);
 
             // Help 本文は固定文言のため、EnsureSplitHudLayout（Awake）で1回だけ設定する。
             // Update で毎 Frame 再構築すると、不要な string 生成と TMP 再代入の候補になる。
@@ -195,10 +207,14 @@ namespace FightingGameTrial.DebugTools
         }
 
         /// <summary>
-        /// 左上の状態行のみ。追加ラベルは ASCII 優先（TMP欠落回避）。
+        /// 左上の状態行のみを statusTextBuilder へ構築する（GC-2）。
+        /// Clear は内容を消すが確保済み容量は再利用する。表示内容・改行は従来どおり。
+        /// 改行は既存どおり '\n'（AppendLine の Environment.NewLine は使わない）。
         /// </summary>
-        private string BuildStatusHudText(SimulationTimeState timeState)
+        private void BuildStatusHudText(SimulationTimeState timeState)
         {
+            statusTextBuilder.Clear();
+
             // P1 AttackState を1回だけ取得（攻撃表示の正本。重複取得しない）
             DebugFighterParticipant p1 = simulationSession.ParticipantP1;
             DebugFighterAttackState attackState = null;
@@ -253,6 +269,7 @@ namespace FightingGameTrial.DebugTools
             string p1FacingLabel = "-";
             if (p1 != null && p1.Motor != null)
             {
+                // 小数桁は既存書式を維持（GC-2 では数値 ToString の完全除去はしない）
                 p1XLabel = p1.Motor.LogicalX.ToString("0.00");
                 p1FacingLabel = p1.Motor.FacingRight ? "R" : "L";
             }
@@ -315,62 +332,119 @@ namespace FightingGameTrial.DebugTools
                 attackResult = "None";
             }
 
-            string text = "";
-            // Tick / Combat は timeState。AF だけ AttackState。
-            text = text + "Tick/Combat/AF : " + timeState.SimulationTick
-                + " / " + timeState.CombatFrame
-                + " / " + actionFrameValue + "\n";
-            // Action は AttackState。Pause / HitStop は timeState。
-            text = text + "Action/Pause/HS: " + actionPlayingLabel
-                + " / " + pauseLabel
-                + " / " + timeState.HitStopRemaining + "\n";
-            text = text + "Step           : " + stepLabel + "\n";
-            text = text + "LRUD / Atk H/P : " + leftLabel + rightLabel + upLabel + downLabel
-                + " / " + attackHeldLabel + "/" + attackPressedLabel + "\n";
-            text = text + "P1 X/Face/St   : " + p1XLabel
-                + " / " + p1FacingLabel
-                + " / " + p1StateLabel + "\n";
+            // --- Tick / Combat / AF ---
+            statusTextBuilder.Append("Tick/Combat/AF : ");
+            statusTextBuilder.Append(timeState.SimulationTick);
+            statusTextBuilder.Append(" / ");
+            statusTextBuilder.Append(timeState.CombatFrame);
+            statusTextBuilder.Append(" / ");
+            statusTextBuilder.Append(actionFrameValue);
+            statusTextBuilder.Append('\n');
 
-            // HP（段階14A）: ASCII のみ。左上状態領域内。操作説明とは分離済み。
-            string p1HpLabel = "-";
+            // --- Action / Pause / HitStop ---
+            statusTextBuilder.Append("Action/Pause/HS: ");
+            statusTextBuilder.Append(actionPlayingLabel);
+            statusTextBuilder.Append(" / ");
+            statusTextBuilder.Append(pauseLabel);
+            statusTextBuilder.Append(" / ");
+            statusTextBuilder.Append(timeState.HitStopRemaining);
+            statusTextBuilder.Append('\n');
+
+            statusTextBuilder.Append("Step           : ");
+            statusTextBuilder.Append(stepLabel);
+            statusTextBuilder.Append('\n');
+
+            statusTextBuilder.Append("LRUD / Atk H/P : ");
+            statusTextBuilder.Append(leftLabel);
+            statusTextBuilder.Append(rightLabel);
+            statusTextBuilder.Append(upLabel);
+            statusTextBuilder.Append(downLabel);
+            statusTextBuilder.Append(" / ");
+            statusTextBuilder.Append(attackHeldLabel);
+            statusTextBuilder.Append('/');
+            statusTextBuilder.Append(attackPressedLabel);
+            statusTextBuilder.Append('\n');
+
+            statusTextBuilder.Append("P1 X/Face/St   : ");
+            statusTextBuilder.Append(p1XLabel);
+            statusTextBuilder.Append(" / ");
+            statusTextBuilder.Append(p1FacingLabel);
+            statusTextBuilder.Append(" / ");
+            statusTextBuilder.Append(p1StateLabel);
+            statusTextBuilder.Append('\n');
+
+            // --- HP / Life（段階14A）---
+            statusTextBuilder.Append("P1 HP          : ");
             if (p1 != null)
             {
-                p1HpLabel = p1.CurrentHitPoints + " / " + p1.MaxHitPoints;
+                statusTextBuilder.Append(p1.CurrentHitPoints);
+                statusTextBuilder.Append(" / ");
+                statusTextBuilder.Append(p1.MaxHitPoints);
+            }
+            else
+            {
+                statusTextBuilder.Append('-');
             }
 
-            text = text + "P1 HP          : " + p1HpLabel + "\n";
+            statusTextBuilder.Append('\n');
 
-            string p1LifeLabel = "-";
+            statusTextBuilder.Append("P1 Life        : ");
             if (p1 != null)
             {
-                p1LifeLabel = p1.BuildLifeLabel();
+                statusTextBuilder.Append(p1.BuildLifeLabel());
+            }
+            else
+            {
+                statusTextBuilder.Append('-');
             }
 
-            text = text + "P1 Life        : " + p1LifeLabel + "\n";
-            text = text + "Sprite         : " + visualLabel + "\n";
-            text = text + "P2 X/Face/Hit  : " + p2XLabel
-                + " / " + p2FacingLabel
-                + " / " + p2HitLabel + "\n";
+            statusTextBuilder.Append('\n');
 
-            string p2HpLabel = "-";
+            statusTextBuilder.Append("Sprite         : ");
+            statusTextBuilder.Append(visualLabel);
+            statusTextBuilder.Append('\n');
+
+            statusTextBuilder.Append("P2 X/Face/Hit  : ");
+            statusTextBuilder.Append(p2XLabel);
+            statusTextBuilder.Append(" / ");
+            statusTextBuilder.Append(p2FacingLabel);
+            statusTextBuilder.Append(" / ");
+            statusTextBuilder.Append(p2HitLabel);
+            statusTextBuilder.Append('\n');
+
+            statusTextBuilder.Append("P2 HP          : ");
             if (p2 != null)
             {
-                p2HpLabel = p2.CurrentHitPoints + " / " + p2.MaxHitPoints;
+                statusTextBuilder.Append(p2.CurrentHitPoints);
+                statusTextBuilder.Append(" / ");
+                statusTextBuilder.Append(p2.MaxHitPoints);
+            }
+            else
+            {
+                statusTextBuilder.Append('-');
             }
 
-            text = text + "P2 HP          : " + p2HpLabel + "\n";
+            statusTextBuilder.Append('\n');
 
-            string p2LifeLabel = "-";
+            statusTextBuilder.Append("P2 Life        : ");
             if (p2 != null)
             {
-                p2LifeLabel = p2.BuildLifeLabel();
+                statusTextBuilder.Append(p2.BuildLifeLabel());
+            }
+            else
+            {
+                statusTextBuilder.Append('-');
             }
 
-            text = text + "P2 Life        : " + p2LifeLabel + "\n";
-            text = text + "P2 Stun/State  : " + p2HitStunLabel
-                + " / " + p2StateLabel + "\n";
+            statusTextBuilder.Append('\n');
 
-            // Knockback（段階13A）: 1行に Vx / Active を収めて下端切れを避ける。
+            statusTextBuilder.Append("P2 Stun/State  : ");
+            statusTextBuilder.Append(p2HitStunLabel);
+            statusTextBuilder.Append(" / ");
+            statusTextBuilder.Append(p2StateLabel);
+            statusTextBuilder.Append('\n');
+
+            // --- Knockback（段階13A）---
             string p2KnockbackVxLabel = "0.000";
             string p2KnockbackActiveLabel = "0";
             if (p2 != null)
@@ -382,29 +456,40 @@ namespace FightingGameTrial.DebugTools
                 }
             }
 
-            text = text + "P2 KB Vx/Act   : " + p2KnockbackVxLabel
-                + " / " + p2KnockbackActiveLabel + "\n";
+            statusTextBuilder.Append("P2 KB Vx/Act   : ");
+            statusTextBuilder.Append(p2KnockbackVxLabel);
+            statusTextBuilder.Append(" / ");
+            statusTextBuilder.Append(p2KnockbackActiveLabel);
+            statusTextBuilder.Append('\n');
 
-            // 段階15: P2 KB の直後（操作説明ブロックの前＝状態 HUD 本文内の早い位置）。
-            // Truncate で末尾行が隠れるため、ここに置く。値は攻撃データから生成する。
+            // --- J Punch 攻撃データ（段階15）---
             DebugAttackData jPunchData = DebugAttackData.JPunch;
-            text = text + "JPunch Data    : S/A/R "
-                + jPunchData.StartupFrames
-                + "/" + jPunchData.ActiveFrames
-                + "/" + jPunchData.RecoveryFrames
-                + " Dmg " + jPunchData.Damage
-                + " HStop " + jPunchData.HitStopFrames
-                + " HStun " + jPunchData.HitStunFrames
-                + " KB " + jPunchData.KnockbackInitialVelocityX.ToString("0.000")
-                + "\n";
+            statusTextBuilder.Append("JPunch Data    : S/A/R ");
+            statusTextBuilder.Append(jPunchData.StartupFrames);
+            statusTextBuilder.Append('/');
+            statusTextBuilder.Append(jPunchData.ActiveFrames);
+            statusTextBuilder.Append('/');
+            statusTextBuilder.Append(jPunchData.RecoveryFrames);
+            statusTextBuilder.Append(" Dmg ");
+            statusTextBuilder.Append(jPunchData.Damage);
+            statusTextBuilder.Append(" HStop ");
+            statusTextBuilder.Append(jPunchData.HitStopFrames);
+            statusTextBuilder.Append(" HStun ");
+            statusTextBuilder.Append(jPunchData.HitStunFrames);
+            statusTextBuilder.Append(" KB ");
+            statusTextBuilder.Append(jPunchData.KnockbackInitialVelocityX.ToString("0.000"));
+            statusTextBuilder.Append('\n');
 
-            // Push Box（段階10B-3）: ASCII のみ。常時大量ログは出さず HUD で確認する。
+            // --- Push（段階10B-3）---
             string pushDistLabel = simulationSession.LastPushCenterDistance.ToString("0.00");
             string pushOverlapLabel = simulationSession.LastPushWasOverlapping ? "1" : "0";
-            text = text + "Push Dist/Over : " + pushDistLabel
-                + " / " + pushOverlapLabel + "\n";
+            statusTextBuilder.Append("Push Dist/Over : ");
+            statusTextBuilder.Append(pushDistLabel);
+            statusTextBuilder.Append(" / ");
+            statusTextBuilder.Append(pushOverlapLabel);
+            statusTextBuilder.Append('\n');
 
-            // Box 可視化（段階11A）: P1 の World Box 状態を短く表示。
+            // --- Box 可視化（段階11A）---
             string pushBoxOnLabel = "0";
             string hurtBoxOnLabel = "0";
             string hitBoxOnLabel = "0";
@@ -431,12 +516,19 @@ namespace FightingGameTrial.DebugTools
                 }
             }
 
-            text = text + "Box P/H/Hit    : " + pushBoxOnLabel
-                + " / " + hurtBoxOnLabel
-                + " / " + hitBoxOnLabel + "\n";
-            text = text + "HitBox CenterX : " + hitBoxCenterXLabel + "\n";
+            statusTextBuilder.Append("Box P/H/Hit    : ");
+            statusTextBuilder.Append(pushBoxOnLabel);
+            statusTextBuilder.Append(" / ");
+            statusTextBuilder.Append(hurtBoxOnLabel);
+            statusTextBuilder.Append(" / ");
+            statusTextBuilder.Append(hitBoxOnLabel);
+            statusTextBuilder.Append('\n');
 
-            // Hit Box × Hurt Box（段階11B）: ASCII のみ。Miss の毎フレームログは出さない。
+            statusTextBuilder.Append("HitBox CenterX : ");
+            statusTextBuilder.Append(hitBoxCenterXLabel);
+            statusTextBuilder.Append('\n');
+
+            // --- Hit 判定ラベル（段階11B）---
             string boxOverlapLabel = simulationSession.LastBoxOverlap ? "1" : "0";
             string hitCheckLabel = simulationSession.LastHitCheckLabel;
             if (string.IsNullOrEmpty(hitCheckLabel))
@@ -444,14 +536,29 @@ namespace FightingGameTrial.DebugTools
                 hitCheckLabel = "Inactive";
             }
 
-            text = text + "BoxOverlap     : " + boxOverlapLabel + "\n";
-            text = text + "HitCheck       : " + hitCheckLabel + "\n";
+            statusTextBuilder.Append("BoxOverlap     : ");
+            statusTextBuilder.Append(boxOverlapLabel);
+            statusTextBuilder.Append('\n');
 
-            text = text + "Punch Phase    : " + punchPhase + "\n";
-            text = text + "AttackResult   : " + attackResult + "\n";
-            text = text + "PunchHitDone   : " + punchHitDone + "\n";
-            text = text + "Status         : " + statusLabel;
-            return text;
+            statusTextBuilder.Append("HitCheck       : ");
+            statusTextBuilder.Append(hitCheckLabel);
+            statusTextBuilder.Append('\n');
+
+            statusTextBuilder.Append("Punch Phase    : ");
+            statusTextBuilder.Append(punchPhase);
+            statusTextBuilder.Append('\n');
+
+            statusTextBuilder.Append("AttackResult   : ");
+            statusTextBuilder.Append(attackResult);
+            statusTextBuilder.Append('\n');
+
+            statusTextBuilder.Append("PunchHitDone   : ");
+            statusTextBuilder.Append(punchHitDone);
+            statusTextBuilder.Append('\n');
+
+            // 最終行は従来どおり末尾改行なし
+            statusTextBuilder.Append("Status         : ");
+            statusTextBuilder.Append(statusLabel);
         }
     }
 }

@@ -725,9 +725,9 @@ GC の話は「仕様の正本」ではなく、**実行時コストの学習**�
 
 | 箇所 | コード上の候補 | 実行頻度 | 推定される割り当て種類 | 実測状態 |
 |---|---|---|---|---|
-| `DebugHudView.Update` → `BuildStatusHudText` | 多数の `string` 連結（`text = text + ...`）と `ToString("0.00")` 等 | **毎描画 Frame** | `string`（連結・数値整形） | 待機時は §16.13 の GC-1 前後で Update 合計を実測。内訳は未計測 |
+| `DebugHudView.Update` → `BuildStatusHudText` | （GC-2 以前）多数の `string` 連結。現在は再利用 `StringBuilder` + `Append` | **毎描画 Frame**（更新頻度は維持） | 小数 `ToString` 等は残存 | GC-2 で Update 約17.2→約3.2 KB（§16.14）。内訳は未計測 |
 | `BuildHelpHudText` / Help の毎 Frame 再代入 | （GC-1 以前）固定文言の再構築と `helpText.text` 代入 | GC-1 で **Update から削除**。初期化時1回のみ | `string` + TMP 代入 | GC-1 で約 0.6 KB/frame 削減を確認（§16.13） |
-| `DebugHudView` → `hudText.text` 代入 | TMP への状態文字列設定 | 毎描画 Frame | TMP 側の内部処理の可能性（コード外） | 未計測（内訳） |
+| `DebugHudView` → `hudText.SetText(StringBuilder)` | TMP への状態文字列設定（GC-2） | 毎描画 Frame | TMP 側の内部処理の可能性（コード外） | 未計測（内訳） |
 | `BuildStatusHudText` 内の `EvaluateWorld*Box` | 各評価で `new DebugBox2D()`（class） | HUD 更新ごと（Push/Hurt/Hit） | `DebugBox2D` インスタンス | 未計測 |
 | `DebugFighterParticipant.EvaluateWorldHitBox` 等 | Session の Hit 判定経路でも `new DebugBox2D()` | Active 中の Combat など | `DebugBox2D` | 未計測 |
 | `SimulationSession` の Attack started/ended / Punch hit / KO | `Debug.Log` + 文字列連結・`ToString` | イベント時 | `string`（ログ用） | 未計測 |
@@ -779,7 +779,7 @@ GC の話は「仕様の正本」ではなく、**実行時コストの学習**�
 
 | ケース | GC.Alloc / Frame | 主な発生元 | 備考 |
 |---|---|---|---|
-| A. 通常待機 | 変更前フレーム全体 約18.0 KB（69 alloc）。Update 約17.8→約17.2 KB（GC-1後） | `DebugHudView.Update` | Editor 実測。§16.13 |
+| A. 通常待機 | Update: 初期 約17.8 → GC-1後 約17.2 → GC-2後 約3.2 KB | `DebugHudView.Update` | Editor 実測。§16.13 / §16.14 |
 | B. 移動（矢印） |  |  | 未計測 |
 | C. J Punch Miss |  |  | 未計測 |
 | D. J Punch Hit |  |  | 未計測 |
@@ -852,8 +852,8 @@ GC の話は「仕様の正本」ではなく、**実行時コストの学習**�
 
 1. Development Build で待機時 GC.Alloc を取り、Editor との差を見る（**未計測**）
 2. ケース B〜H の記録（多くは **未計測**）
-3. **GC-2**（便宜名）: `BuildStatusHudText` の動的文字列生成の内訳確認 → 仕様決定は実測後（**未実装・未確定**）
-4. 実測後にのみ改善案を決める（可読性を壊す最適化を先にしない）
+3. 残存候補の内訳（小数 `ToString`、`DebugBox2D` class の HUD 用生成、TMP 内部）の確認（**未計測**）
+4. 実測後にのみ次の改善案を決める（可読性を壊す最適化を先にしない。GC Alloc 0 を目的化しない）
 
 ### 16.13 GC-1: 固定 Help 本文の毎 Frame 再構築を停止
 
@@ -867,7 +867,7 @@ GC の話は「仕様の正本」ではなく、**実行時コストの学習**�
 
 - Update から Help の毎 Frame 再構築・再代入を削除
 - Help 本文は従来どおり **Awake → EnsureSplitHudLayout → `helpText.text = BuildHelpHudText()`** で初期化時に1回だけ設定
-- **Status HUD（`BuildStatusHudText` / `hudText.text`）は変更していない**
+- **Status HUD（`BuildStatusHudText`）は GC-1 では変更していない**
 - Help 文面・レイアウト・Truncate 設定は未変更
 
 #### 実測条件
@@ -892,11 +892,61 @@ GC の話は「仕様の正本」ではなく、**実行時コストの学習**�
 
 - `DebugHudView.Update` について **約 0.6 KB / frame**、**約 3.4%** の削減を確認
 - 固定 Help の毎 Frame 再構築を外した効果として扱う
-- 待機時の主発生元は引き続き `DebugHudView.Update`（残りの大半は `BuildStatusHudText` 等が候補）
+- 待機時の主発生元は引き続き `DebugHudView.Update`（残りの大半は `BuildStatusHudText` 等が候補 → GC-2 で対応）
 - 連結・`ToString`・TMP 内部の内訳は **未計測**
 - Compile Error なし。既知 Warning: `TMP_Text.enableWordWrapping` の CS0618 が1件（既存）
 
-#### GC-2（便宜名・未実装）
+### 16.14 GC-2: Status HUD 文字列構築を StringBuilder 再利用へ変更
 
-- 候補: Status HUD 本体（`BuildStatusHudText`）の動的文字列生成の整理
-- **仕様未確定・未実装**。GC-1 の完了をもって GC-2 を完了扱いしない
+**名称について**: 「GC-2」も正式な工程表の Stage 番号ではない。GC 改善作業内の**便宜的な区分**である。Round / Guard 等の機能 Stage と混同しない。
+
+#### 問題
+
+`BuildStatusHudText` 内の `text = text + ...` による**中間 string の大量生成**が、待機時 `DebugHudView.Update` の主因だった（GC-1 後も約 17.2 KB / frame）。
+
+#### 修正
+
+- 再利用フィールド: `private readonly StringBuilder statusTextBuilder = new StringBuilder(2048);`
+- 毎 Frame `new` せず、先頭で `Clear()` して容量を再利用
+- 連結を `Append` へ置換（改行は既存どおり `'\n'`）
+- TMP へは `hudText.SetText(statusTextBuilder)`（導入 TMP の公開 API）
+- **Status HUD の毎描画 Frame 更新は維持**（更新頻度は下げない）
+- 表示内容・行順・ラベル・小数桁は維持
+- Help は GC-1 のまま（初期化時1回）
+- 小数書式維持のため一部 `ToString("0.00")` / `ToString("0.000")` は残存
+- `DebugBox2D`（class）の HUD 用 `EvaluateWorld*Box` 生成は今回変更なし
+
+#### 実測条件
+
+- Unity 6.3 LTS / Editor Play Mode / `FightDebugScene` / 通常待機
+- CPU Usage → Hierarchy / `DebugHudView.Update()` の単一通常フレーム
+- **Editor 上の測定**（Development Build は **未計測**）
+- 別の通常フレームでも約 3.2 KB / frame を確認
+- 製品性能の断定には使わない。GC Alloc 0 達成ではない
+
+#### `DebugHudView.Update` の比較
+
+| 段階 | `DebugHudView.Update` GC Alloc |
+|---|---:|
+| 初期状態 | 約 17.8 KB / frame |
+| GC-1 後 | 約 17.2 KB / frame |
+| GC-2 後 | 約 3.2 KB / frame |
+
+- **GC-2 単体**（17.2 → 3.2）: 約 **14.0 KB / frame**、約 **81.4%** 削減
+- **初期状態比**（17.8 → 3.2）: 約 **14.6 KB / frame**、約 **82.0%** 削減
+- 変更後のフレーム全体 KB・alloc 回数・GC.Collect は **未記録**（推測しない）
+
+#### 回帰確認
+
+- Compile Error なし。既知 CS0618（`enableWordWrapping`）1件
+- HUD 行順・ラベル・小数桁維持
+- J Punch Miss / Hit、Damage=10、HitStop、HitStun / Knockback、HitCount、KO、KO 後 Miss
+- Push / 壁際再配分
+- R Reset（HitCount=0、AttackResult=None、HP / KO / HitStun / Knockback 初期化）
+- Help 表示・Status HUD 毎 Frame 更新を維持
+
+#### 残存候補（内訳は未計測）
+
+- 小数書式用 `ToString`
+- `DebugBox2D` が class であることによる HUD 確認用 Box 生成
+- TMP 内部処理

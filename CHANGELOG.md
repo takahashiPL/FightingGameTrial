@@ -1,13 +1,22 @@
 # CHANGELOG
 
+## GC-2（補助改善・Status HUD の StringBuilder 再利用）
+
+- 正式 Stage 番号ではない（GC 学習・計測の便宜区分）。機能 Stage（Round/Guard 等）とは別枠
+- `DebugHudView`: Status HUD を再利用 `StringBuilder(2048)` + `Clear` + `Append` で構築。`hudText.SetText(statusTextBuilder)`
+- 毎描画 Frame 更新・表示内容・Help（GC-1）・戦闘処理は維持。小数書式用 `ToString` は一部残存
+- Editor Play Mode / 通常待機: `DebugHudView.Update` 約17.2 KB → 約3.2 KB（約14.0 KB・約81.4%削減）。初期状態（約17.8 KB）比 約82.0%
+- Miss/Hit/KO/Push/Reset まで回帰確認。Development Build・フレーム全体 KB / alloc 回数 / GC.Collect・内訳は未計測／未記録
+- `docs/component_and_scene_guide.md` §16.14 / `docs/unity_implementation_status.md` §5.1 / README を更新
+
 ## GC-1（補助改善・DebugHudView 固定 Help の毎 Frame 再構築停止）
 
 - 正式 Stage 番号ではない（GC 学習・計測の便宜区分）。機能 Stage（Round/Guard 等）とは別枠
 - `DebugHudView`: 固定 Help 本文を Awake → EnsureSplitHudLayout で1回だけ設定。Update から毎 Frame 再構築・再代入を削除
-- Status HUD は未変更（毎 Frame 更新を維持）。Help 文面・レイアウト・表示は維持
+- Status HUD は GC-1 では未変更（毎 Frame 更新を維持）。Help 文面・レイアウト・表示は維持
 - Editor Play Mode / 通常待機の実測: `DebugHudView.Update` 約17.8 KB → 約17.2 KB（約0.6 KB・約3.4%削減）
 - 変更後のフレーム全体 KB・alloc 回数・GC.Collect、Development Build は未記録／未計測
-- GC-2（Status HUD 文字列の整理）は未実装・仕様未確定
+- 続く GC-2（Status HUD StringBuilder）でさらに削減（上記 GC-2 項）
 - `docs/component_and_scene_guide.md` §16.13 / `docs/unity_implementation_status.md` §5.1 / README を更新
 
 ## v3.15（Unity段階15完了・J Punch攻撃データ化）
