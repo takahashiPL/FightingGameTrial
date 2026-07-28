@@ -1,11 +1,12 @@
 # Unity 実装状況・次工程（段階1〜15到達後）
 
-最終更新: 2026-07-27
+最終更新: 2026-07-28
 対象ブランチ: `unity`
-最新コミット済み HEAD: **`f051464`**（Document training and versus mode boundaries）
+最新コミット済み HEAD: **`5bd43f7`**（Reset training positions and facing）
 段階14全体（14A+14B）・段階15（攻撃データ化）: **完了・push 済み**
 GC-1 / GC-2（補助改善・正式 Stage ではない）: **完了・push 済み**
-Training Reset 位置・向き復帰: **実装・Editor 確認済み**（正式 Stage 番号なし。Docs 反映時点ではコード未コミットの場合あり）
+Training Reset 位置・向き復帰: **実装・Editor 確認済み**（正式 Stage 番号なし）
+最小 Visual State（Idle / WalkF / WalkB / Attack）: **実装・Editor 一部確認済み**（正式 Stage 番号なし。Docs 反映時点ではコード未コミットの場合あり）
 正式な次工程番号: **未定義**（新 Stage 番号は作らない）
 
 このファイルは、Unity 側の**実装済み / 暫定 / 未実装 / 次回候補 / 正式方針**を混同せずに追うための正本です。
@@ -84,6 +85,54 @@ Training Reset 位置・向き復帰: **実装・Editor 確認済み**（正式 
 
 詳細は §2.3、教材 §17.7、`docs/rules.md` §15.4。
 
+### 最小 Visual State（実装済み・Editor 一部確認済み）
+
+正式 Stage 番号は付けない。`FighterVisualState` enum で見た目意図を区別する（Animator / Walk 専用 Sprite は未実装）。
+
+| 値 | 意味 | Sprite（現状） |
+|---|---|---|
+| Idle | 停止 | idleSprite |
+| WalkForward | 前進（Facing と同方向入力） | idleSprite 流用 |
+| WalkBackward | 後退（Facing と逆方向入力） | idleSprite 流用 |
+| Attack | J Punch 攻撃ポーズ中 | attackSprite |
+
+**責務**
+
+| 担当 | 内容 |
+|---|---|
+| `SimulationSession` | `ResolveFighterVisualState` / `ResolveLocomotionVisualState`。CurrentInput × `Motor.FacingRight` で前進／後退を決定 |
+| `DebugFighterVisual` | `Apply(FighterVisualState)` で Sprite 差し替えのみ。`CurrentVisualState` / `CurrentVisualLabel` / `IsAttackPoseActive` |
+| `DebugFighterMotor` | 位置・Facing（歩行判定はしない） |
+| `DebugFighterParticipant` | 戦闘状態（HP/KO/HitStun 等）。Visual 判定はしない |
+
+**優先順位（Sprite）**: HitStun または KO → Idle 系 → Attack → WalkForward / WalkBackward → Idle
+
+**判定**: 入力意図基準。Left+Right 同時・無入力は Idle。壁際で論理 X が変わらなくても方向入力中は Walk。Push / Knockback の受動移動だけでは Walk にしない。P2 Neutral は通常 Idle。HitStop 中は Combat スキップのため直前 Visual を保持。
+
+**Editor 確認済み（主に P1・右向き）**
+
+| 条件 | FighterVisual |
+|---|---|
+| 無入力 | Idle |
+| 右向き + 左入力 | WalkBackward |
+| 右向き + 右入力 | WalkForward |
+| Left+Right 同時 | Idle |
+| 壁際（P1X≈6 / P2X≈7）右入力 | WalkForward（実移動なしでも維持） |
+| 移動入力中の J Punch | Attack（Walk より優先） |
+| Training Reset 後 | Idle（位置 0.00 / 3.00、Facing 初期どおり） |
+
+Push / Damage / HitStop / HitStun / Knockback / KO の継続動作も確認。Compile Error なし。既知 CS0618 以外の新規警告なし。
+
+**未確認 / 現仕様上確認不可**
+
+| 項目 | 区分 | 理由 |
+|---|---|---|
+| 左向き時の WalkForward / WalkBackward | **現仕様上確認不可（実測未実施）** | Push ですり抜け不可。ジャンプ・飛び越し・位置交換がなく、通常操作で P1 が P2 右側へ回れない。コードは `FacingRight` 参照で対応済みだが**実測済みとはしない** |
+| P1 自身が HitStun / KO 中に Walk にならないこと | **未確認** | 今回 KO したのは P2。HUD/Console の FighterVisual は主に P1。優先順位コード上は Walk より上 |
+| Development Build | **未確認** | |
+
+詳細は教材 §17.8、`docs/rules.md` §15.5。
+
 キャラクターの前進・後退・Idle・歩行表現・ジャンプ・キック・Punch・HitStun・Knockback・KO・アニメーション状態は、**練習専用ではなく練習／対戦共通のキャラクター機能**とする方針。見た目は戦闘処理がコマを直接決めず、戦闘状態→ Visual State → Animator または Sprite 差し替え、とする（詳細は `docs/rules.md` / 教材 §17）。
 
 ---
@@ -121,11 +170,12 @@ Round 終了・勝敗判定は工程表上の段階14/15には含まれず、**�
 | **`DebugFighterAttackState`** | 攻撃進行の正本（ActionFrame / HasCurrentJPunchHit 等） |
 | **`DebugFighterHitState`** | 被 Hit / HitStun / ノックバック速度（HP・KO・攻撃データは持たない） |
 | **`DebugFighterParticipant`** | **HP 正本** + **KO 正本**（`isKnockedOut`）。local→world Hit Box 変換・Facing 反転 |
-| **`DebugFighterMotor`** | LogicalX・`initialLogicalX`・TryMoveLogicalXBy・Training Reset 時の論理 X 復帰（攻撃データ非所有） |
+| **`DebugFighterMotor`** | LogicalX・`initialLogicalX`・TryMoveLogicalXBy・Training Reset 時の論理 X 復帰（攻撃データ非所有。歩行 Visual 判定はしない） |
+| **`DebugFighterVisual`** | `FighterVisualState` → Sprite。`Apply` / `CurrentVisualState` / `IsAttackPoseActive`（入力判定はしない） |
 | **`DebugFighterPushResolver`** | 等分 Push ＋壁際再配分（攻撃データ非所有） |
 | **`DebugPunchHitResolver`** | world Hit×Hurt 重なり判定（攻撃全体の設定正本にはしない） |
 | **`SimulationTimeState`** | 共有時間・共有 HitStop |
-| **`SimulationSession`** | tick 進行、攻撃開始/終了、Hit 適用、HitStop 開始、KO 接続（数値の正本にはしない） |
+| **`SimulationSession`** | tick 進行、攻撃開始/終了、Hit 適用、HitStop 開始、KO 接続、**Visual State 決定**（数値の正本にはしない） |
 
 ### 2.2 段階14A（HP / Damage・維持）
 
@@ -293,10 +343,12 @@ ScriptableObject 化、Inspector 編集、Character 別攻撃データ、複数�
 - 壁バウンド等（工程番号なし残課題）
 - 攻撃データの ScriptableObject 化 / Inspector 編集 / JSON・CSV
 - 複数攻撃、弱/中/強、技コマンド、コンボ、Cancel、Counter Hit
-- Idle / WalkForward / WalkBackward の Visual State、歩行 Animation、K Kick、Animator、ジャンプ／空中（いずれも未実装）
+- Walk 専用 Sprite、Animator + Animation Clip（最小 Visual State enum は実装済み。§1.1）
+- 左向き Walk 実測のための位置入れ替え／ジャンプ等（現仕様ではすり抜け不可）
+- K Kick、ジャンプ／空中（いずれも未実装）
 - 練習用将来候補: ダミー回復、自動回復、ガード設定、行動記録、判定表示、フレーム表示など
 
-（Training Reset の位置・向き復帰は **§1.1 で実装済み**。未実装候補からは外す。）
+（Training Reset 位置復帰・最小 Visual State は **§1.1 で実装済み**。未実装候補からは外す。）
 
 ### 2.10 相打ち・キャラ差し替え
 
@@ -330,8 +382,9 @@ Push / Hurt / Hit 可視化（11A）と Hit×Hurt 重なり判定（11B）は完
 
 その後の候補（順不同・未着手。**新工程番号は作らない**。正式な次 Stage も未定義）:
 
-- Idle / WalkForward / WalkBackward の Visual State 整理、歩行用複数 Sprite または Animation Clip
-- K Kick、Animator 導入、ジャンプ／空中状態（未実装）
+- Walk 専用 Sprite、Animator + Animation Clip（Visual State 基盤は完了）
+- 左向き実測のための位置入れ替え／ジャンプ等
+- K Kick、ジャンプ／空中状態（未実装）
 - 対戦モード用 Scene / Controller / HUD（Round / 勝敗 / タイマー / リザルト等。FightDebugScene とは分離）
 - Down、HP バー、Guard
 - ノックバック壁到達時の速度停止、壁バウンド、壁やられ、Corner
@@ -341,7 +394,7 @@ Push / Hurt / Hit 可視化（11A）と Hit×Hurt 重なり判定（11B）は完
 - 複数 Hurt / Hit Box、キャラ固有データ化
 - 練習モード将来候補: ダミー回復、自動回復、ガード設定、行動記録、判定／フレーム表示など
 
-Training Reset の位置・向き復帰は完了（§1.1）。モード責務の方針も同節。Round/勝敗は**対戦モード固有**であり、練習 Scene の次必須工程としては未確定。
+Training Reset 位置復帰・最小 Visual State は完了（§1.1）。モード責務の方針も同節。Round/勝敗は**対戦モード固有**であり、練習 Scene の次必須工程としては未確定。
 
 ---
 
@@ -397,8 +450,8 @@ Round / Guard / 複数攻撃などの**機能 Stage とは別枠**。番号「GC
 ## 7. 一言まとめ
 
 - 段階1〜**15**まで到達。工程表の段階14（HP/Damage/KO）と段階15（攻撃データ化）は完了
-- 最新コミット済み HEAD: `f051464`（モード境界 Docs）。Training Reset 位置・向き復帰はコード実装済み（Docs 反映時点では未コミットの場合あり）。正式 Stage 番号なし
-- `FightDebugScene` は**練習・検証モード**（対戦進行なし）。戦闘コアは共通、KO 後処理はモード側（§1.1）
-- Training Reset（R）: 戦闘状態＋論理 X・Facing を Scene 開始時へ復帰（壁際・KO 後 Editor 確認済み）。Pause 中 R / Dev Build は未確認
-- J Punch 設定正本は `DebugAttackData.JPunch`。Visual 優先は HitStun 赤 > KO 暗色 > 通常 Tint
-- 正式な次 Stage 番号は未定義。候補は順不同（Visual State、Kick、Animator、対戦モード分離など）
+- 最新コミット済み HEAD: `5bd43f7`。Training Reset 位置復帰・最小 Visual State は実装済み（Docs 反映時点では後者が未コミットの場合あり）。正式 Stage 番号なし
+- `FightDebugScene` は**練習・検証モード**。戦闘コア共通、KO 後処理はモード側（§1.1）
+- Visual State: Session が Facing×入力で Idle/WalkF/WalkB/Attack を決定。Walk は Idle Sprite 流用。Animator 未使用
+- 右向き Walk / 壁際 Walk / Attack 優先 / Reset 後 Idle は Editor 確認済み。左向き実測・P1 被弾側・Dev Build は未確認
+- 正式な次 Stage 番号は未定義。候補は順不同（Walk Sprite、Animator、位置入れ替え／ジャンプ、Kick、対戦モード分離など）

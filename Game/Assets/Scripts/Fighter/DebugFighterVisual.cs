@@ -3,35 +3,27 @@ using UnityEngine;
 namespace FightingGameTrial.Fighter
 {
     /// <summary>
-    /// ActionFrame に応じて Sprite を切り替える表示専用コンポーネントです（段階8 / 10B-1）。
+    /// Visual State に応じて Sprite を切り替える表示専用コンポーネントです（段階8 / 10B-1＋最小 Visual State）。
     ///
     /// 責務:
     /// - Idle / Attack の Sprite 参照を保持する
-    /// - SimulationSession から渡された Action 状態で SpriteRenderer.sprite を切り替える
+    /// - SimulationSession から渡された <see cref="FighterVisualState"/> で SpriteRenderer.sprite を切り替える
+    /// - HUD / ログ用に現在の Visual State 名を公開する
     ///
     /// やらないこと:
     /// - 入力を読まない
+    /// - Facing / 前進後退の判定をしない（Session の責務）
     /// - 時間（Update / FixedUpdate）を使わない
     /// - 移動や flipX を扱わない（向きは DebugFighterMotor の責務）
     /// - SpriteRenderer.color を毎フレーム上書きしない（色違いは Participant.Tint）
     ///
-    /// なぜ Motor から分離するか:
-    /// 移動と見た目のコマ送りは別の関心です。
-    /// 混ぜると「なぜこのフレームでスプライトが変わったか」が追いづらくなります。
+    /// Sprite 対応（現状）:
+    /// - Idle / WalkForward / WalkBackward → idleSprite（Walk 専用 Sprite は未用意）
+    /// - Attack → attackSprite
     ///
-    /// なぜ P1/P2 で同じ Visual を使うか:
-    /// Sprite 切替は参加枠に依存しない共通表示処理だからです。
-    /// Idle/Attack Sprite 自体は SerializeField で持ち、SlotId では分岐しません。
-    /// CharacterDefinition はまだ導入せず、将来ここに差し替え余地を残します。
-    ///
-    /// なぜ Animator をまだ使わないか:
-    /// 学習用に、ActionFrame と Sprite の対応をコード上で直接追えるようにするためです。
-    /// 演出やブレンドは後段で Animator に寄せられます。
-    ///
-    /// ActionFrame と見た目の関係（Jパンチ）:
-    /// - 1〜attackPoseEndFrame … 攻撃 Sprite
-    /// - それ以降〜actionEndFrame … Idle Sprite（硬直の見た目）
-    /// - 終了後 … Idle、Action 停止
+    /// ActionFrame と攻撃ポーズの関係（Jパンチ）:
+    /// - 1〜attackPoseEndFrame … 攻撃ポーズとして Session が Attack を渡す
+    /// - それ以降 … Session が Idle / Walk を渡しうる（攻撃硬直中の見た目は Idle Sprite）
     /// </summary>
     public class DebugFighterVisual : MonoBehaviour
     {
@@ -42,6 +34,7 @@ namespace FightingGameTrial.Fighter
 
         [Tooltip(
             "待機（Idle）用の Sprite です。fighter_idle_00_transparent を割り当てます。"
+            + " WalkForward / WalkBackward も当面これを流用します。"
             + " SlotId では分岐しません（将来の CharacterDefinition 差し替えを阻害しない）。"
         )]
         [SerializeField]
@@ -56,8 +49,8 @@ namespace FightingGameTrial.Fighter
 
         [Header("Jパンチ見た目の区切り（ActionFrame）")]
         [Tooltip(
-            "この ActionFrame 以下（かつ1以上）のあいだ攻撃 Sprite を表示します。"
-            + " 例: 6 なら 1〜6 が攻撃ポーズ。"
+            "この ActionFrame 以下（かつ1以上）のあいだ攻撃ポーズとみなします。"
+            + " 例: 6 なら 1〜6 が攻撃ポーズ。判定は Session が行い、ここは境界値を公開します。"
         )]
         [SerializeField]
         private int attackPoseEndFrame = 6;
@@ -70,16 +63,37 @@ namespace FightingGameTrial.Fighter
         private int actionEndFrame = 12;
 
         /// <summary>
-        /// HUD / ログ用。いま表示している見た目名（Idle / Attack）。
+        /// いま適用している Visual State です。
+        /// </summary>
+        private FighterVisualState currentVisualState = FighterVisualState.Idle;
+
+        /// <summary>
+        /// HUD / ログ用。いま表示している見た目名（Idle / WalkForward / WalkBackward / Attack）。
         /// </summary>
         private string currentVisualLabel = "Idle";
 
         /// <summary>
-        /// HUD / ログ用の現在 Sprite 名です。
+        /// HUD / ログ用の現在 Visual State です。
+        /// </summary>
+        public FighterVisualState CurrentVisualState
+        {
+            get { return currentVisualState; }
+        }
+
+        /// <summary>
+        /// HUD / ログ用の現在 Sprite / State 名です。
         /// </summary>
         public string CurrentVisualLabel
         {
             get { return currentVisualLabel; }
+        }
+
+        /// <summary>
+        /// Jパンチ攻撃ポーズの最終 ActionFrame（1〜この値）。
+        /// </summary>
+        public int AttackPoseEndFrame
+        {
+            get { return attackPoseEndFrame; }
         }
 
         /// <summary>
@@ -110,53 +124,55 @@ namespace FightingGameTrial.Fighter
                 Debug.LogError("DebugFighterVisual: attackSprite が未設定です。");
             }
 
-            // 開始時は Idle
-            Apply(false, 0, false);
+            Apply(FighterVisualState.Idle);
         }
 
         /// <summary>
-        /// Action 状態を見た目へ反映します。
+        /// Visual State を見た目へ反映します。
         /// SimulationSession（または A/R 直後の再描画）から呼ばれます。
         ///
-        /// isJPunchAttack が false のとき（AキーのデバッグActionなど）は常に Idle を出します。
-        /// ActionFrame の数値確認用であり、攻撃ポーズへは切り替えません。
+        /// 状態の決定（前進／後退／攻撃優先）は Session 側の責務です。
+        /// このメソッドは渡された State に対応する Sprite を当てるだけです。
         /// </summary>
-        public void Apply(bool isActionPlaying, int actionFrame, bool isJPunchAttack)
+        public void Apply(FighterVisualState visualState)
         {
             if (spriteRenderer == null)
             {
                 return;
             }
 
-            bool showAttackPose = false;
+            currentVisualState = visualState;
+            currentVisualLabel = visualState.ToString();
 
-            if (isJPunchAttack && isActionPlaying)
-            {
-                // ActionFrame 1〜attackPoseEndFrame だけ攻撃ポーズ
-                if (actionFrame >= 1 && actionFrame <= attackPoseEndFrame)
-                {
-                    showAttackPose = true;
-                }
-            }
-
-            if (showAttackPose)
+            if (visualState == FighterVisualState.Attack)
             {
                 if (attackSprite != null)
                 {
                     spriteRenderer.sprite = attackSprite;
                 }
 
-                currentVisualLabel = "Attack";
+                return;
             }
-            else
-            {
-                if (idleSprite != null)
-                {
-                    spriteRenderer.sprite = idleSprite;
-                }
 
-                currentVisualLabel = "Idle";
+            // Idle / WalkForward / WalkBackward は当面 Idle Sprite を流用する。
+            if (idleSprite != null)
+            {
+                spriteRenderer.sprite = idleSprite;
             }
+        }
+
+        /// <summary>
+        /// Jパンチの攻撃ポーズ期間かどうかを返します（Session の Attack 判定用）。
+        /// isJPunchAttack が false のときは常に false（Aキーのデバッグ Action 等）。
+        /// </summary>
+        public bool IsAttackPoseActive(bool isActionPlaying, int actionFrame, bool isJPunchAttack)
+        {
+            if (isJPunchAttack == false || isActionPlaying == false)
+            {
+                return false;
+            }
+
+            return actionFrame >= 1 && actionFrame <= attackPoseEndFrame;
         }
     }
 }

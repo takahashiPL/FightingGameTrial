@@ -387,7 +387,7 @@ namespace FightingGameTrial.Simulation
             TryResolveJPunchHit(participantP1, participantP2);
             TryResolveJPunchHit(participantP2, participantP1);
 
-            // 15. Visual 更新（各 AttackState を反映。HitStun 中は Idle Sprite 優先）
+            // 15. Visual 更新（Attack / Walk / Idle。HitStun・KO 中は Idle Sprite 優先）
             RefreshFighterVisual();
 
             // 16. 攻撃終了判定（AttackState 側）
@@ -553,10 +553,16 @@ namespace FightingGameTrial.Simulation
         }
 
         /// <summary>
-        /// 1体分の Visual を AttackState / HitState / KO から反映します。
+        /// 1体分の Visual を AttackState / HitState / KO / 移動入力から反映します。
         ///
-        /// 表示優先: KO または HitStun 中は Idle Sprite。色は Participant.ApplyDisplayColor
-        /// （KO &gt; HitStun &gt; 通常）。color は Visual では触らない。
+        /// Sprite 優先:
+        /// HitStun または KO → Idle
+        /// → Attack（J Punch 攻撃ポーズ中）
+        /// → WalkForward / WalkBackward（Facing × 左右入力）
+        /// → Idle
+        ///
+        /// 色は Participant.ApplyDisplayColor（HitStun 赤 &gt; KO 暗色 &gt; 通常）。
+        /// color は Visual では触らない。Walk 専用 Sprite は未使用（Idle 流用）。
         /// </summary>
         private void RefreshOneFighterVisual(DebugFighterParticipant participant)
         {
@@ -565,29 +571,91 @@ namespace FightingGameTrial.Simulation
                 return;
             }
 
-            // KO / Hit 表示 > Attack 表示 > Idle
+            FighterVisualState visualState = ResolveFighterVisualState(participant);
+            participant.Visual.Apply(visualState);
+            participant.ApplyDisplayColor();
+        }
+
+        /// <summary>
+        /// 1体の Visual State を決定します（見た目の正本決定。Sprite 差し替えは Visual）。
+        /// </summary>
+        private FighterVisualState ResolveFighterVisualState(DebugFighterParticipant participant)
+        {
+            // HitStun / KO は専用 enum 値を持たず、Idle Sprite ＋色で表現する。
             if (participant.IsKnockedOut || participant.IsInHitStun)
             {
-                participant.Visual.Apply(false, 0, false);
-                participant.ApplyDisplayColor();
-                return;
+                return FighterVisualState.Idle;
             }
 
             DebugFighterAttackState attackState = participant.AttackState;
-
-            if (attackState == null)
+            if (attackState != null
+                && participant.Visual.IsAttackPoseActive(
+                    attackState.IsActionPlaying,
+                    attackState.ActionFrame,
+                    attackState.IsJPunchAttack))
             {
-                participant.Visual.Apply(false, 0, false);
-                participant.ApplyDisplayColor();
-                return;
+                return FighterVisualState.Attack;
             }
 
-            participant.Visual.Apply(
-                attackState.IsActionPlaying,
-                attackState.ActionFrame,
-                attackState.IsJPunchAttack
-            );
-            participant.ApplyDisplayColor();
+            return ResolveLocomotionVisualState(participant);
+        }
+
+        /// <summary>
+        /// 左右入力と Facing から前進／後退／停止の Visual State を決めます。
+        ///
+        /// 右向き+右 / 左向き+左 → WalkForward
+        /// 右向き+左 / 左向き+右 → WalkBackward
+        /// 入力なし・左右同時 → Idle
+        ///
+        /// 実座標の変化は見ない（入力意図ベース。壁際でも入力があれば歩行 State）。
+        /// Push / Knockback による移動は歩行にしない（入力が無いため）。
+        /// </summary>
+        private FighterVisualState ResolveLocomotionVisualState(DebugFighterParticipant participant)
+        {
+            if (participant.Motor == null)
+            {
+                return FighterVisualState.Idle;
+            }
+
+            SimulationInputState input = ResolveInputForParticipant(participant);
+            if (input == null)
+            {
+                return FighterVisualState.Idle;
+            }
+
+            bool left = input.Left;
+            bool right = input.Right;
+
+            // Motor と同じ: Left+Right 同時は移動なし → Idle
+            if (left && right)
+            {
+                return FighterVisualState.Idle;
+            }
+
+            if (left == false && right == false)
+            {
+                return FighterVisualState.Idle;
+            }
+
+            bool facingRight = participant.Motor.FacingRight;
+
+            if (facingRight)
+            {
+                if (right)
+                {
+                    return FighterVisualState.WalkForward;
+                }
+
+                return FighterVisualState.WalkBackward;
+            }
+
+            // 左向き
+            if (left)
+            {
+                return FighterVisualState.WalkForward;
+            }
+
+            return FighterVisualState.WalkBackward;
         }
 
         /// <summary>

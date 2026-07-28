@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## 最小 Visual State（Idle / WalkForward / WalkBackward / Attack）
+
+- 正式 Stage 番号なし（段階15完了状態は維持）。練習モードの見た目基盤
+- 新規 `FighterVisualState`。`SimulationSession` が CurrentInput × Facing で State を決定し、`DebugFighterVisual.Apply` が描画
+- Walk は Idle Sprite 流用。Animator / Animation Clip / Walk 専用 Sprite は未実装
+- 優先: HitStun・KO → Attack → Walk → Idle。入力意図基準（壁際でも方向入力中は Walk）。Left+Right / 無入力は Idle
+- Editor 確認済み: Idle / WalkF / WalkB（右向き）/ 同時入力 Idle / 壁際 Walk / 移動中 Attack 優先 / Reset 後 Idle
+- 未確認: 左向き Walk（現仕様ですり抜け不可のため実測困難）、P1 被弾側、Development Build
+- Scene / Prefab / Sprite / Animator / Font 変更なし
+- Docs: README / `unity_implementation_status.md` §1.1 / `rules.md` §15.5 / `component_and_scene_guide.md` §17.8
+- コードと Docs を同一コミットにまとめる予定（本作業では Cursor は commit しない）
+
 ## Training Reset の位置・向き復帰
 
 - 正式 Stage 番号なし（段階15完了状態は維持）。練習モードの Training Reset 拡張

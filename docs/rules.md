@@ -505,27 +505,40 @@ Unity デバッグ実装の**実際の到達点**（段階1〜15）と次工程�
 
 前進・後退・Idle・歩行表現・ジャンプ・キック・Punch・HitStun・Knockback・KO・アニメーション状態は、**練習専用ではなく練習／対戦共通のキャラクター機能**とする。
 
-見た目側で将来扱う Visual State 候補（方針・未実装含む）:
+**実装済み（最小）**: `FighterVisualState` = Idle / WalkForward / WalkBackward / Attack。
+Session が状態を決定し、`DebugFighterVisual.Apply` が Sprite を差し替える。Walk 専用画像が無い間は **Idle Sprite を流用**する。Animator は未導入。
 
-- Idle、WalkForward、WalkBackward
-- JumpRise、JumpFall、Landing
-- Punch、Kick
-- HitStun、Knockback、KO
+**将来候補（未実装含む）**: JumpRise / JumpFall / Landing、Kick、HitStun・Knockback・KO 専用 State など。
 
-戦闘処理が足の角度や Sprite のコマを直接決めない。戦闘状態を Visual State へ変換し、見た目側が Animator または Sprite 差し替えで表現する。
+**責務境界（維持する）**
 
-**前進／後退**は左右キーだけで決めない。移動方向と Facing の組み合わせで決める。
+| 担当 | 内容 |
+|---|---|
+| `SimulationSession` | Visual State の決定（入力 × Facing、Attack / HitStun / KO 優先） |
+| `DebugFighterVisual` | 描画専用（渡された State の Sprite 反映のみ。入力を読まない） |
+| `DebugFighterMotor` | 論理位置と Facing |
+| `DebugFighterParticipant` | 戦闘状態（HP / KO / HitStun 等） |
 
-| Facing | 移動 | Visual State |
+戦闘処理が足の角度や Sprite のコマを直接決めない。戦闘状態を Visual State へ変換し、見た目側が Animator または Sprite 差し替えで表現する。Animator 導入後もこの責務境界を維持する。
+
+**前進／後退**は左右キーだけで決めない。移動方向と Facing の組み合わせで決める。Left+Right 同時は Idle。無入力は Idle。
+
+| Facing | 移動入力 | Visual State |
 |---|---|---|
-| 右向き | 右移動 | WalkForward |
-| 右向き | 左移動 | WalkBackward |
-| 左向き | 左移動 | WalkForward |
-| 左向き | 右移動 | WalkBackward |
+| 右向き | 右 | WalkForward |
+| 右向き | 左 | WalkBackward |
+| 左向き | 左 | WalkForward |
+| 左向き | 右 | WalkBackward |
+
+判定は**入力意図**を基準とする。壁際で論理 X が変化しなくても方向入力中は Walk とする。Push / Knockback による受動移動だけでは Walk にしない。
+
+**優先（Sprite）**: HitStun または KO（Idle 系＋色）→ Attack → WalkForward / WalkBackward → Idle。
+
+左向き Walk の Editor 実測は、現仕様（すり抜け不可・飛び越しなし）では通常操作で確認しにくい。コードは Facing を参照するが、実測済みとはしない。
 
 ### 15.6 Sprite と Animation（学習方針）
 
-**現在（実装済みの簡易方式）**: `fighter_idle_00_transparent` / `fighter_attack_punch_transparent` など、1状態1枚の Sprite をコードで差し替える。単独 256×256 画像は Sprite Mode **`Single`** で正しい。
+**現在（実装済みの簡易方式）**: `fighter_idle_00_transparent` / `fighter_attack_punch_transparent` など、1状態1枚の Sprite をコードで差し替える。単独 256×256 画像は Sprite Mode **`Single`** で正しい。`WalkForward` / `WalkBackward` も当面 Idle 画像を流用する（専用 Walk Sprite・Animator は未実装）。
 
 **複数コマの用意**
 

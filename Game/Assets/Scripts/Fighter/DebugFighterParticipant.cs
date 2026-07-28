@@ -72,7 +72,7 @@ namespace FightingGameTrial.Fighter
         [SerializeField]
         private DebugFighterMotor motor;
 
-        [Tooltip("この参加者の Idle/Attack Sprite 切替を持つ DebugFighterVisual です。")]
+        [Tooltip("この参加者の Visual State → Sprite 切替を持つ DebugFighterVisual です。")]
         [SerializeField]
         private DebugFighterVisual visual;
 
