@@ -130,6 +130,13 @@ namespace FightingGameTrial.Simulation
         [SerializeField]
         private int consoleLogIntervalTicks = 60;
 
+        [Tooltip(
+            "true なら Jump started / apex / landed のイベントログを出します。"
+            + " false でもジャンプ処理は動きます。文字列生成はこのフラグが true のときだけ行います。"
+        )]
+        [SerializeField]
+        private bool enableJumpDebugLog = true;
+
         /// <summary>
         /// P2 専用の Neutral 入力です。
         /// P1 の CurrentInput とは別インスタンスで、毎tick new しません。
@@ -141,6 +148,23 @@ namespace FightingGameTrial.Simulation
         /// HUD 用: 直近 CombatFrame の Push 中心間距離（補正後）。
         /// </summary>
         private float lastPushCenterDistance;
+
+        /// <summary>
+        /// ジャンプ上入力の前 tick 保持（P1）。押下エッジ検出用。毎 tick new しない。
+        /// </summary>
+        private bool previousUpHeldP1;
+
+        /// <summary>
+        /// ジャンプ上入力の前 tick 保持（P2）。
+        /// </summary>
+        private bool previousUpHeldP2;
+
+        /// <summary>
+        /// Training Reset 後の共通 release gate。
+        /// true の間は物理 Held を観測しつつ、Simulation へ渡す有効入力を全ニュートラルにする。
+        /// Left/Right/Up/Down/Attack がすべて離れた tick で解除する（R は含めない）。
+        /// </summary>
+        private bool waitForAllGameplayInputReleaseAfterReset;
 
         /// <summary>
         /// HUD 用: 直近 CombatFrame で補正前に重なっていたか。
@@ -328,6 +352,10 @@ namespace FightingGameTrial.Simulation
             SampleAttackInputForParticipant(participantP1, inputP1);
             SampleAttackInputForParticipant(participantP2, inputP2);
 
+            // 4b. ジャンプ用 Up 押下エッジ（HitStop 中も前状態を更新し、解除後の誤エッジを防ぐ）
+            bool jumpPressedP1 = SampleJumpUpPressedThisTick(inputP1, ref previousUpHeldP1);
+            bool jumpPressedP2 = SampleJumpUpPressedThisTick(inputP2, ref previousUpHeldP2);
+
             // 5. 既存 HitStop 判定
             //    Remaining>0 なら Combat 処理へ入らず、ここで1減らして return。
             //    （Hit成立tickで設定した6は、次tickから減り始める）
@@ -358,12 +386,22 @@ namespace FightingGameTrial.Simulation
             BeginCombatFrameForParticipant(participantP2);
 
             // 8. Jパンチ開始判定（Participant 単位。P2 は Neutral のため通常は開始しない）
+            //    同一 CombatFrame で Up と J が同時でも、攻撃開始を先に試みる（Attack 優先）。
             TryStartJPunchForParticipant(participantP1);
             TryStartJPunchForParticipant(participantP2);
 
-            // 9. 両体移動（ワールド X のみ。Facing はここでは変えない。HitStun 中は入力移動スキップ）
+            // 8b. ジャンプ開始（地上・非 Attack・非 Landing。空中再ジャンプなし）
+            TryStartJumpForParticipant(participantP1, inputP1, jumpPressedP1);
+            TryStartJumpForParticipant(participantP2, inputP2, jumpPressedP2);
+            FlushJumpDebugLogsForParticipant(participantP1);
+            FlushJumpDebugLogsForParticipant(participantP2);
+
+            // 9. 両体移動（地上: 入力移動 / 空中: ジャンプ軌道。HitStun・KO 中は入力移動スキップ）
             ProcessOneFighterMovement(participantP1, inputP1);
             ProcessOneFighterMovement(participantP2, inputP2);
+            // 頂点・着地イベントは空中軌道更新後に発生するため、ここで消費してログする
+            FlushJumpDebugLogsForParticipant(participantP1);
+            FlushJumpDebugLogsForParticipant(participantP2);
 
             // 10. ノックバック移動＋減速（段階13A）
             //     Hit 成立フレームでは速度セットが後段のため、ここではまだ動かない。
@@ -372,7 +410,7 @@ namespace FightingGameTrial.Simulation
             ProcessKnockbackForParticipant(participantP1);
             ProcessKnockbackForParticipant(participantP2);
 
-            // 11. Push Box 重なり解消（移動後・Facing 前。Participant 共通。ノックバック速度は触らない）
+            // 11. Push Box 重なり解消（空中で十分高いときはスキップして飛び越え可能）
             ResolvePushBoxBetweenParticipants(true);
 
             // 12. 両体 Facing 確定（Push 後の最終位置基準。Hit 判定より前）
@@ -483,6 +521,12 @@ namespace FightingGameTrial.Simulation
                 return;
             }
 
+            // 空中攻撃は今回未実装（A キーも地上のみ）
+            if (participantP1.Motor != null && participantP1.Motor.IsGrounded == false)
+            {
+                return;
+            }
+
             attackState.StartJPunch();
             RefreshOneFighterVisual(participantP1);
 
@@ -495,17 +539,20 @@ namespace FightingGameTrial.Simulation
         }
 
         /// <summary>
-        /// Rキー用: 練習モードの Training Reset（段階12A＋位置・向き復帰）。
+        /// Rキー用: 練習モードの Training Reset（段階12A＋位置・向き・ジャンプ復帰）。
         ///
         /// 何をするか:
         /// - P1/P2 の AttackState・HitState・HP・KO・表示色を Reset
-        /// - P1/P2 の論理位置 X を Scene 開始時の初期値へ戻す（Motor）
+        /// - P1/P2 の論理位置 X/Y とジャンプ状態を Scene 開始時へ戻す（Motor）
         /// - 初期配置に基づき互いに向き合う Facing を再適用
-        /// - 共有 HitStopRemaining を 0
+        /// - 共有 HitStopRemaining を 0、Sampled 入力をクリア
+        /// - 共通 release gate を立て、全ゲーム操作を一度離すまで有効入力をニュートラル化
+        /// - 未消費の Jump debug event を破棄（Motor Reset 経路）
         /// - Visual を Idle へ即時更新
         ///
         /// SimulationTick は進めません。Pause 中でも呼べます。
-        /// Transform を直接初期化せず、論理座標を正本として戻し、既存同期経路で反映します。
+        /// ClockDriver は Reset 受理フレームで通常 tick へ進まないこと（同一フレーム再処理防止）。
+        /// 抑制中に再度 R を押した場合も再実行してよい（gate は維持・解除しない）。
         /// </summary>
         public void ResetTestActionForP1()
         {
@@ -524,9 +571,39 @@ namespace FightingGameTrial.Simulation
             }
 
             // 位置を先に戻し、その配置から Facing を決め直す（Training Reset）。
-            ResetParticipantLogicalXToInitial(participantP1);
-            ResetParticipantLogicalXToInitial(participantP2);
+            // Motor 側で Jump 計測・pending started/apex/landed も破棄する。
+            ResetParticipantLogicalPositionAndJump(participantP1);
+            ResetParticipantLogicalPositionAndJump(participantP2);
             ApplyInitialFacingTowardOpponents();
+
+            // ------------------------------------------------------------
+            // 共通 release gate
+            //
+            // なぜ全操作を一度離すまで無効化するか:
+            // Reset 直後に押しっぱなしの Left/Up/J 等をそのまま通すと、
+            // 意図しない移動・再ジャンプ・再攻撃が始まるため。
+            //
+            // 一部だけ離しても解除しない（全ゲーム操作が false になるまで待つ）。
+            // R 自体は DebugPlaybackInput 側であり、解除条件に含めない。
+            //
+            // 有効入力は SampleCurrentInputFromGameplay 側でニュートラル化する。
+            // 物理 Held（DebugGameplayInput）は消さない。
+            // ------------------------------------------------------------
+            waitForAllGameplayInputReleaseAfterReset = true;
+
+            if (timeState != null && timeState.CurrentInput != null)
+            {
+                timeState.CurrentInput.ResetToInitialValues();
+            }
+
+            if (p2NeutralInput != null)
+            {
+                p2NeutralInput.ResetToInitialValues();
+            }
+
+            // 有効入力はニュートラル前提なので、エッジ用 previous も false に揃える。
+            // （個別の Up/Attack 押しっぱなし抑制は共通 gate に一本化した）
+            ResyncGameplayInputEdgePreviousAfterReleaseGate();
 
             if (timeState != null)
             {
@@ -535,21 +612,53 @@ namespace FightingGameTrial.Simulation
             }
 
             RefreshFighterVisual();
-            Debug.Log("[FightDebug] Training reset (Attack/HitStun/Knockback/HitStop/HP/KO/LogicalX/Facing)");
+            Debug.Log(
+                "[FightDebug] Training reset"
+                + " (Attack/HitStun/Knockback/HitStop/HP/KO/LogicalX/LogicalY/Jump/Facing)"
+            );
         }
 
         /// <summary>
-        /// Participant の Motor 論理 X を Scene 開始時の初期値へ戻します。
-        /// Facing は触りません。
+        /// 共通 release gate 解除時・Reset 時に、エッジ検出用 previous をニュートラルへ再同期します。
+        /// 解除直後サンプルで偽エッジ（Up/Attack）を出さないためです。
         /// </summary>
-        private void ResetParticipantLogicalXToInitial(DebugFighterParticipant participant)
+        private void ResyncGameplayInputEdgePreviousAfterReleaseGate()
+        {
+            previousUpHeldP1 = false;
+            previousUpHeldP2 = false;
+            ClearAttackEdgePreviousForParticipant(participantP1);
+            ClearAttackEdgePreviousForParticipant(participantP2);
+        }
+
+        private static void ClearAttackEdgePreviousForParticipant(DebugFighterParticipant participant)
+        {
+            if (participant == null || participant.AttackState == null)
+            {
+                return;
+            }
+
+            participant.AttackState.ClearAttackEdgePrevious();
+        }
+
+        /// <summary>
+        /// Participant の Motor 論理位置とジャンプ状態を Scene 開始時へ戻します。
+        /// </summary>
+        private void ResetParticipantLogicalPositionAndJump(DebugFighterParticipant participant)
         {
             if (participant == null || participant.Motor == null)
             {
                 return;
             }
 
-            participant.Motor.ResetLogicalXToInitial();
+            participant.Motor.ResetLogicalPositionAndJumpToInitial();
+        }
+
+        /// <summary>
+        /// 互換ヘルパー（旧名）。位置＋ジャンプ Reset へ委譲します。
+        /// </summary>
+        private void ResetParticipantLogicalXToInitial(DebugFighterParticipant participant)
+        {
+            ResetParticipantLogicalPositionAndJump(participant);
         }
 
         /// <summary>
@@ -578,6 +687,8 @@ namespace FightingGameTrial.Simulation
 
         /// <summary>
         /// 1体の Visual State を決定します（見た目の正本決定。Sprite 差し替えは Visual）。
+        ///
+        /// 優先: HitStun/KO → Attack → JumpRise → JumpFall → Landing → Walk → Idle
         /// </summary>
         private FighterVisualState ResolveFighterVisualState(DebugFighterParticipant participant)
         {
@@ -595,6 +706,25 @@ namespace FightingGameTrial.Simulation
                     attackState.IsJPunchAttack))
             {
                 return FighterVisualState.Attack;
+            }
+
+            DebugFighterMotor motor = participant.Motor;
+            if (motor != null)
+            {
+                if (motor.IsGrounded == false)
+                {
+                    if (motor.IsRising)
+                    {
+                        return FighterVisualState.JumpRise;
+                    }
+
+                    return FighterVisualState.JumpFall;
+                }
+
+                if (motor.IsLanding)
+                {
+                    return FighterVisualState.Landing;
+                }
             }
 
             return ResolveLocomotionVisualState(participant);
@@ -683,7 +813,7 @@ namespace FightingGameTrial.Simulation
 
         /// <summary>
         /// Participant 単位で Jパンチ開始を試みます。
-        /// AttackPressedThisTick かつ未 Action かつ HitStun/KO でないときだけ開始します。
+        /// AttackPressedThisTick かつ未 Action かつ HitStun/KO/空中でないときだけ開始します。
         /// </summary>
         private void TryStartJPunchForParticipant(DebugFighterParticipant participant)
         {
@@ -700,6 +830,12 @@ namespace FightingGameTrial.Simulation
 
             // HitStun 中は新規攻撃不可（段階12A）
             if (participant.IsInHitStun)
+            {
+                return;
+            }
+
+            // 空中攻撃は今回未実装
+            if (participant.Motor != null && participant.Motor.IsGrounded == false)
             {
                 return;
             }
@@ -788,8 +924,8 @@ namespace FightingGameTrial.Simulation
         }
 
         /// <summary>
-        /// 参加枠へ 1 CombatFrame 分の移動を依頼します。
-        /// Facing は変えません。HitStun / KO 中は移動入力を適用しません（Push / ノックバックは別経路）。
+        /// 参加枠へ 1 CombatFrame 分の移動／ジャンプ軌道を依頼します。
+        /// Facing は変えません。HitStun / KO 中は入力移動・空中制御を適用しません。
         /// </summary>
         private void ProcessOneFighterMovement(
             DebugFighterParticipant participant,
@@ -802,6 +938,24 @@ namespace FightingGameTrial.Simulation
 
             if (participant.Motor == null)
             {
+                return;
+            }
+
+            DebugFighterMotor motor = participant.Motor;
+
+            // 空中軌道は HitStun / KO 中も重力落下を進める（入力による空中制御は Motor 側で入力 null 相当にできる）
+            if (motor.IsGrounded == false)
+            {
+                if (participant.IsKnockedOut || participant.IsInHitStun)
+                {
+                    // プレイヤー空中制御なし（Up/左右を無視した軌道継続）
+                    motor.ProcessOneAirborneCombatFrame(null);
+                }
+                else
+                {
+                    motor.ProcessOneAirborneCombatFrame(input);
+                }
+
                 return;
             }
 
@@ -818,6 +972,227 @@ namespace FightingGameTrial.Simulation
             }
 
             participant.Motor.ProcessOneCombatFrame(input);
+        }
+
+        /// <summary>
+        /// Up の押下エッジを検出し、前 tick 保持を更新します（HitStop 前でも呼ぶ）。
+        /// </summary>
+        private static bool SampleJumpUpPressedThisTick(
+            SimulationInputState input,
+            ref bool previousUpHeld)
+        {
+            bool upHeldNow = false;
+            if (input != null)
+            {
+                upHeldNow = input.Up;
+            }
+
+            bool pressed = upHeldNow && previousUpHeld == false;
+            previousUpHeld = upHeldNow;
+            return pressed;
+        }
+
+        /// <summary>
+        /// 上入力エッジでジャンプ開始を試みます。
+        /// Attack 再生中・空中・Landing・HitStun・KO では開始しません。
+        /// </summary>
+        private void TryStartJumpForParticipant(
+            DebugFighterParticipant participant,
+            SimulationInputState input,
+            bool upPressedThisTick)
+        {
+            if (participant == null || participant.Motor == null)
+            {
+                return;
+            }
+
+            if (upPressedThisTick == false)
+            {
+                return;
+            }
+
+            if (participant.IsKnockedOut || participant.IsInHitStun)
+            {
+                return;
+            }
+
+            DebugFighterMotor motor = participant.Motor;
+            if (motor.IsGrounded == false)
+            {
+                return;
+            }
+
+            if (motor.IsLanding)
+            {
+                return;
+            }
+
+            if (participant.AttackState != null && participant.AttackState.IsActionPlaying)
+            {
+                return;
+            }
+
+            FighterJumpType jumpType = ResolveJumpType(motor.FacingRight, input);
+            if (jumpType == FighterJumpType.None)
+            {
+                return;
+            }
+
+            bool started = motor.TryStartJump(jumpType);
+            if (started && timeState != null)
+            {
+                timeState.LastStatusMessage = "Jump " + jumpType;
+            }
+        }
+
+        /// <summary>
+        /// Motor が立てたジャンプ計測イベントを消費し、slot 付きでログします。
+        ///
+        /// なぜ Session がログするか: slot（P1/P2）を知るのは参加枠側だからです。
+        /// なぜ毎フレーム呼ばないか: イベントがあるときだけ文字列を作り、GC を抑えるためです。
+        /// enableJumpDebugLog=false でも Consume して旗を下ろし、古いログの遅延出力を防ぎます。
+        /// </summary>
+        private void FlushJumpDebugLogsForParticipant(DebugFighterParticipant participant)
+        {
+            if (participant == null || participant.Motor == null)
+            {
+                return;
+            }
+
+            DebugFighterMotor motor = participant.Motor;
+            string slotLabel = participant.SlotId.ToString();
+
+            FighterJumpType startedType;
+            float startedX;
+            float startedY;
+            bool startedFacing;
+            if (motor.TryConsumeJumpStartedDebug(
+                out startedType,
+                out startedX,
+                out startedY,
+                out startedFacing))
+            {
+                if (enableJumpDebugLog)
+                {
+                    Debug.Log(
+                        "[FightDebug] Jump started"
+                        + " slot=" + slotLabel
+                        + " type=" + startedType
+                        + " startX=" + startedX.ToString("0.00")
+                        + " startY=" + startedY.ToString("0.00")
+                        + " facingRight=" + (startedFacing ? "true" : "false")
+                    );
+                }
+            }
+
+            FighterJumpType apexType;
+            int apexElapsed;
+            int apexHeld;
+            int apexDirHeld;
+            float apexHeight;
+            float apexXDistance;
+            if (motor.TryConsumeJumpApexDebug(
+                out apexType,
+                out apexElapsed,
+                out apexHeld,
+                out apexDirHeld,
+                out apexHeight,
+                out apexXDistance))
+            {
+                if (enableJumpDebugLog)
+                {
+                    Debug.Log(
+                        "[FightDebug] Jump apex"
+                        + " slot=" + slotLabel
+                        + " type=" + apexType
+                        + " elapsed=" + apexElapsed
+                        + " jumpHeld=" + apexHeld
+                        + " directionHeld=" + apexDirHeld
+                        + " height=" + apexHeight.ToString("0.00")
+                        + " xDistance=" + apexXDistance.ToString("0.00")
+                    );
+                }
+            }
+
+            FighterJumpType landedType;
+            int landedTotal;
+            int landedHeld;
+            int landedDirHeld;
+            float landedMaxHeight;
+            float landedHoriz;
+            float landedStartX;
+            float landedEndX;
+            bool landedFacing;
+            if (motor.TryConsumeJumpLandedDebug(
+                out landedType,
+                out landedTotal,
+                out landedHeld,
+                out landedDirHeld,
+                out landedMaxHeight,
+                out landedHoriz,
+                out landedStartX,
+                out landedEndX,
+                out landedFacing))
+            {
+                if (enableJumpDebugLog)
+                {
+                    Debug.Log(
+                        "[FightDebug] Jump landed"
+                        + " slot=" + slotLabel
+                        + " type=" + landedType
+                        + " totalFrames=" + landedTotal
+                        + " jumpHeld=" + landedHeld
+                        + " directionHeld=" + landedDirHeld
+                        + " maxHeight=" + landedMaxHeight.ToString("0.00")
+                        + " horizontalDistance=" + landedHoriz.ToString("0.00")
+                        + " startX=" + landedStartX.ToString("0.00")
+                        + " endX=" + landedEndX.ToString("0.00")
+                        + " facingRight=" + (landedFacing ? "true" : "false")
+                    );
+                }
+            }
+        }
+
+        /// <summary>
+        /// Facing と左右入力から Neutral / Forward / Backward を決めます。
+        /// 左右同時は Neutral。JumpType 自体は開始後に変更しません。
+        /// </summary>
+        private static FighterJumpType ResolveJumpType(bool facingRight, SimulationInputState input)
+        {
+            if (input == null)
+            {
+                return FighterJumpType.Neutral;
+            }
+
+            bool left = input.Left;
+            bool right = input.Right;
+
+            if (left && right)
+            {
+                return FighterJumpType.Neutral;
+            }
+
+            if (left == false && right == false)
+            {
+                return FighterJumpType.Neutral;
+            }
+
+            if (facingRight)
+            {
+                if (right)
+                {
+                    return FighterJumpType.Forward;
+                }
+
+                return FighterJumpType.Backward;
+            }
+
+            if (left)
+            {
+                return FighterJumpType.Forward;
+            }
+
+            return FighterJumpType.Backward;
         }
 
         /// <summary>
@@ -915,6 +1290,52 @@ namespace FightingGameTrial.Simulation
         }
 
         /// <summary>
+        /// 空中で十分な高さがあるとき横 Push をスキップするか。
+        /// 開始直後の低高度ではすり抜けず、頂点付近で飛び越え可能にする。
+        /// </summary>
+        private static bool ShouldSkipPushForAerialSeparation(
+            DebugFighterMotor motorA,
+            DebugFighterMotor motorB)
+        {
+            if (motorA == null || motorB == null)
+            {
+                return false;
+            }
+
+            // 両方地上なら通常 Push
+            if (motorA.IsGrounded && motorB.IsGrounded)
+            {
+                return false;
+            }
+
+            float thresholdA = motorA.JumpSettings.PushBoxVerticalSeparationThreshold;
+            float thresholdB = motorB.JumpSettings.PushBoxVerticalSeparationThreshold;
+            float threshold = thresholdA;
+            if (thresholdB > threshold)
+            {
+                threshold = thresholdB;
+            }
+
+            float heightA = motorA.HeightAboveGround;
+            float heightB = motorB.HeightAboveGround;
+            float maxHeightAboveGround = heightA;
+            if (heightB > maxHeightAboveGround)
+            {
+                maxHeightAboveGround = heightB;
+            }
+
+            float absDeltaY = Mathf.Abs(motorA.LogicalY - motorB.LogicalY);
+
+            // どちらかが十分高く、かつ互いの Y 差も閾値以上
+            if (maxHeightAboveGround >= threshold && absDeltaY >= threshold)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
         /// 両 Participant の横方向 Push Box 重なりを解消します（段階10B-3 / 13B-1）。
         ///
         /// 何をするか:
@@ -941,6 +1362,18 @@ namespace FightingGameTrial.Simulation
             {
                 lastPushCenterDistance = 0f;
                 lastPushWasOverlapping = false;
+                return;
+            }
+
+            // 十分高い空中では横 Push をスキップし、飛び越えを許可する。
+            if (ShouldSkipPushForAerialSeparation(participantP1.Motor, participantP2.Motor))
+            {
+                float airDist = Mathf.Abs(
+                    participantP2.Motor.LogicalX - participantP1.Motor.LogicalX
+                );
+                lastPushCenterDistance = airDist;
+                lastPushWasOverlapping = false;
+                previousPushDidCorrect = false;
                 return;
             }
 
@@ -1283,6 +1716,9 @@ namespace FightingGameTrial.Simulation
                 timeState.CurrentInput = new SimulationInputState();
             }
 
+            // 物理 Held は DebugGameplayInput から読む（消さない）。
+            // 共通 release gate 中は、この物理値で解除判定だけ行い、
+            // Simulation へ渡す有効入力はニュートラルへ落とす。
             bool left = false;
             bool right = false;
             bool up = false;
@@ -1296,6 +1732,42 @@ namespace FightingGameTrial.Simulation
                 up = debugGameplayInput.IsUpPressed;
                 down = debugGameplayInput.IsDownPressed;
                 attack = debugGameplayInput.IsAttackPressed;
+            }
+
+            if (waitForAllGameplayInputReleaseAfterReset)
+            {
+                // ------------------------------------------------------------
+                // 全ゲーム操作が離れるまで有効入力を通さない。
+                // R は DebugPlaybackInput のためここには含まれない。
+                //
+                // 一部だけ離しても解除しない。
+                // 全解除したサンプルでも有効入力はニュートラルのままにし、
+                // previous エッジを false へ再同期して偽エッジを防ぐ。
+                // 次の新しい押下から通常受付を再開する。
+                // ------------------------------------------------------------
+                bool anyGameplayHeld = SimulationInputState.HasAnyGameplayInputHeld(
+                    left,
+                    right,
+                    up,
+                    down,
+                    attack);
+
+                timeState.CurrentInput.CopyFromPhysicalAndCommit(
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    timeState.SimulationTick);
+
+                if (anyGameplayHeld == false)
+                {
+                    waitForAllGameplayInputReleaseAfterReset = false;
+                    ResyncGameplayInputEdgePreviousAfterReleaseGate();
+                    Debug.Log("[FightDebug] Gameplay input re-enabled after Training Reset");
+                }
+
+                return;
             }
 
             timeState.CurrentInput.CopyFromPhysicalAndCommit(

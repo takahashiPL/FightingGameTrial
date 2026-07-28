@@ -33,7 +33,7 @@ namespace FightingGameTrial.DebugTools
         /// 操作説明ブロック高さ。1行分（約28px）を状態側へ譲り、
         /// JPunch Data が Truncate で切れにくくする（Scene は触らない）。
         /// </summary>
-        private const float HelpBlockHeightPixels = 92f;
+        private const float HelpBlockHeightPixels = 108f;
 
         private const float StatusHelpGapPixels = 16f;
 
@@ -202,7 +202,7 @@ namespace FightingGameTrial.DebugTools
             text = text + "Space=Pause切替      .=1Tick送り\n";
             text = text + "H=HitStop            A=Action開始\n";
             text = text + "R=Combatリセット     矢印=方向\n";
-            text = text + "J=Attack";
+            text = text + "Up=Jump              J=Attack";
             return text;
         }
 
@@ -278,6 +278,14 @@ namespace FightingGameTrial.DebugTools
             if (p1 != null && p1.Visual != null)
             {
                 visualLabel = p1.Visual.CurrentVisualLabel;
+            }
+
+            string p1YLabel = "-";
+            string p1JumpTypeLabel = "None";
+            if (p1 != null && p1.Motor != null)
+            {
+                p1YLabel = p1.Motor.LogicalY.ToString("0.00");
+                p1JumpTypeLabel = p1.Motor.CurrentJumpType.ToString();
             }
 
             string p2XLabel = "-";
@@ -402,6 +410,12 @@ namespace FightingGameTrial.DebugTools
 
             statusTextBuilder.Append("Sprite         : ");
             statusTextBuilder.Append(visualLabel);
+            statusTextBuilder.Append('\n');
+
+            statusTextBuilder.Append("P1 Y/Jump      : ");
+            statusTextBuilder.Append(p1YLabel);
+            statusTextBuilder.Append(" / ");
+            statusTextBuilder.Append(p1JumpTypeLabel);
             statusTextBuilder.Append('\n');
 
             statusTextBuilder.Append("P2 X/Face/Hit  : ");

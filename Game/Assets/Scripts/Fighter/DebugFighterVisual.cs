@@ -18,12 +18,11 @@ namespace FightingGameTrial.Fighter
     /// - SpriteRenderer.color を毎フレーム上書きしない（色違いは Participant.Tint）
     ///
     /// Sprite 対応（現状）:
-    /// - Idle / WalkForward / WalkBackward → idleSprite（Walk 専用 Sprite は未用意）
+    /// - Idle / Walk / JumpRise / JumpFall / Landing → idleSprite（専用 Sprite は未用意）
     /// - Attack → attackSprite
     ///
-    /// ActionFrame と攻撃ポーズの関係（Jパンチ）:
-    /// - 1〜attackPoseEndFrame … 攻撃ポーズとして Session が Attack を渡す
-    /// - それ以降 … Session が Idle / Walk を渡しうる（攻撃硬直中の見た目は Idle Sprite）
+    /// JumpType（Neutral/Forward/Backward）は Visual State に分けず、
+    /// 上昇／落下／着地の見た目だけを区別します。
     /// </summary>
     public class DebugFighterVisual : MonoBehaviour
     {
@@ -34,7 +33,7 @@ namespace FightingGameTrial.Fighter
 
         [Tooltip(
             "待機（Idle）用の Sprite です。fighter_idle_00_transparent を割り当てます。"
-            + " WalkForward / WalkBackward も当面これを流用します。"
+            + " Walk / JumpRise / JumpFall / Landing も当面これを流用します。"
             + " SlotId では分岐しません（将来の CharacterDefinition 差し替えを阻害しない）。"
         )]
         [SerializeField]
@@ -154,7 +153,7 @@ namespace FightingGameTrial.Fighter
                 return;
             }
 
-            // Idle / WalkForward / WalkBackward は当面 Idle Sprite を流用する。
+            // Idle / Walk / Jump / Landing は当面 Idle Sprite を流用する。
             if (idleSprite != null)
             {
                 spriteRenderer.sprite = idleSprite;

@@ -348,7 +348,7 @@ HitStun / KO 表示色もコード側 SerializeField。Scene YAML には未保�
 | Sprite Renderer | SpriteRenderer | 自分 | flipX 等 |
 | Faces Right By Default | bool | true | 素材の初期向き |
 
-実行時のみ（Inspector 非表示）: `logicalX`（位置の正本）、`initialLogicalX`（Scene 開始時の論理 X。Training Reset 用）。詳細は §17.7。
+実行時のみ（Inspector 非表示）: `logicalX` / `logicalY`（位置の正本）、`initialLogicalX` / `initialLogicalY`（Scene 開始時。Training Reset 用）、ジャンプ速度・JumpType・各種 Jump frames。詳細は §17.7・§17.9。
 
 ### DebugFighterVisual（両体とも Scene 値は同一）
 
@@ -613,12 +613,12 @@ HUD の数字は便利な鏡です。**戦闘データの正本は Session / Par
 - 複数攻撃・コンボ・Cancel・Counter Hit
 - 2P 実操作（現在 P2 は Neutral）
 - 壁バウンド・壁やられ など
-- Walk 専用 Sprite、Animator、K Kick、ジャンプ／空中
-- 左向き Walk 実測（現仕様ですり抜け不可。§17.8）
+- Walk / Jump 専用 Sprite、Animator、K Kick、空中 Attack、空中被弾専用仕様
+- 正式 Character Data ScriptableObject
 
-Training Reset の位置・向き復帰は **実装済み**（§17.7）。最小 Visual State は **実装済み**（§17.8）。
+Training Reset の位置・向き・Jump 復帰と共通 release gate は **実装済み**（§17.7）。Visual State（Walk / Jump 含む）は **実装済み**（§17.8・§17.9）。ジャンプ基盤は **実装済み**（§17.9）。
 
-詳細は `docs/unity_implementation_status.md`（モード責務は §1.1）。概念図は本資料 §17。
+詳細は `docs/unity_implementation_status.md`（モード責務は §1.1、ジャンプは §1.2）。概念図は本資料 §17。
 
 ---
 
@@ -638,8 +638,9 @@ Training Reset の位置・向き復帰は **実装済み**（§17.7）。最小
 
 - 「Unity 上で誰が何を持っているか」→ **この資料 §1〜§15**
 - 「モード／Visual State／Sprite・Animator」→ **この資料 §17**
-- 「Training Reset の処理順」→ **この資料 §17.7**
-- 「最小 Visual State（Walk）の処理順」→ **この資料 §17.8**
+- 「Training Reset の処理順・release gate」→ **この資料 §17.7**
+- 「Visual State（Walk / Jump）の処理順」→ **この資料 §17.8・§17.9**
+- 「ジャンプ基盤（LogicalY / 種類判定 / Push skip）」→ **この資料 §17.9**
 - 「GC.Alloc をどう見るか」→ **この資料 §16**
 - 「Stage 何まで終わったか」→ `unity_implementation_status.md`
 - 「HitStop とは何か」→ `rules.md`
@@ -982,14 +983,14 @@ GC の話は「仕様の正本」ではなく、**実行時コストの学習**�
 
 ## 17. モード構成・Visual State・Sprite（方針と現状）
 
-この章は **実装済み** と **将来構想（方針確定・未実装）** を分けて書く。新 Stage 番号は作らない。仕様の正本は `docs/rules.md` §15、到達点は `docs/unity_implementation_status.md` §1.1。
+この章は **実装済み** と **将来構想（方針確定・未実装）** を分けて書く。新 Stage 番号は作らない。仕様の正本は `docs/rules.md` §15、到達点は `docs/unity_implementation_status.md` §1.1・§1.2。
 
 ### 17.1 概念図（共通コアとモード）
 
 ```text
 ┌─────────────────────────────────────────┐
 │           共通戦闘コア（Combat Core）      │
-│  入力 / 移動 / Facing / Box / S・A・R     │
+│  入力 / 移動 / ジャンプ / Facing / Box     │
 │  Damage / HitStop / HitStun / Knockback │
 │  HP / KO判定 / KO後追加被弾拒否 / 攻撃データ │
 │  戦闘状態 → 見た目同期（Visual 反映）      │
@@ -1011,26 +1012,27 @@ GC の話は「仕様の正本」ではなく、**実行時コストの学習**�
 ### 17.2 実装済み（現状）
 
 - FightDebugScene 上の戦闘コア（段階15到達時点の機能）
-- R による **Training Reset**: 戦闘状態＋論理位置 X・Facing の Scene 開始時復帰（§17.7）
-- **最小 Visual State**: `FighterVisualState`（Idle / WalkForward / WalkBackward / Attack）。Session が決定、Visual が描画（§17.8）
-- Idle / Punch の **Sprite 直接差し替え**（Walk は Idle Sprite 流用）
+- R による **Training Reset**: 戦闘状態＋論理位置 X/Y・ジャンプ状態・Facing 復帰＋共通 release gate（§17.7）
+- **Visual State**: `FighterVisualState`（Idle / WalkForward / WalkBackward / Attack / JumpRise / JumpFall / Landing）。Session が決定、Visual が描画（§17.8・§17.9）
+- **ジャンプ基盤**: Neutral / Forward / Backward、LogicalY 軌道、飛び越し Push skip、計測ログ（§17.9）
+- Idle / Punch の **Sprite 直接差し替え**（Walk / Jump は Idle Sprite 流用）
 - 単独 256×256 デバッグ画像の Sprite Mode **`Single`**
 
 ### 17.3 将来構想（方針確定・未実装）
 
 - 対戦モード用 Scene / Controller / HUD
-- Walk 専用 Sprite、Animator + Animation Clip
-- Kick / Jump などの共通キャラクター表現
-- 左向き実測のための位置入れ替え／飛び越し等
+- Walk / Jump 専用 Sprite、Animator + Animation Clip
+- Kick、空中 Attack、空中被弾専用仕様
+- Character Data ScriptableObject（ジャンプ設定の正式データ化含む）
 
-（Training Reset・最小 Visual State enum は §17.7 / §17.8 で実装済み。ここには含めない。）
+（Training Reset・Jump Visual・ジャンプ基盤は §17.7〜§17.9 で実装済み。ここには含めない。）
 
 ### 17.4 Visual State と前進・後退
 
-戦闘処理が足の角度や Sprite コマを直接決めない。Session が Visual State を決め、Visual が表現する（**実装済み・最小**）。
+戦闘処理が足の角度や Sprite コマを直接決めない。Session が Visual State を決め、Visual が表現する（**実装済み**）。
 
-**enum 実装済み**: Idle、WalkForward、WalkBackward、Attack。
-**将来候補**: JumpRise、JumpFall、Landing、Kick、HitStun / Knockback / KO 専用 State など。
+**enum 実装済み**: Idle、WalkForward、WalkBackward、Attack、JumpRise、JumpFall、Landing。
+**将来候補**: Kick、HitStun / Knockback / KO 専用 State、専用 Walk/Jump Sprite など。
 
 前進／後退は左右キーだけで決めない。**移動方向 × Facing**（詳細・優先順位は §17.8）。
 
@@ -1063,74 +1065,89 @@ Sprite 群
 
 | 方式 | いま | 将来 |
 |---|---|---|
-| コードで Sprite を直接差し替え | **実装済み**（Idle / Punch。Walk は Idle 流用＋State ラベル） | 学習用の簡易経路として理解する |
+| コードで Sprite を直接差し替え | **実装済み**（Idle / Punch。Walk・Jump は Idle 流用＋State ラベル） | 学習用の簡易経路として理解する |
 | Animator + Animation Clip | **未実装** | 導入方針あり。State 決定は Session のまま |
 
-Animator 未導入のまま歩行・キック・ジャンプの**見た目素材**を「実装済み」としない。Visual State の区別自体は §17.8 で実装済み。
+Animator 未導入のまま歩行・ジャンプの**見た目素材**を「実装済み」としない。Visual State の区別自体は §17.8・§17.9 で実装済み。
 
-### 17.7 Training Reset（位置・向き復帰・学習用）
+### 17.7 Training Reset（位置・向き・Jump・release gate・学習用）
 
-正式 Stage 番号は付けない。対戦モード実装ではない。仕様の正本は `docs/rules.md` §15.4、到達点は `docs/unity_implementation_status.md` §1.1。
+正式 Stage 番号は付けない。対戦モード実装ではない。仕様の正本は `docs/rules.md` §15.4・§15.7、到達点は `docs/unity_implementation_status.md` §1.1。
 
 #### なぜ論理座標を正本にするか
 
-戦闘の位置正本は `DebugFighterMotor.logicalX` である。Transform は表示への写し。
+戦闘の位置正本は `DebugFighterMotor.logicalX` / `logicalY` である。Transform は表示への写し。
 Session が `transform.position` を直接戻すと、正本と表示がずれやすい。
-そのため Reset では **論理 X を戻し、既存の SetLogicalX がクランプと Transform 同期を行う**。
+そのため Reset では **論理座標を戻し、既存同期経路がクランプと Transform 反映を行う**。
 
 | やり方 | 本プロジェクト |
 |---|---|
 | Transform を直接初期位置へ代入 | **しない**（Session / Participant からも直書きしない） |
-| `logicalX` を初期値へ戻す → `SetLogicalX` | **する** |
-| Y / Z | **変更しない**（復帰対象外） |
+| `logicalX` / `logicalY` とジャンプ状態を初期値へ戻す | **する** |
+
+#### Reset フレームで通常 Tick へ進めない理由
+
+R 受理と同じ Unity Update 内で通常 SimulationTick を続けると、押しっぱなしの Up / J / Left 等が「新しい入力」として再処理され、直後に再ジャンプ・再攻撃・再移動が始まる。
+`SimulationClockDriver` は Reset 適用直後に **return** し、そのフレームの Step / AccumulatedTime tick を行わない。
+
+#### 共通 release gate
+
+Reset 後もキーを押し続けていると、次 tick で意図しない操作が始まる。
+そのため Session は `waitForAllGameplayInputReleaseAfterReset` を立てる。
+
+| 項目 | 内容 |
+|---|---|
+| 観測 | `DebugGameplayInput` の物理 Held（消さない） |
+| 有効入力 | `CurrentInput` へ渡す Left/Right/Up/Down/Attack をすべて false |
+| 解除条件 | 上記5つがすべて false。**一部だけ離しても解除しない** |
+| R | `DebugPlaybackInput` 側。**解除条件に含めない** |
+| 解除 tick | 有効入力は Neutral のまま。エッジ previous を false 再同期。次の新規押下から受付 |
+| 再 Reset | 抑制中に再度 R しても Reset 再実行。gate は `true` 維持 |
+
+`SimulationInputState.HasAnyGameplayInputHeld` / `ClearGameplayHeldButtons` に将来 Kick / Guard を足せる。
+
+解除ログ（1回）: `[FightDebug] Gameplay input re-enabled after Training Reset`
 
 #### Motor 側
 
-1. `Awake`: Scene の `transform.position.x` → logicalX。同値を initialLogicalX に保存。Facing / Transform 同期。
-2. `ResetLogicalXToInitial()`: `SetLogicalX(initialLogicalX)` のみ呼ぶ（Facing は触らない）。
-3. `SetLogicalX`: minX/maxX でクランプし、`ApplyLogicalPositionToTransform` で表示 X を合わせる。
+1. `Awake`: Scene の Transform → logicalX / logicalY。同値を initial に保存。
+2. `ResetLogicalPositionAndJumpToInitial()`: X/Y・ジャンプランタイム・計測 pending を初期化（Facing は触らない）。
+3. 既存同期経路でクランプと Transform 反映。
 
 #### Session 側の処理順（`ResetTestActionForP1`）
 
-学習用に順序を固定して読む。
-
 ```text
-1. participantP1.ResetCombatDebugState()   … HP/KO/攻撃/HitStun 等（位置・Facing なし）
-2. participantP2.ResetCombatDebugState()   … 同上
-3. P1 Motor.ResetLogicalXToInitial()       … 論理 X → 初期値（SetLogicalX 経由）
-4. P2 Motor.ResetLogicalXToInitial()       … 同上
-5. ApplyInitialFacingTowardOpponents()     … 両位置が戻ったあと、位置関係で Facing
+1. participantP1/P2.ResetCombatDebugState()     … HP/KO/攻撃/HitStun 等
+2. Motor.ResetLogicalPositionAndJumpToInitial() … X/Y・Jump・計測破棄
+3. ApplyInitialFacingTowardOpponents()          … 両位置復帰後に Facing
+4. waitForAllGameplayInputReleaseAfterReset=true
+5. CurrentInput / p2Neutral を Neutral 化、エッジ previous 再同期
 6. HitStopRemaining = 0 / メッセージ更新
-7. RefreshFighterVisual()                  … Idle 等
+7. RefreshFighterVisual()                       … Idle
 ```
 
-ログ例: `[FightDebug] Training reset (Attack/HitStun/Knockback/HitStop/HP/KO/LogicalX/Facing)`
+ログ例: `[FightDebug] Training reset (Attack/HitStun/Knockback/HitStop/HP/KO/LogicalX/LogicalY/Jump/Facing)`
 
-Facing は Slot 固定で決め打ちしない。P1 が左・P2 が右なら、既存の向き合い更新と同じく互いに向き合う。
+Facing は Slot 固定で決め打ちしない。
 
-#### Editor Play Mode 実測例（確認済み）
+#### Editor Play Mode 実測（確認済み）
 
-| 時点 | P1X | P2X | Facing | その他 |
-|---|---:|---:|---|---|
-| 初期 | 0.00 | 3.00 | P1 true / P2 false | |
-| 壁際 | 6.00 | 7.00 | （移動後） | Push wall redistribute 確認 |
-| KO 後 | — | — | — | P2 HP=0、KO=1、HitCount=10、AttackResult=Hit |
-| R 後 | 0.00 | 3.00 | P1 true / P2 false | HP=100、Alive、HitCount=0、AttackResult=None、Idle、HitStop=0 |
-
-確認済み: 壁際→初期位置、KO 後 Reset、論理 X と Transform 表示の一致、向きの復帰、既存 Push/Hit/HitStop/KO 維持、Compile Error なし（既知 CS0618 以外の新規警告なし）。
+- 壁際・KO 後の位置/Facing 復帰（従来どおり）
+- ジャンプ中 R → 初期 X/Y・Grounded・Idle・JumpType=None
+- Reset 直後に Jump started / Attack started / 古い apex・landed なし
+- 抑制中 L/R/U/D/Attack=0、Visual=Idle、P1X=0.00
+- 全操作 release で解除ログ1回 → 新規入力で移動/Jump/Attack 可
+- HitStop 中 Reset、連続 Reset で古い Jump event なし
 
 #### この資料では未確認
 
 - Pause 中に R Reset できるか
-- Reset 直後に移動と J Punch を再実行したか
 - Development Build
-- P2 が P1 より左側に配置された別 Scene 構成
-- Y/Z 位置の復帰
 - 複数の初期配置プリセット
 
 推測で確認済みとしない。
 
-### 17.8 最小 Visual State（Idle / Walk / Attack・学習用）
+### 17.8 Visual State（Idle / Walk / Attack / Jump・学習用）
 
 正式 Stage 番号は付けない。仕様の正本は `docs/rules.md` §15.5、到達点は `docs/unity_implementation_status.md` §1.1。
 
@@ -1142,16 +1159,20 @@ Facing は Slot 固定で決め打ちしない。P1 が左・P2 が右なら、�
 | WalkForward | 前進 | idleSprite 流用（専用なし） |
 | WalkBackward | 後退 | idleSprite 流用（専用なし） |
 | Attack | J Punch 攻撃ポーズ | attackSprite |
+| JumpRise | ジャンプ上昇 | idleSprite 流用 |
+| JumpFall | ジャンプ落下 | idleSprite 流用 |
+| Landing | 着地 | idleSprite 流用 |
 
 HitStun / KO は enum に含めず、Idle Sprite ＋色（`ApplyDisplayColor`）で表現する。
 
 #### 責務と呼び出し流れ
 
 ```text
-入力（CurrentInput）
+入力（CurrentInput・release gate 適用後）
   → SimulationSession.ResolveFighterVisualState
        ├─ HitStun / KO → Idle
-       ├─ IsAttackPoseActive → Attack
+       ├─ Attack → Attack
+       ├─ JumpRise / JumpFall / Landing
        └─ ResolveLocomotionVisualState（Facing × Left/Right）
   → DebugFighterVisual.Apply(FighterVisualState)
   → SpriteRenderer.sprite
@@ -1160,8 +1181,8 @@ HitStun / KO は enum に含めず、Idle Sprite ＋色（`ApplyDisplayColor`）
 | クラス | やること | やらないこと |
 |---|---|---|
 | Session | State 決定・優先順位 | Sprite 差し替え |
-| Visual | `Apply` / `CurrentVisualState` / `CurrentVisualLabel` / `IsAttackPoseActive` | 入力・Facing 判定 |
-| Motor | LogicalX・Facing | Visual State |
+| Visual | `Apply` / `CurrentVisualState` / `CurrentVisualLabel` / `IsAttackPoseActive` | 入力・Jump 計算 |
+| Motor | LogicalX/Y・Facing・Jump 状態 | Visual State 決定 |
 | Participant | HP / KO / HitStun 等 | Visual State 決定 |
 
 #### 前進／後退判定（入力意図）
@@ -1182,30 +1203,106 @@ Push / Knockback だけの受動移動は入力が無いため Walk にしない
 
 1. HitStun または KO → Idle 系
 2. Attack（攻撃ポーズ）
-3. WalkForward / WalkBackward
-4. Idle
+3. JumpRise
+4. JumpFall
+5. Landing
+6. WalkForward / WalkBackward
+7. Idle
 
-HitStop 中は Combat 処理をスキップするため、**直前の Visual を保持**する（従来どおり）。
+HitStop 中は Combat 処理をスキップするため、**直前の Visual を保持**する（Jump Visual 含む）。
 
-#### Editor 確認済み（主に P1・右向き）
+#### Editor 確認済み
 
 - 無入力 → Idle
-- 右向き＋左 → WalkBackward／右向き＋右 → WalkForward
-- Left+Right → Idle
-- 壁際（≈6.00 / 7.00）右入力 → WalkForward
+- 右向き WalkForward / WalkBackward、Left+Right → Idle、壁際 Walk
 - 移動中 J Punch → Attack
-- Training Reset 後 → Idle（位置・Facing 初期化も確認）
+- JumpRise / JumpFall / Landing → Idle
+- 飛び越し後の左向き Walk / Jump / J Punch
+- Training Reset 後 → Idle（位置・Facing・Jump 初期化）
 - Push / Damage / HitStop / HitStun / Knockback / KO 継続
 
-#### 未確認・現仕様上確認不可
+#### 未確認
 
 | 項目 | 区分 |
 |---|---|
-| 左向き Walk | **現仕様上確認不可**（すり抜け不可・飛び越しなし。コードは Facing 対応済みだが実測なし） |
-| P1 が HitStun / KO 中に Walk へ落ちないこと | **未確認**（今回 KO は P2。HUD FighterVisual は主に P1） |
+| P1 が HitStun / KO 中に Walk へ落ちないこと | **未確認**（優先順位コード上は上位） |
 | Development Build | **未確認** |
 
 #### 将来の接続点
 
-- Walk 専用 Sprite や Animator を足すときは `Apply` 内の割り当てだけ拡げ、State 決定は Session に残す
-- 左向き実測には位置入れ替え・ジャンプ等の別機能が必要（すり抜けは現行方針に反する）
+- Walk / Jump 専用 Sprite や Animator を足すときは `Apply` 内の割り当てだけ拡げ、State 決定は Session に残す
+
+### 17.9 ジャンプ基盤（LogicalY・種類判定・Push skip・計測・学習用）
+
+正式 Stage 番号は付けない。仕様ルールは `docs/rules.md` §15.7、到達点は `docs/unity_implementation_status.md` §1.2。
+
+#### 型と設定
+
+| 型 | 役割 |
+|---|---|
+| `FighterJumpType` | None / Neutral / Forward / Backward |
+| `JumpArcSettings` | 種類ごとの Min/Max Height・DurationFrames・HorizontalDistance |
+| `FighterJumpSettings` | 3種類の Arc ＋ Hold / DirHold / ReverseAirControl / LandingFrames / Push 垂直閾値 |
+
+初期パラメータ（コード設定値）と実測値は混同しない。実測は設定 Min/Max を少し上回る場合がある（例: Neutral 長押し maxHeight=2.66）。
+
+#### Motor が持つもの
+
+- `LogicalX` / `LogicalY` / `GroundLogicalY`
+- `VerticalVelocity` / `HorizontalJumpVelocity`
+- `IsGrounded` / `CurrentJumpType`
+- `JumpElapsedFrames` / `JumpHeldFrames` / `DirectionHeldFrames` / `LandingFramesRemaining`
+- 計測: 開始 X/Y、最大 Y、apex 検出、pending started/apex/landed
+- API: `TryStartJump`、CombatFrame ジャンプ進行、`ResetLogicalPositionAndJumpToInitial`
+
+#### Session の役割
+
+1. Up 押下エッジを検出
+2. Facing × Left/Right で Jump 種類を決定（Left+Right 同時は Neutral）
+3. Motor に開始要求。同一フレームでは Attack 開始を先に試みる（Attack 優先）
+4. 地上移動 vs 空中軌道を分岐。空中で高さ差≥閾値なら Push 解決をスキップ
+5. Facing 更新（飛び越し後の位置関係）
+6. Visual State 決定
+7. Jump debug event を Consume してログ（`enableJumpDebugLog`）
+8. Training Reset 後の共通 release gate
+
+#### 入力 → Session → Motor → Transform → Visual
+
+```text
+DebugGameplayInput（物理 Held）
+  → SampleCurrentInputFromGameplay（release gate なら有効入力 Neutral）
+  → Session: Jump 種類判定 / 開始 / 移動分岐 / Push skip / Facing / Visual
+  → Motor: LogicalX/Y 更新・クランプ
+  → Transform 同期
+  → DebugFighterVisual.Apply
+```
+
+#### 計測ログ（最大3本/ジャンプ）
+
+1. Jump started
+2. Jump apex
+3. Jump landed
+
+`enableJumpDebugLog=false` でも event は Consume して残留防止。false 時は文字列生成しない。毎 Frame ログではない。
+
+#### 空中 Attack / HitStop / Landing（現状）
+
+| 項目 | 現状 |
+|---|---|
+| 空中 J Punch | **開始不可** |
+| HitStop | Jump 軌道・LogicalY 停止。Jump Visual 保持 |
+| HitStun / KO | Jump 開始不可。入力空中制御不可（コード上対応） |
+| LandingFrames | 2。Landing 中左右移動可・再ジャンプ不可 |
+| 空中被弾専用仕様 | **未実装** |
+
+#### Editor 確認済み（要約）
+
+- Neutral / Forward / Backward、短押し／長押し差、飛び越し・Facing 反転
+- 計測ログ3本、空中再ジャンプなし
+- Reset 中の古い Jump event なし
+
+#### 将来の接続点
+
+- Character Data SO へ Jump 設定を移す
+- Animator / 専用 Sprite を Visual に接続（State 決定は Session のまま）
+- Air Hit / Air Knockback / 空中 Attack

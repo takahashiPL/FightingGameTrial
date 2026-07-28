@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## ジャンプ基盤・計測ログ・Training Reset 共通 release gate
+
+- 正式 Stage 番号なし（段階15完了状態は維持）。Docs 反映時点ではジャンプ関連コードが未コミットの場合あり
+- キャラクター別ジャンプ基盤: `FighterJumpType`（None / Neutral / Forward / Backward）、`FighterJumpSettings` / `JumpArcSettings`（種類ごと Min/Max 高さ・DurationFrames・HorizontalDistance）
+- 入力保持補間: `JumpHoldFramesToMax` / `DirectionHoldFramesToMax`。逆入力は種類反転せず小さな空中制御のみ（`ReverseAirControlPerFrame`）
+- 軌道: Rigidbody 物理は使わない。固定 CombatFrame で `LogicalX` / `LogicalY` を更新。HitStop 中はジャンプ軌道も停止。Stage 境界クランプ維持
+- Jump Visual State: `JumpRise` / `JumpFall` / `Landing` を追加。専用 Sprite 未実装のため Idle Sprite 流用。Animator / Animation Clip は未実装
+- 飛び越し: 高さ差が閾値以上なら空中 Push Box 解決をスキップ。着地付近で Push 復帰。飛び越し後は位置関係から Facing 更新（Editor 確認済み）
+- Jump 計測ログ: 1ジャンプ最大3本（started / apex / landed）。`enableJumpDebugLog`（既定 true）。毎 Frame ログではない
+- Training Reset: Reset 受理フレームは `SimulationClockDriver` が通常 Tick へ進めない（同一 Update return）
+- Training Reset 後の共通 release gate: 全ゲーム操作（Left/Right/Up/Down/Attack）を一度すべて離すまで有効入力を Neutral 化。物理入力は消さない。R は解除条件に含めない
+- Editor Play Mode 確認済み: 基本ジャンプ、短押し／長押し差、Forward／Backward、飛び越し・Facing、計測ログ、Reset 後の再ジャンプ／再移動なし、全 release 後の再受付、HitStop 中 Reset
+- 未実装: 空中 Attack、空中被弾専用仕様、Jump 専用 Sprite、Animator、正式 Character Data SO、P2 操作
+- 未確認: Development Build Profiler、Pause 中 R の詳細など
+- Scene / Prefab / Sprite / Animator / Font 変更なし
+- Docs: README / `unity_implementation_status.md` §1.1・§1.2 / `rules.md` §15.4・§15.5・§15.7 / `component_and_scene_guide.md` §17.7〜§17.9
+
 ## 最小 Visual State（Idle / WalkForward / WalkBackward / Attack）
 
 - 正式 Stage 番号なし（段階15完了状態は維持）。練習モードの見た目基盤

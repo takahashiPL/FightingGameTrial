@@ -50,13 +50,50 @@ namespace FightingGameTrial.Input
         /// </summary>
         public void ResetToInitialValues()
         {
+            ClearGameplayHeldButtons();
+            SampledAtSimulationTick = 0;
+            SampleSequence = 0;
+        }
+
+        /// <summary>
+        /// ゲーム操作の Held ボタンだけをニュートラルにします。
+        /// SampleSequence / SampledAtSimulationTick は維持します。
+        ///
+        /// Training Reset 後の入力抑制中に、Simulation へ渡す有効入力だけを落とす用途です。
+        /// 将来 Kick / Guard / Dash 等を追加したら、ここにも false 代入を足してください。
+        /// </summary>
+        public void ClearGameplayHeldButtons()
+        {
             Left = false;
             Right = false;
             Up = false;
             Down = false;
             Attack = false;
-            SampledAtSimulationTick = 0;
-            SampleSequence = 0;
+        }
+
+        /// <summary>
+        /// いずれかのゲーム操作 Held が true か。
+        /// Training Reset 後の共通 release gate 解除判定に使います。
+        /// R（Training Reset）はゲーム操作に含めません。
+        /// 将来 Kick / Guard / Dash 等を追加したら、ここにも OR 条件を足してください。
+        /// </summary>
+        public bool HasAnyGameplayInputHeld()
+        {
+            return HasAnyGameplayInputHeld(Left, Right, Up, Down, Attack);
+        }
+
+        /// <summary>
+        /// サンプリング直前の物理 Held から、ゲーム操作が残っているかを判定します。
+        /// 毎フレーム new / LINQ は使いません。
+        /// </summary>
+        public static bool HasAnyGameplayInputHeld(
+            bool left,
+            bool right,
+            bool up,
+            bool down,
+            bool attack)
+        {
+            return left || right || up || down || attack;
         }
 
         /// <summary>

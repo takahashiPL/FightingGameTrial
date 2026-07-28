@@ -172,6 +172,20 @@ namespace FightingGameTrial.Simulation
             if (testActionResetRequested)
             {
                 ApplyTestActionReset();
+
+                // ------------------------------------------------------------
+                // Reset を受理した Unity フレームでは、以降の通常 SimulationTick へ進まない。
+                //
+                // なぜか:
+                // Reset 直後に押しっぱなしのゲーム操作を同一フレームの tick で再処理すると、
+                // 意図しない移動・ジャンプ・攻撃が始まるため。
+                //
+                // このフレームは Reset（位置・戦闘状態・共通 release gate 開始）だけを行い、
+                // 次の Unity フレーム以降の tick で gate 判定を続ける。
+                // 有効入力は、全ゲーム操作（Left/Right/Up/Down/Attack）を一度離すまで
+                // ニュートラルのまま（R は解除条件に含めない）。
+                // ------------------------------------------------------------
+                return;
             }
 
             // ============================================================
@@ -281,10 +295,10 @@ namespace FightingGameTrial.Simulation
         }
 
         /// <summary>
-        /// Rキー: P1 AttackState のリセットを Session に依頼します。
+        /// Rキー: 練習モードの Training Reset を Session に依頼します。
         ///
         /// SimulationTick は進めません。Pause 中でも受理します。
-        /// Jパンチ進行中でも Idle へ戻せます。
+        /// 呼び出し元（Update）は Reset 受理フレームで通常 tick 進行へ進まないこと。
         /// </summary>
         private void ApplyTestActionReset()
         {

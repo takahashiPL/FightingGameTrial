@@ -185,5 +185,15 @@ namespace FightingGameTrial.Fighter
             actionFrame = 0;
             lastAttackResult = "None";
         }
+
+        /// <summary>
+        /// Training Reset 共通 release gate 解除時など、Attack エッジ用 previous を再同期します。
+        /// 攻撃進行状態（Action）は触りません。
+        /// </summary>
+        public void ClearAttackEdgePrevious()
+        {
+            previousAttackHeld = false;
+            attackPressedThisTick = false;
+        }
     }
 }
