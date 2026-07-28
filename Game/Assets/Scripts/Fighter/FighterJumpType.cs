@@ -4,7 +4,7 @@ namespace FightingGameTrial.Fighter
     /// ジャンプの種類です（開始時に確定し、着地まで保持）。
     ///
     /// Facing と左右入力の組み合わせで決まります。
-    /// JumpType 自体は Visual State には分けず、見た目は JumpRise / JumpFall / Landing を使います。
+    /// JumpType 自体は Visual State には分けず、見た目は JumpStart / JumpRise / JumpApex / JumpFall / Landing を使います。
     /// </summary>
     public enum FighterJumpType
     {

@@ -3,12 +3,12 @@ namespace FightingGameTrial.Fighter
     /// <summary>
     /// 戦闘状態から見た目側へ渡す Visual State です。
     ///
-    /// 実装済み:
-    /// - Idle / WalkForward / WalkBackward / Attack
-    /// - JumpRise / JumpFall / Landing（Jump 専用 Sprite は未用意・Idle 流用）
+    /// 内部状態は細かく分けます（素材節約のために統合しない）。
+    /// 表示素材は複数状態で共有してよい（例: WalkForward/Backward で同じ歩行列）。
+    /// 状態の決定は Session、Sprite 割り当ては Visual の責務です。
     ///
-    /// JumpType（Neutral/Forward/Backward）自体はここへ分けない。
-    /// HitStun / KO は色と強制 Idle 表示で扱い、この enum には含めない。
+    /// HitStun / KO は専用 State を持ちつつ、専用 Sprite が無い間は Idle 画像へ fallback します。
+    /// 色による被弾／KO 表現（Participant.ApplyDisplayColor）は維持します。
     /// </summary>
     public enum FighterVisualState
     {
@@ -18,6 +18,10 @@ namespace FightingGameTrial.Fighter
         Attack = 3,
         JumpRise = 4,
         JumpFall = 5,
-        Landing = 6
+        Landing = 6,
+        JumpStart = 7,
+        JumpApex = 8,
+        HitStun = 9,
+        KO = 10
     }
 }

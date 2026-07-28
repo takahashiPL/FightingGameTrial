@@ -36,20 +36,20 @@ GC-2（Editor）: `DebugHudView.Update` 約17.2 KB → 約3.2 KB / frame。Devel
 ## Unity 実装の到達点（要約）
 
 ブランチ `unity` 上で、**段階1〜15まで完了**しています。
-最新コミット済み HEAD: **`d209c8f`**（Add fighter locomotion visual states）
+最新コミット済み HEAD: **本コミット**（Add sprite sheet fighter visual sequences）※ push 前はローカルのみ
 段階14全体（14A+14B）・段階15（J Punch 攻撃データ化）: **完了・push 済み**（SO 化は見送り）。
 GC-1 / GC-2（補助改善・正式 Stage ではない）: **完了・push 済み**。
 Training Reset 位置・向き復帰: **実装・Editor 確認済み**（正式 Stage 番号なし）。
-最小 Visual State（Idle / WalkForward / WalkBackward / Attack）: **実装・Editor 確認済み**（正式 Stage 番号なし。Walk 専用 Sprite / Animator は未実装）。
-ジャンプ基盤（Neutral / Forward / Backward・LogicalY 軌道・Jump Visual・計測ログ）: **実装・Editor 確認済み**（正式 Stage 番号なし。Docs 反映時点では未コミットの場合あり）。
+Visual Sequence + Sprite Sheet 移行: **実装・Editor 確認済み**（正式 Stage 番号なし。Walk 見た目は暫定）。
+ジャンプ基盤（Neutral / Forward / Backward・LogicalY 軌道・Jump Visual・計測ログ）: **実装・Editor 確認済み**（正式 Stage 番号なし）。
 Training Reset 共通 release gate（全操作 release まで入力抑制）: **実装・Editor 確認済み**（正式 Stage 番号なし）。
 正式な次工程番号は**未定義**（新 Stage 番号は作らない）。
 
 | 区分 | 内容 |
 |---|---|
-| **実装済み** | 60Hz SimulationTick、Pause/Step、HUD（左上状態／左下操作・JPunch Data）、HitStop、入力、左右移動、Facing分離、2体共通 Participant / AttackState / HitState、Push Box、壁際 Push 再配分、Box 可視化、Hit×Hurt 重なり判定、Jパンチ、1攻撃1Hit、Hit時6F HitStop、HitStun 12CF・被Hit表示、横ノックバック、HP/Damage（max100・J Punch10）、**KO状態・遷移（Life表示）**、**`DebugAttackData.JPunch` による攻撃設定正本**、**Training Reset（R）: 戦闘状態＋論理位置 X/Y・ジャンプ状態・Facing を Scene 開始時へ復帰**、**共通 release gate（全ゲーム操作を一度離すまで有効入力 Neutral）**、**最小 Visual State（Idle / WalkForward / WalkBackward / Attack / JumpRise / JumpFall / Landing。Walk・Jump 見た目は Idle Sprite 流用）**、**ジャンプ基盤（Neutral / Forward / Backward、キャラ別 Min/Max 高さ・時間・距離、押下時間補間、CombatFrame LogicalY 軌道、飛び越し時 Push skip、Jump 計測ログ）** |
-| **暫定** | Push 等分＋壁際再配分。攻撃数値はコード内不変データ（SO 未使用）。KO 視覚は色変更のみ（優先: HitStun赤 > KO暗色 > 通常Tint）。Motor minX/maxX（±7）。相打ちは両方向判定の土台のみ（P2 は Neutral）。見た目はコードによる Sprite 直接差し替え（Animator 未使用）。ジャンプ数値はコード内 `FighterJumpSettings`（正式 Character Data SO ではない）。実測高さは設定 Min/Max より少し上回る場合あり |
-| **未実装（方針確定含む）** | 対戦モード進行（Round/勝敗/WIN・LOSE/タイマー等）、HPバー、Guard、壁バウンド等、Walk / Jump 専用 Sprite、Animator + Animation Clip、空中 Attack、空中被弾専用仕様、Kick、正式 Character Data ScriptableObject、複数 Hurt/Hit Box、攻撃データ SO 化（要否は後続判断）、複数攻撃・コンボ・Cancel |
+| **実装済み** | 60Hz SimulationTick、Pause/Step、HUD（左上状態／左下操作・JPunch Data）、HitStop、入力、左右移動、Facing分離、2体共通 Participant / AttackState / HitState、Push Box、壁際 Push 再配分、Box 可視化、Hit×Hurt 重なり判定、Jパンチ、1攻撃1Hit、Hit時6F HitStop、HitStun 12CF・被Hit表示、横ノックバック、HP/Damage（max100・J Punch10）、**KO状態・遷移（Life表示）**、**`DebugAttackData.JPunch` による攻撃設定正本**、**Training Reset（R）: 戦闘状態＋論理位置 X/Y・ジャンプ状態・Facing を Scene 開始時へ復帰**、**共通 release gate（全ゲーム操作を一度離すまで有効入力 Neutral）**、**Visual Sequence（Idle / WalkF / WalkB / Attack / JumpStart / Rise / Apex / Fall / Landing / HitStun / KO）+ `Fighter_SpriteSheet` 9 sub-sprite**、**ジャンプ基盤（Neutral / Forward / Backward、キャラ別 Min/Max 高さ・時間・距離、押下時間補間、CombatFrame LogicalY 軌道、飛び越し時 Push skip、Jump 計測ログ）** |
+| **暫定** | Push 等分＋壁際再配分。攻撃数値はコード内不変データ（SO 未使用）。KO 視覚は色変更のみ（優先: HitStun赤 > KO暗色 > 通常Tint）。Motor minX/maxX（±7）。相打ちは両方向判定の土台のみ（P2 は Neutral）。見た目は Sequence による Sprite 差し替え（Animator 未使用）。**Walk 2 コマは動作するが歩行見た目品質は暫定**。ジャンプ数値はコード内 `FighterJumpSettings`（正式 Character Data SO ではない）。実測高さは設定 Min/Max より少し上回る場合あり |
+| **未実装（方針確定含む）** | 対戦モード進行（Round/勝敗/WIN・LOSE/タイマー等）、HPバー、Guard、壁バウンド等、自然な歩行素材、Animator + Animation Clip、空中 Attack、空中被弾専用仕様、Kick、正式 Character Data ScriptableObject、複数 Hurt/Hit Box、攻撃データ SO 化（要否は後続判断）、複数攻撃・コンボ・Cancel |
 
 詳細・次工程は **`docs/unity_implementation_status.md`** を正とする。
 ジャンプ・Visual・Reset gate は同ファイル §1.1・§1.2 および教材 §17.7〜§17.9。
@@ -112,24 +112,25 @@ Git 管理外: `Game/Library`、`Temp`、`Logs`、`UserSettings`、`obj` など
 | `moves.csv` | 技設計。数値は provisional |
 | `state_transitions.csv` | **草案**（完全実行用SMではない） |
 | `hit_resolution.csv` | 方向ごとの一次分類参照（Tradeは複合集約・表外） |
-| 本番スプライトシート | **未完成** |
-| デバッグ用透過PNG（Idle/Punch） | FightDebugScene 用の試験素材（本番清書ではない） |
+| 本番スプライトシート（固定セル清書） | **未完成** |
+| FightDebug 用 `Fighter_SpriteSheet` | **運用中**（個別 Rect・Walk 見た目は暫定） |
 
 ## 次の実装候補（要約）
 
 正式な優先順位・次工程番号は**未決定**（順不同・新 Stage 番号は作らない）。
 
-1. Walk / Jump 専用 Sprite、または Animator + Animation Clip（Visual State 基盤は実装済み）
-2. Air Hit / Air Knockback など空中被弾専用仕様（空中 Attack も未実装）
-3. K Kick、Guard
-4. Character Data ScriptableObject 化（ジャンプ設定の正式データ化含む）
-5. ジャンプ数値の調整（現状の実測値を踏まえたチューニング）
-6. Development Build Profiler 確認（Editor 上の毎 Frame new / LINQ なしはコード確認済み）
-7. 対戦モード用 Scene / Controller / HUD（FightDebugScene とは分離）
-8. 既存残課題: KB壁停止、壁バウンド、壁やられ、Corner、HPバー、複数攻撃・バッファ・Cancel、攻撃データ SO 化（必要時）
-9. 2P入力/AI時の実操作確認（KO中移動・攻撃禁止、P1被Hit・左方向KB など）
+1. 自然な歩行素材の再制作（Walk 2 コマ切替は済み、見た目品質は暫定）
+2. Animator + Animation Clip
+3. Air Hit / Air Knockback など空中被弾専用仕様（空中 Attack も未実装）
+4. K Kick、Guard
+5. Character Data ScriptableObject 化（ジャンプ設定の正式データ化含む）
+6. ジャンプ数値の調整（現状の実測値を踏まえたチューニング）
+7. Development Build Profiler 確認（Editor 上の毎 Frame new / LINQ なしはコード確認済み）
+8. 対戦モード用 Scene / Controller / HUD（FightDebugScene とは分離）
+9. 既存残課題: KB壁停止、壁バウンド、壁やられ、Corner、HPバー、複数攻撃・バッファ・Cancel、攻撃データ SO 化（必要時）
+10. 2P入力/AI時の実操作確認（KO中移動・攻撃禁止、P1被Hit・左方向KB など）
 
-ジャンプ基盤・Jump Visual・計測ログ・Training Reset 共通 release gate・飛び越し Facing は**実装済み**（未実装候補からは外す）。詳細は `docs/unity_implementation_status.md`。
+ジャンプ基盤・Visual Sequence / Sprite Sheet・計測ログ・Training Reset 共通 release gate・飛び越し Facing は**実装済み**（未実装候補からは外す）。詳細は `docs/unity_implementation_status.md`。
 
 ## スプライト制作方針（要約）
 
@@ -147,9 +148,9 @@ Git 管理外: `Game/Library`、`Temp`、`Logs`、`UserSettings`、`obj` など
 
 - `art/fighter_motion_reference_sheet.png` … デザイン参考。**完成スプライトではない**
 - `art/spritesheet_grid_template.png` … 128×128、8×8台紙（セルサイズ。画面等倍表示の意味ではない）
-- `Game/Assets/Art/Characters/fighter_idle_00_transparent.png` 等 … デバッグ表示用の透過試験素材（本番シートではない）
+- `Game/Assets/Art/Characters/Fighter_SpriteSheet.png` … FightDebug 用動作確認シート（本番清書ではない。個別 Rect）
 - `docs/production_spritesheet_spec.md` … 制作工程とセル仕様の正本
-- `docs/sprite_art_status.md` … 現在の素材は未完成であること
+- `docs/sprite_art_status.md` … 現在の素材状態（シート運用・Walk 暫定・本番清書未達）
 
 ## ディレクトリ構成
 

@@ -250,7 +250,6 @@ MonoBehaviour:
   debugGameplayInput: {fileID: 600000003}
   participantP1: {fileID: 700000016}
   participantP2: {fileID: 700000027}
-  attackRange: 1.35
   timeState:
     SimulationTick: 0
     CombatFrame: 0
@@ -267,6 +266,7 @@ MonoBehaviour:
       SampledAtSimulationTick: 0
       SampleSequence: 0
   consoleLogIntervalTicks: 60
+  enableJumpDebugLog: 1
 --- !u!1 &400000001
 GameObject:
   m_ObjectHideFlags: 0
@@ -1018,7 +1018,7 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_MaskInteraction: 0
-  m_Sprite: {fileID: 21300000, guid: 9dee2e8501eada14687cb116bef21376, type: 3}
+  m_Sprite: {fileID: -6893699965396766270, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -1026,7 +1026,7 @@ SpriteRenderer:
   m_Size: {x: 2.56, y: 2.56}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
-  m_WasSpriteAssigned: 1
+  m_WasSpriteAssigned: 0
   m_SpriteSortPoint: 0
 --- !u!114 &700000014
 MonoBehaviour:
@@ -1043,6 +1043,33 @@ MonoBehaviour:
   moveUnitsPerCombatFrame: 0.05
   minX: -7
   maxX: 7
+  jumpSettings:
+    NeutralJump:
+      MinHeight: 1.8
+      MaxHeight: 2.2
+      MinDurationFrames: 28
+      MaxDurationFrames: 34
+      MinHorizontalDistance: 0
+      MaxHorizontalDistance: 0
+    ForwardJump:
+      MinHeight: 1.7
+      MaxHeight: 2.1
+      MinDurationFrames: 28
+      MaxDurationFrames: 34
+      MinHorizontalDistance: 2.3
+      MaxHorizontalDistance: 2.8
+    BackwardJump:
+      MinHeight: 1.6
+      MaxHeight: 2
+      MinDurationFrames: 26
+      MaxDurationFrames: 32
+      MinHorizontalDistance: 1.7
+      MaxHorizontalDistance: 2.1
+    JumpHoldFramesToMax: 8
+    DirectionHoldFramesToMax: 10
+    ReverseAirControlPerFrame: 0.02
+    LandingFrames: 2
+    PushBoxVerticalSeparationThreshold: 0.85
   spriteRenderer: {fileID: 700000013}
   facesRightByDefault: 1
 --- !u!114 &700000015
@@ -1058,8 +1085,67 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: FightingGameTrial.Fighter::FightingGameTrial.Fighter.DebugFighterVisual
   spriteRenderer: {fileID: 700000013}
-  idleSprite: {fileID: 21300000, guid: 9dee2e8501eada14687cb116bef21376, type: 3}
-  attackSprite: {fileID: 21300000, guid: 4aa3699e577e44147b96f91c02003530, type: 3}
+  idleSequence:
+    sprites:
+    - {fileID: -6893699965396766270, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
+    framesPerSprite: 6
+    loop: 1
+    holdLastFrame: 1
+  walkSequence:
+    sprites:
+    - {fileID: -6173448706499852527, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
+    - {fileID: -1272312983355927443, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
+    framesPerSprite: 6
+    loop: 1
+    holdLastFrame: 1
+  jumpStartSequence:
+    sprites:
+    - {fileID: 2423625779142430129, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
+    framesPerSprite: 1
+    loop: 0
+    holdLastFrame: 1
+  jumpRiseSequence:
+    sprites:
+    - {fileID: -5042221198134202916, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
+    framesPerSprite: 6
+    loop: 1
+    holdLastFrame: 1
+  jumpApexSequence:
+    sprites:
+    - {fileID: 935476333197682602, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
+    framesPerSprite: 1
+    loop: 0
+    holdLastFrame: 1
+  jumpFallSequence:
+    sprites:
+    - {fileID: 6352025079003738632, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
+    framesPerSprite: 6
+    loop: 1
+    holdLastFrame: 1
+  landingSequence:
+    sprites:
+    - {fileID: 7950610859281020069, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
+    framesPerSprite: 1
+    loop: 0
+    holdLastFrame: 1
+  attackSequence:
+    sprites:
+    - {fileID: -6380533871378565388, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
+    framesPerSprite: 1
+    loop: 0
+    holdLastFrame: 1
+  hitStunSequence:
+    sprites: []
+    framesPerSprite: 6
+    loop: 1
+    holdLastFrame: 1
+  koSequence:
+    sprites: []
+    framesPerSprite: 6
+    loop: 1
+    holdLastFrame: 1
+  jumpStartVisualFrames: 2
+  jumpApexVisualFrames: 2
   attackPoseEndFrame: 6
   actionEndFrame: 12
 --- !u!114 &700000016
@@ -1072,7 +1158,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c3e5f7a9b1d24e8c0a2f4d6e8b0a1c78, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: FightingGameTrial.Fighter::FightingGameTrial.Fighter.DebugFighterParticipant
   slotId: 0
   motor: {fileID: 700000014}
@@ -1080,7 +1166,34 @@ MonoBehaviour:
   spriteRenderer: {fileID: 700000013}
   opponent: {fileID: 700000027}
   displayTint: {r: 1, g: 1, b: 1, a: 1}
+  hitStunDisplayColor: {r: 1, g: 0.35, b: 0.35, a: 1}
+  knockoutDisplayColor: {r: 0.35, g: 0.35, b: 0.35, a: 1}
   usesGameplayInput: 1
+  hitStunFrames: 12
+  knockbackInitialSpeed: 0.18
+  knockbackDeceleration: 0.015
+  maxHitPoints: 100
+  pushBoxHalfWidth: 0.5
+  boxOriginLocalY: 0
+  deriveBoxOriginLocalYFromSprite: 1
+  pushBoxLocal:
+    CenterX: 0
+    CenterY: 1
+    HalfWidth: 0.5
+    HalfHeight: 1
+    IsActive: 1
+  hurtBoxLocal:
+    CenterX: 0
+    CenterY: 1
+    HalfWidth: 0.45
+    HalfHeight: 1
+    IsActive: 1
+  jPunchHitBoxLocal:
+    CenterX: 0.75
+    CenterY: 1.25
+    HalfWidth: 0.55
+    HalfHeight: 0.35
+    IsActive: 0
 --- !u!1 &700000021
 GameObject:
   m_ObjectHideFlags: 0
@@ -1165,7 +1278,7 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_MaskInteraction: 0
-  m_Sprite: {fileID: 21300000, guid: 9dee2e8501eada14687cb116bef21376, type: 3}
+  m_Sprite: {fileID: -6893699965396766270, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
   m_Color: {r: 0.65, g: 0.78, b: 0.95, a: 1}
   m_FlipX: 1
   m_FlipY: 0
@@ -1173,7 +1286,7 @@ SpriteRenderer:
   m_Size: {x: 2.56, y: 2.56}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
-  m_WasSpriteAssigned: 1
+  m_WasSpriteAssigned: 0
   m_SpriteSortPoint: 0
 --- !u!114 &700000025
 MonoBehaviour:
@@ -1185,11 +1298,38 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9b2d4f6a8c0e5f7b1d3a5c7e9f0b1c45, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: FightingGameTrial.Fighter::FightingGameTrial.Fighter.DebugFighterMotor
   moveUnitsPerCombatFrame: 0.05
   minX: -7
   maxX: 7
+  jumpSettings:
+    NeutralJump:
+      MinHeight: 1.8
+      MaxHeight: 2.2
+      MinDurationFrames: 28
+      MaxDurationFrames: 34
+      MinHorizontalDistance: 0
+      MaxHorizontalDistance: 0
+    ForwardJump:
+      MinHeight: 1.7
+      MaxHeight: 2.1
+      MinDurationFrames: 28
+      MaxDurationFrames: 34
+      MinHorizontalDistance: 2.3
+      MaxHorizontalDistance: 2.8
+    BackwardJump:
+      MinHeight: 1.6
+      MaxHeight: 2
+      MinDurationFrames: 26
+      MaxDurationFrames: 32
+      MinHorizontalDistance: 1.7
+      MaxHorizontalDistance: 2.1
+    JumpHoldFramesToMax: 8
+    DirectionHoldFramesToMax: 10
+    ReverseAirControlPerFrame: 0.02
+    LandingFrames: 2
+    PushBoxVerticalSeparationThreshold: 0.85
   spriteRenderer: {fileID: 700000023}
   facesRightByDefault: 1
 --- !u!114 &700000026
@@ -1202,11 +1342,70 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a1c3e5f7b9d24e8a0c2f4d6e8b0a1c56, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: FightingGameTrial.Fighter::FightingGameTrial.Fighter.DebugFighterVisual
   spriteRenderer: {fileID: 700000023}
-  idleSprite: {fileID: 21300000, guid: 9dee2e8501eada14687cb116bef21376, type: 3}
-  attackSprite: {fileID: 21300000, guid: 4aa3699e577e44147b96f91c02003530, type: 3}
+  idleSequence:
+    sprites:
+    - {fileID: -6893699965396766270, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
+    framesPerSprite: 6
+    loop: 1
+    holdLastFrame: 1
+  walkSequence:
+    sprites:
+    - {fileID: -6173448706499852527, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
+    - {fileID: -1272312983355927443, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
+    framesPerSprite: 6
+    loop: 1
+    holdLastFrame: 1
+  jumpStartSequence:
+    sprites:
+    - {fileID: 2423625779142430129, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
+    framesPerSprite: 1
+    loop: 0
+    holdLastFrame: 1
+  jumpRiseSequence:
+    sprites:
+    - {fileID: -5042221198134202916, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
+    framesPerSprite: 6
+    loop: 1
+    holdLastFrame: 1
+  jumpApexSequence:
+    sprites:
+    - {fileID: 935476333197682602, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
+    framesPerSprite: 1
+    loop: 0
+    holdLastFrame: 1
+  jumpFallSequence:
+    sprites:
+    - {fileID: 6352025079003738632, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
+    framesPerSprite: 6
+    loop: 1
+    holdLastFrame: 1
+  landingSequence:
+    sprites:
+    - {fileID: 7950610859281020069, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
+    framesPerSprite: 1
+    loop: 0
+    holdLastFrame: 1
+  attackSequence:
+    sprites:
+    - {fileID: -6380533871378565388, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
+    framesPerSprite: 1
+    loop: 0
+    holdLastFrame: 1
+  hitStunSequence:
+    sprites: []
+    framesPerSprite: 6
+    loop: 1
+    holdLastFrame: 1
+  koSequence:
+    sprites: []
+    framesPerSprite: 6
+    loop: 1
+    holdLastFrame: 1
+  jumpStartVisualFrames: 2
+  jumpApexVisualFrames: 2
   attackPoseEndFrame: 6
   actionEndFrame: 12
 --- !u!114 &700000027
@@ -1219,7 +1418,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c3e5f7a9b1d24e8c0a2f4d6e8b0a1c78, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: FightingGameTrial.Fighter::FightingGameTrial.Fighter.DebugFighterParticipant
   slotId: 1
   motor: {fileID: 700000025}
@@ -1227,7 +1426,34 @@ MonoBehaviour:
   spriteRenderer: {fileID: 700000023}
   opponent: {fileID: 700000016}
   displayTint: {r: 0.65, g: 0.78, b: 0.95, a: 1}
+  hitStunDisplayColor: {r: 1, g: 0.35, b: 0.35, a: 1}
+  knockoutDisplayColor: {r: 0.35, g: 0.35, b: 0.35, a: 1}
   usesGameplayInput: 0
+  hitStunFrames: 12
+  knockbackInitialSpeed: 0.18
+  knockbackDeceleration: 0.015
+  maxHitPoints: 100
+  pushBoxHalfWidth: 0.5
+  boxOriginLocalY: 0
+  deriveBoxOriginLocalYFromSprite: 1
+  pushBoxLocal:
+    CenterX: 0
+    CenterY: 1
+    HalfWidth: 0.5
+    HalfHeight: 1
+    IsActive: 1
+  hurtBoxLocal:
+    CenterX: 0
+    CenterY: 1
+    HalfWidth: 0.45
+    HalfHeight: 1
+    IsActive: 1
+  jPunchHitBoxLocal:
+    CenterX: 0.75
+    CenterY: 1.25
+    HalfWidth: 0.55
+    HalfHeight: 0.35
+    IsActive: 0
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

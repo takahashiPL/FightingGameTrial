@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## Visual Sequence + Sprite Sheet 移行
+
+- 正式 Stage 番号なし（段階15完了状態は維持）
+- `FighterSpriteSequence`（sprites / framesPerSprite / loop / holdLastFrame）。CombatFrame 基準でコマ解決
+- `DebugFighterVisual` を単一 Sprite 切替から Sequence 再生へ拡張。WalkForward / WalkBackward は同一 Walk 2 コマ
+- `FighterVisualState`: Idle / WalkForward / WalkBackward / Attack / JumpStart / JumpRise / JumpApex / JumpFall / Landing / HitStun / KO
+- Session / Motor: JumpStart・Rise・Apex・Fall・Landing の見た目解決（軌道・攻撃判定は変更なし）
+- `Fighter_SpriteSheet.png`（1024×1536、Multiple、個別 Rect）。P1/P2 同一シート、P2 Tint 維持。FightDebugScene 正本・Prefab なし
+- 旧単体 PNG（Idle/Punch および Walk/Jump 中間）を参照ゼロ確認後に削除
+- Walk 2 コマ切替は動作確認済み。**歩行見た目は暫定**（自然な歩行素材は未完了・今後の改善候補）
+- Docs: README / CHANGELOG / `unity_implementation_status.md` / `sprite_art_status.md` / `rules.md` §15.5・§15.6 / `component_and_scene_guide.md` §4・§17 / `learning_and_readability.md`
+
 ## ジャンプ基盤・計測ログ・Training Reset 共通 release gate
 
 - 正式 Stage 番号なし（段階15完了状態は維持）。Docs 反映時点ではジャンプ関連コードが未コミットの場合あり

@@ -9,6 +9,8 @@
 - セル配置: `data/sprite_frame_requirements.csv`
 - ゲーム仕様: `docs/rules.md`
 
+**注（FightDebug 現行）**: `Game/Assets/Art/Characters/Fighter_SpriteSheet.png` は動作確認用シートで、**均等固定セルではなく個別 Rect** で切り出している。本仕様の固定セル清書パイプラインとは別物として扱う。状態の正本は `sprite_art_status.md`。
+
 ---
 
 ## 0. 制作方針の要約（引継ぎ用）

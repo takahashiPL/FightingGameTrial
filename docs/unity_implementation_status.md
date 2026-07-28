@@ -2,12 +2,12 @@
 
 最終更新: 2026-07-28
 対象ブランチ: `unity`
-最新コミット済み HEAD: **`d209c8f`**（Add fighter locomotion visual states）
+最新コミット済み HEAD: **本コミット**（Add sprite sheet fighter visual sequences）※ push 前はローカルのみ
 段階14全体（14A+14B）・段階15（攻撃データ化）: **完了・push 済み**
 GC-1 / GC-2（補助改善・正式 Stage ではない）: **完了・push 済み**
 Training Reset 位置・向き復帰: **実装・Editor 確認済み**（正式 Stage 番号なし）
-最小 Visual State（Idle / WalkF / WalkB / Attack）: **実装・Editor 確認済み**（正式 Stage 番号なし）
-ジャンプ基盤・Jump Visual・計測ログ: **実装・Editor 確認済み**（正式 Stage 番号なし。Docs 反映時点では未コミットの場合あり）
+Visual Sequence + Sprite Sheet 移行: **実装・Editor 確認済み**（正式 Stage 番号なし）
+ジャンプ基盤・Jump Visual・計測ログ: **実装・Editor 確認済み**（正式 Stage 番号なし）
 Training Reset 共通 release gate: **実装・Editor 確認済み**（正式 Stage 番号なし）
 正式な次工程番号: **未定義**（新 Stage 番号は作らない）
 
@@ -96,58 +96,54 @@ Training Reset 共通 release gate: **実装・Editor 確認済み**（正式 St
 
 詳細は §1.2、教材 §17.7・§17.9、`docs/rules.md` §15.4・§15.7。
 
-### 最小 Visual State（実装済み・Editor 確認済み）
+### Visual Sequence + Sprite Sheet（実装済み・Editor 確認済み）
 
-正式 Stage 番号は付けない。`FighterVisualState` enum で見た目意図を区別する（Animator / Walk・Jump 専用 Sprite は未実装）。
+正式 Stage 番号は付けない。Animator / Animation Clip は未使用。`FightDebugScene` が正本（Prefab 化なし）。Gameplay（入力・Jump 軌道・攻撃判定）は変更していない。
 
-| 値 | 意味 | Sprite（現状） |
-|---|---|---|
-| Idle | 停止 | idleSprite |
-| WalkForward | 前進（Facing と同方向入力） | idleSprite 流用 |
-| WalkBackward | 後退（Facing と逆方向入力） | idleSprite 流用 |
-| Attack | J Punch 攻撃ポーズ中 | attackSprite |
-| JumpRise | ジャンプ上昇中 | idleSprite 流用 |
-| JumpFall | ジャンプ落下中 | idleSprite 流用 |
-| Landing | 着地硬直中 | idleSprite 流用 |
+**構造**
 
-**責務**
-
-| 担当 | 内容 |
+| 要素 | 内容 |
 |---|---|
-| `SimulationSession` | `ResolveFighterVisualState`。入力 × Facing、Jump / Attack / HitStun / KO 優先 |
-| `DebugFighterVisual` | `Apply(FighterVisualState)` で Sprite 差し替えのみ |
-| `DebugFighterMotor` | 位置・Facing・LogicalY / Jump 状態（Visual 判定はしない） |
-| `DebugFighterParticipant` | 戦闘状態。Visual 判定はしない |
+| `FighterSpriteSequence` | `sprites[]` / `framesPerSprite` / `loop` / `holdLastFrame`。CombatFrame 経過でコマ解決 |
+| `DebugFighterVisual` | State ごと Sequence。`Apply(state, advanceElapsed)`。WalkF/B は同一 `walkSequence` |
+| `FighterVisualState` | Idle / WalkForward / WalkBackward / Attack / JumpStart / JumpRise / JumpApex / JumpFall / Landing / HitStun / KO |
+| `SimulationSession` | Visual 優先解決。JumpStart / Apex は見た目用窓（軌道計算には使わない） |
+| `DebugFighterMotor` | `HasPassedJumpApex` / `FramesSinceJumpApex`（表示専用） |
 
-**優先順位（Sprite）**: HitStun / KO → Attack → JumpRise → JumpFall → Landing → WalkForward / WalkBackward → Idle
+**優先順位（Sprite）**: KO → HitStun → Attack → JumpStart → JumpRise → JumpApex → JumpFall → Landing → WalkForward / WalkBackward → Idle
 
-**判定**: 入力意図基準。Left+Right 同時・無入力は Idle。壁際で論理 X が変わらなくても方向入力中は Walk。Push / Knockback の受動移動だけでは Walk にしない。P2 Neutral は通常 Idle。HitStop 中は Combat スキップのため直前 Visual を保持（Jump Visual 含む）。
+HitStun / KO は専用 State。専用 Sequence 未設定時は Idle Sequence へ fallback。色は従来どおり `ApplyDisplayColor`（HitStun 赤 > KO 暗色 > 通常 Tint）。
 
-**Editor 確認済み**
+**素材（FightDebug 正本）**: `Assets/Art/Characters/Fighter_SpriteSheet.png`（1024×1536、Multiple）。均等グリッドではない。Alpha 連結成分から 9 個別 Rect。PPU 100 / Full Rect / Point / Compression None / Physics Shape Off。地上は Bottom Center、空中は足元基準 Custom Pivot。P1/P2 同一シート参照、P2 は Tint 区別。
 
-| 条件 | FighterVisual |
+| State | sub-sprite |
 |---|---|
-| 無入力 | Idle |
-| 右向き + 左／右入力 | WalkBackward / WalkForward |
-| Left+Right 同時 | Idle |
-| 壁際右入力 | WalkForward（実移動なしでも維持） |
-| 移動入力中の J Punch | Attack |
-| Jump 上昇／落下／着地 | JumpRise / JumpFall / Landing → Idle |
-| 左向き時の WalkForward / WalkBackward | **確認済み**（飛び越し後） |
-| Training Reset 後 | Idle（位置・Facing 初期化） |
+| Idle | `Fighter_Idle` |
+| Attack | `Fighter_Punch` |
+| WalkForward / WalkBackward | `Fighter_Walk_00` + `Fighter_Walk_01`（2コマ） |
+| JumpStart | `Fighter_JumpStart` |
+| JumpRise | `Fighter_JumpRise` |
+| JumpApex | `Fighter_JumpApex` |
+| JumpFall | `Fighter_JumpFall` |
+| Landing | `Fighter_Landing` |
 
-Push / Damage / HitStop / HitStun / Knockback / KO の継続動作も確認。Compile Error なし。既知 CS0618 以外の新規警告なし。
+旧単体 PNG（Idle/Punch および Walk/Jump 中間素材）は参照ゼロ確認後に削除。Characters はシートのみ。
 
-**未確認**
+**評価**
 
-| 項目 | 区分 |
+| 項目 | 状態 |
 |---|---|
-| P1 自身が HitStun / KO 中に Walk にならないこと | **未確認**（優先順位コード上は Walk より上） |
-| Development Build | **未確認** |
+| Sprite Sheet 運用移行 | **完了** |
+| 9 状態 sub-sprite 参照 | **完了** |
+| Walk 2 コマ切替 | **動作確認済み** |
+| Punch / Jump 各状態表示 | **動作確認済み** |
+| P1/P2・P2 Tint | **確認済み** |
+| 歩行の見た目品質 | **暫定**（「へこへこ」に見える。自然な歩行素材は未完了） |
+| Gameplay ロジック変更 | **なし** |
 
-詳細は教材 §17.8・§17.9、`docs/rules.md` §15.5。
+**次回改善候補**: 自然な歩行素材の再制作（コマ間の脚・腰・重心）。コードや再生速度だけでは解決済みとしない。Animator 導入は別候補。
 
-キャラクターの前進・後退・Idle・歩行表現・ジャンプ・キック・Punch・HitStun・Knockback・KO・アニメーション状態は、**練習専用ではなく練習／対戦共通のキャラクター機能**とする方針。見た目は戦闘処理がコマを直接決めず、戦闘状態→ Visual State → Animator または Sprite 差し替え、とする（詳細は `docs/rules.md` / 教材 §17）。
+詳細は教材 §17.8・§17.9、`docs/rules.md` §15.5・§15.6、`docs/sprite_art_status.md`。
 
 ---
 
@@ -166,7 +162,7 @@ Push / Damage / HitStop / HitStun / Knockback / KO の継続動作も確認。Co
 | HitStop | ジャンプ軌道・LogicalY も停止。Jump Visual 保持 |
 | Push | 地上維持。空中で高さ差≥閾値なら解決スキップ（飛び越し可）。着地付近で復帰 |
 | Facing | 飛び越し後は位置関係から更新（Slot 固定ではない） |
-| Visual | JumpRise / JumpFall / Landing（Idle Sprite 流用） |
+| Visual | JumpStart / JumpRise / JumpApex / JumpFall / Landing（シート sub-sprite。§1.1） |
 | 計測ログ | started / apex / landed（最大3本/ジャンプ）。`enableJumpDebugLog` |
 | Reset | Y/Jump 状態復帰 + 同一フレーム Tick 打ち切り + 共通 release gate |
 
@@ -224,9 +220,9 @@ Left+Right 同時: Neutral
 
 | 区分 | 内容 |
 |---|---|
-| **未実装** | Jump 専用 Sprite、Animator / Animation Clip、空中 Attack、空中被弾専用仕様、正式 Character Data SO、高度な着地硬直・入力予約 |
+| **未実装** | Animator / Animation Clip、空中 Attack、空中被弾専用仕様、正式 Character Data SO、高度な着地硬直・入力予約、自然な歩行素材 |
 | **未確認** | Development Build Profiler、Pause 中 R の詳細 |
-| **将来候補** | Walk/Jump 専用 Sprite、Animator、Air Hit/KB、Kick、Guard、Jump 値調整、SO 化 |
+| **将来候補** | 歩行素材品質改善、Animator、Air Hit/KB、Kick、Guard、Jump 値調整、SO 化 |
 
 ### GC（コード確認）
 
@@ -439,13 +435,14 @@ ScriptableObject 化、Inspector 編集、Character 別攻撃データ、複数�
 - 壁バウンド等（工程番号なし残課題）
 - 攻撃データの ScriptableObject 化 / Inspector 編集 / JSON・CSV
 - 複数攻撃、弱/中/強、技コマンド、コンボ、Cancel、Counter Hit
-- Walk / Jump 専用 Sprite、Animator + Animation Clip（Jump Visual State enum は実装済み。§1.1・§1.2）
+- 自然な歩行素材の再制作（現状 Walk 2 コマは動作するが見た目は暫定）
+- Animator + Animation Clip
 - K Kick、空中 Attack、空中被弾専用仕様
 - Character Data ScriptableObject（ジャンプ設定の正式データ化含む）
 - Jump 数値調整、Development Build Profiler
 - 練習用将来候補: ダミー回復、自動回復、ガード設定、行動記録、判定表示、フレーム表示など
 
-（Training Reset 位置/Jump 復帰・release gate・ジャンプ基盤・Jump Visual は **§1.1・§1.2 で実装済み**。未実装候補からは外す。）
+（Training Reset・release gate・ジャンプ基盤・Visual Sequence / Sprite Sheet は **§1.1・§1.2 で実装済み**。未実装候補からは外す。）
 
 ### 2.10 相打ち・キャラ差し替え
 
@@ -479,7 +476,8 @@ Push / Hurt / Hit 可視化（11A）と Hit×Hurt 重なり判定（11B）は完
 
 その後の候補（順不同・未着手。**新工程番号は作らない**。正式な次 Stage も未定義）:
 
-- Walk / Jump 専用 Sprite、Animator + Animation Clip（Visual State 基盤は完了）
+- 自然な歩行素材の再制作（Walk 2 コマ切替は完了、見た目品質は暫定）
+- Animator + Animation Clip
 - Air Hit / Air Knockback、空中 Attack
 - K Kick、Guard
 - Character Data ScriptableObject 化（ジャンプ設定含む）
@@ -493,7 +491,7 @@ Push / Hurt / Hit 可視化（11A）と Hit×Hurt 重なり判定（11B）は完
 - 複数 Hurt / Hit Box、キャラ固有データ化
 - 練習モード将来候補: ダミー回復、自動回復、ガード設定、行動記録、判定／フレーム表示など
 
-Training Reset・ジャンプ基盤・Jump Visual・release gate は完了（§1.1・§1.2）。モード責務の方針も同節。Round/勝敗は**対戦モード固有**であり、練習 Scene の次必須工程としては未確定。
+Training Reset・ジャンプ基盤・Visual Sequence / Sprite Sheet・release gate は完了（§1.1・§1.2）。モード責務の方針も同節。Round/勝敗は**対戦モード固有**であり、練習 Scene の次必須工程としては未確定。
 
 ---
 
@@ -549,8 +547,8 @@ Round / Guard / 複数攻撃などの**機能 Stage とは別枠**。番号「GC
 ## 7. 一言まとめ
 
 - 段階1〜**15**まで到達。工程表の段階14（HP/Damage/KO）と段階15（攻撃データ化）は完了
-- 最新コミット済み HEAD: `d209c8f`。ジャンプ基盤・Jump Visual・計測ログ・Training Reset release gate は実装・Editor 確認済み（Docs 反映時点では未コミットの場合あり）。正式 Stage 番号なし
+- Visual Sequence + Sprite Sheet 移行・ジャンプ基盤・計測ログ・Training Reset release gate は実装・Editor 確認済み。正式 Stage 番号なし
 - `FightDebugScene` は**練習・検証モード**。戦闘コア共通、KO 後処理はモード側（§1.1）
-- Visual State: Idle / WalkF / WalkB / Attack / JumpRise / JumpFall / Landing。Walk・Jump は Idle Sprite 流用。Animator 未使用
-- 飛び越し後 Facing 反転・左向き Walk / Jump / J Punch は Editor 確認済み。空中 Attack・空中被弾専用・Dev Build Profiler は未実装／未確認
-- 正式な次 Stage 番号は未定義。候補は順不同（専用 Sprite、Animator、Air Hit、Kick、Guard、Character Data SO、対戦モード分離など）
+- Visual: Sequence 再生 + `Fighter_SpriteSheet` 9 sub-sprite。Walk 2 コマは動作、歩行見た目は暫定。Animator 未使用
+- 飛び越し後 Facing 反転・左向き Walk / Jump / J Punch は Editor 確認済み。空中 Attack・空中被弾専用・Dev Build Profiler・自然な歩行素材は未実装／未完了
+- 正式な次 Stage 番号は未定義。候補は順不同（歩行素材改善、Animator、Air Hit、Kick、Guard、Character Data SO、対戦モード分離など）

@@ -514,18 +514,18 @@ Unity デバッグ実装の**実際の到達点**（段階1〜15）と次工程�
 
 前進・後退・Idle・歩行表現・ジャンプ・キック・Punch・HitStun・Knockback・KO・アニメーション状態は、**練習専用ではなく練習／対戦共通のキャラクター機能**とする。
 
-**実装済み**: `FighterVisualState` = Idle / WalkForward / WalkBackward / Attack / JumpRise / JumpFall / Landing。
-Session が状態を決定し、`DebugFighterVisual.Apply` が Sprite を差し替える。Walk / Jump 専用画像が無い間は **Idle Sprite を流用**する。Animator は未導入。
+**実装済み**: `FighterVisualState` = Idle / WalkForward / WalkBackward / Attack / JumpStart / JumpRise / JumpApex / JumpFall / Landing / HitStun / KO。
+Session が状態を決定し、`DebugFighterVisual` が `FighterSpriteSequence` で Sprite を再生する。WalkForward / WalkBackward は同一 Walk 2 コマ。素材は `Fighter_SpriteSheet` の sub-sprite。Animator は未導入。**歩行見た目品質は暫定**。
 
-**将来候補（未実装含む）**: Kick、HitStun・Knockback・KO 専用 State、専用 Walk/Jump Sprite、Animator など。
+**将来候補（未実装含む）**: 自然な歩行素材、Kick、HitStun・KO 専用画像、Animator など。
 
 **責務境界（維持する）**
 
 | 担当 | 内容 |
 |---|---|
 | `SimulationSession` | Visual State の決定（入力 × Facing、Attack / Jump / HitStun / KO 優先） |
-| `DebugFighterVisual` | 描画専用（渡された State の Sprite 反映のみ。入力を読まない） |
-| `DebugFighterMotor` | 論理位置（X/Y）と Facing、ジャンプ軌道 |
+| `DebugFighterVisual` | 描画専用（Sequence 再生。入力を読まない） |
+| `DebugFighterMotor` | 論理位置（X/Y）と Facing、ジャンプ軌道（Apex 表示用フラグ含む） |
 | `DebugFighterParticipant` | 戦闘状態（HP / KO / HitStun 等） |
 
 戦闘処理が足の角度や Sprite のコマを直接決めない。戦闘状態を Visual State へ変換し、見た目側が Animator または Sprite 差し替えで表現する。Animator 導入後もこの責務境界を維持する。
@@ -541,24 +541,24 @@ Session が状態を決定し、`DebugFighterVisual.Apply` が Sprite を差し�
 
 判定は**入力意図**を基準とする。壁際で論理 X が変化しなくても方向入力中は Walk とする。Push / Knockback による受動移動だけでは Walk にしない。
 
-**優先（Sprite）**: HitStun または KO（Idle 系＋色）→ Attack → JumpRise → JumpFall → Landing → WalkForward / WalkBackward → Idle。
+**優先（Sprite）**: KO → HitStun → Attack → JumpStart → JumpRise → JumpApex → JumpFall → Landing → WalkForward / WalkBackward → Idle。
 
 左向き Walk / Jump / J Punch は飛び越し後に Editor で確認済み。
 
 ### 15.6 Sprite と Animation（学習方針）
 
-**現在（実装済みの簡易方式）**: `fighter_idle_00_transparent` / `fighter_attack_punch_transparent` など、1状態1枚の Sprite をコードで差し替える。単独 256×256 画像は Sprite Mode **`Single`** で正しい。`WalkForward` / `WalkBackward` / `JumpRise` / `JumpFall` / `Landing` も当面 Idle 画像を流用する（専用 Walk/Jump Sprite・Animator は未実装）。
+**現在（実装済み）**: `Fighter_SpriteSheet.png`（Multiple、個別 Rect）。P1/P2 同一シート、P2 は Tint。`FighterSpriteSequence` で CombatFrame 基準のコマ切替。均等 3×3 セル必須ではない。
 
 **複数コマの用意**
 
 | 方式 | Sprite Mode | 例 |
 |---|---|---|
-| A. 1コマ1 PNG | 各画像 `Single` | `fighter_walk_forward_00.png` など |
-| B. 1枚のスプライトシート | `Multiple` + Sprite Editor で Slice | 1画像から複数 Sprite |
+| A. 1コマ1 PNG | 各画像 `Single` | （旧デバッグ単体。現 Scene では未使用） |
+| B. 1枚のスプライトシート | `Multiple` + Slice（グリッドまたは個別 Rect） | `Fighter_SpriteSheet.png` |
 
-複数 Sprite を用意しただけではアニメーションしない。必要な構成は **Sprite 群 → Animation Clip → Animator Controller → 状態切替**。
+複数 Sprite を用意しただけではアニメーションしない。現状はコード側 Sequence。将来候補は **Sprite 群 → Animation Clip → Animator Controller → 状態切替**。
 
-学習中は 1コマ1 PNG が理解しやすい。将来的に Animator + Animation Clip を導入する（現時点では未実装）。
+学習メモ: シート化は見た目統一に有効だが、Walk の自然さはコマ内容次第。再生速度だけでは歩行品質を「完成」としない。
 
 ### 15.7 Unity デバッグ実装のジャンプ・入力ゲート（ルール）
 
@@ -577,7 +577,7 @@ Session が状態を決定し、`DebugFighterVisual.Apply` が Sprite を差し�
 - 固定 CombatFrame で更新する。HitStop 中は Jump 軌道も停止する
 - Facing × 入力で Forward / Backward を判定する。JumpType は着地まで保持する
 - 高さ差が閾値以上なら空中 Push を無効化する。着地付近で Push を復帰する
-- Jump 専用 Sprite が無い間は Idle Sprite を流用する
+- Jump Visual はシートの JumpStart / Rise / Apex / Fall / Landing sub-sprite
 
 **Training Reset**
 
@@ -587,4 +587,4 @@ Session が状態を決定し、`DebugFighterVisual.Apply` が Sprite を差し�
 - R Reset は release 対象外
 - 将来 Kick / Guard 等を追加したら、共通 Held 判定（`HasAnyGameplayInputHeld`）へ追加する
 
-**未実装（混同禁止）**: 空中 Attack、空中被弾専用仕様、Animator、Jump 専用 Sprite、正式 Character Data SO。
+**未実装（混同禁止）**: 空中 Attack、空中被弾専用仕様、Animator、自然な歩行素材、正式 Character Data SO。

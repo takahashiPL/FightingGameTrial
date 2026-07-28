@@ -425,13 +425,15 @@ namespace FightingGameTrial.Simulation
             TryResolveJPunchHit(participantP1, participantP2);
             TryResolveJPunchHit(participantP2, participantP1);
 
-            // 15. Visual 更新（Attack / Walk / Idle。HitStun・KO 中は Idle Sprite 優先）
-            RefreshFighterVisual();
+            // 15. Visual 更新（Attack / Jump / Walk / Idle。HitStun・KO は専用 State）
+            //     同一 CombatFrame の本更新なので歩行 elapsed を進める。
+            RefreshFighterVisual(true);
 
             // 16. 攻撃終了判定（AttackState 側）
             TryEndJPunchForParticipant(participantP1);
             TryEndJPunchForParticipant(participantP2);
-            RefreshFighterVisual();
+            // 攻撃終了で State が変わった場合の再適用。同一 CombatFrame のため elapsed は進めない。
+            RefreshFighterVisual(false);
 
             // 17. HitStun 消費（Combat Frame 末尾・1回だけ。0 ならノックバック残速度もクリア）
             TickHitStunForParticipant(participantP1);
@@ -487,12 +489,21 @@ namespace FightingGameTrial.Simulation
         }
 
         /// <summary>
-        /// 両 Participant の Visual を、各自の AttackState から更新します。
+        /// 両 Participant の Visual を更新します。
+        /// advanceVisualAnimationFrame が true のときだけ、同じ State の経過 CombatFrame を進めます。
+        /// </summary>
+        public void RefreshFighterVisual(bool advanceVisualAnimationFrame)
+        {
+            RefreshOneFighterVisual(participantP1, advanceVisualAnimationFrame);
+            RefreshOneFighterVisual(participantP2, advanceVisualAnimationFrame);
+        }
+
+        /// <summary>
+        /// 互換: 経過加算なしで両体 Visual を更新します（Reset / Start 時など）。
         /// </summary>
         public void RefreshFighterVisual()
         {
-            RefreshOneFighterVisual(participantP1);
-            RefreshOneFighterVisual(participantP2);
+            RefreshFighterVisual(false);
         }
 
         /// <summary>
@@ -528,7 +539,7 @@ namespace FightingGameTrial.Simulation
             }
 
             attackState.StartJPunch();
-            RefreshOneFighterVisual(participantP1);
+            RefreshOneFighterVisual(participantP1, false);
 
             if (timeState != null)
             {
@@ -611,11 +622,24 @@ namespace FightingGameTrial.Simulation
                 timeState.LastStatusMessage = "Training reset";
             }
 
-            RefreshFighterVisual();
+            // Visual を Idle に戻し、歩行 elapsed / JumpStart・Apex 残留を捨てる
+            ResetFighterVisualToIdle(participantP1);
+            ResetFighterVisualToIdle(participantP2);
+            RefreshFighterVisual(false);
             Debug.Log(
                 "[FightDebug] Training reset"
                 + " (Attack/HitStun/Knockback/HitStop/HP/KO/LogicalX/LogicalY/Jump/Facing)"
             );
+        }
+
+        private static void ResetFighterVisualToIdle(DebugFighterParticipant participant)
+        {
+            if (participant == null || participant.Visual == null)
+            {
+                return;
+            }
+
+            participant.Visual.ResetToIdle();
         }
 
         /// <summary>
@@ -662,18 +686,18 @@ namespace FightingGameTrial.Simulation
         }
 
         /// <summary>
-        /// 1体分の Visual を AttackState / HitState / KO / 移動入力から反映します。
+        /// 1体分の Visual を AttackState / HitState / KO / Jump / 移動入力から反映します。
         ///
         /// Sprite 優先:
-        /// HitStun または KO → Idle
-        /// → Attack（J Punch 攻撃ポーズ中）
-        /// → WalkForward / WalkBackward（Facing × 左右入力）
-        /// → Idle
+        /// KO → HitStun → Attack → JumpStart → JumpRise → JumpApex → JumpFall → Landing
+        /// → WalkForward / WalkBackward → Idle
         ///
         /// 色は Participant.ApplyDisplayColor（HitStun 赤 &gt; KO 暗色 &gt; 通常）。
-        /// color は Visual では触らない。Walk 専用 Sprite は未使用（Idle 流用）。
+        /// color は Visual では触らない。
         /// </summary>
-        private void RefreshOneFighterVisual(DebugFighterParticipant participant)
+        private void RefreshOneFighterVisual(
+            DebugFighterParticipant participant,
+            bool advanceVisualAnimationFrame)
         {
             if (participant == null || participant.Visual == null)
             {
@@ -681,21 +705,25 @@ namespace FightingGameTrial.Simulation
             }
 
             FighterVisualState visualState = ResolveFighterVisualState(participant);
-            participant.Visual.Apply(visualState);
+            participant.Visual.Apply(visualState, advanceVisualAnimationFrame);
             participant.ApplyDisplayColor();
         }
 
         /// <summary>
         /// 1体の Visual State を決定します（見た目の正本決定。Sprite 差し替えは Visual）。
         ///
-        /// 優先: HitStun/KO → Attack → JumpRise → JumpFall → Landing → Walk → Idle
+        /// 優先: KO → HitStun → Attack → JumpStart → JumpRise → JumpApex → JumpFall → Landing → Walk → Idle
         /// </summary>
         private FighterVisualState ResolveFighterVisualState(DebugFighterParticipant participant)
         {
-            // HitStun / KO は専用 enum 値を持たず、Idle Sprite ＋色で表現する。
-            if (participant.IsKnockedOut || participant.IsInHitStun)
+            if (participant.IsKnockedOut)
             {
-                return FighterVisualState.Idle;
+                return FighterVisualState.KO;
+            }
+
+            if (participant.IsInHitStun)
+            {
+                return FighterVisualState.HitStun;
             }
 
             DebugFighterAttackState attackState = participant.AttackState;
@@ -713,12 +741,7 @@ namespace FightingGameTrial.Simulation
             {
                 if (motor.IsGrounded == false)
                 {
-                    if (motor.IsRising)
-                    {
-                        return FighterVisualState.JumpRise;
-                    }
-
-                    return FighterVisualState.JumpFall;
+                    return ResolveAirborneJumpVisualState(participant.Visual, motor);
                 }
 
                 if (motor.IsLanding)
@@ -728,6 +751,50 @@ namespace FightingGameTrial.Simulation
             }
 
             return ResolveLocomotionVisualState(participant);
+        }
+
+        /// <summary>
+        /// 空中の Jump Visual State を決めます。
+        /// JumpStart / Apex の長さは Visual 側の見た目用パラメータ（軌道は変更しない）。
+        /// Apex は Motor の頂点通過フラグ＋経過を使い、毎 Frame の速度 Abs だけでは決めません。
+        /// </summary>
+        private static FighterVisualState ResolveAirborneJumpVisualState(
+            DebugFighterVisual visual,
+            DebugFighterMotor motor)
+        {
+            int jumpStartFrames = 2;
+            int jumpApexFrames = 2;
+            if (visual != null)
+            {
+                jumpStartFrames = visual.JumpStartVisualFrames;
+                jumpApexFrames = visual.JumpApexVisualFrames;
+            }
+
+            // Jump 開始直後は JumpStart（例: Elapsed 1〜2）
+            if (motor.JumpElapsedFrames <= jumpStartFrames)
+            {
+                return FighterVisualState.JumpStart;
+            }
+
+            // 頂点通過後の短い見た目窓
+            if (motor.HasPassedJumpApex
+                && motor.FramesSinceJumpApex >= 0
+                && motor.FramesSinceJumpApex < jumpApexFrames)
+            {
+                return FighterVisualState.JumpApex;
+            }
+
+            if (motor.HasPassedJumpApex == false && motor.IsRising)
+            {
+                return FighterVisualState.JumpRise;
+            }
+
+            if (motor.IsRising)
+            {
+                return FighterVisualState.JumpRise;
+            }
+
+            return FighterVisualState.JumpFall;
         }
 
         /// <summary>
@@ -1592,7 +1659,7 @@ namespace FightingGameTrial.Simulation
                 }
             }
 
-            RefreshOneFighterVisual(defender);
+            RefreshOneFighterVisual(defender, false);
 
             // 1攻撃1Hit の正本は attacker の AttackState
             attackState.MarkHit();

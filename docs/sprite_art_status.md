@@ -2,37 +2,29 @@
 
 ## 結論（現状）
 
-**本番スプライトシートは未完成である。**  
-完成した本番用スプライトシートはリポジトリに存在しない。
+**本番清書スプライトシート（固定セル仕様を満たした最終素材）は未完成である。**
+一方、FightDebugScene 向けの**動作確認用シート**は導入済みである。
 
-`art/fighter_motion_reference_sheet.png` および `docs/reference_infographic.png` は、白い道着・赤い鉢巻の格闘家を基準にした**デザイン／モーション方向性の参考画像**である。
+- 正本ファイル: `Game/Assets/Art/Characters/Fighter_SpriteSheet.png`（1024×1536）
+- 旧単体 PNG（Idle/Punch、Walk/Jump 中間素材）は削除済み。Characters フォルダはシートのみ
+- 均等 3×3 セル分割ではない。Alpha 連結成分から 9 個別 Sprite Rect
+- Walk 2 コマ切替は動作する。**歩行の見た目品質は暫定**（自然な歩行素材は未完了）
 
-用途:
+`art/fighter_motion_reference_sheet.png` および `docs/reference_infographic.png` は、白い道着・赤い鉢巻の格闘家を基準にした**デザイン／モーション方向性の参考画像**である（Unity 取込完成シートではない）。
 
-- キャラクターデザインの統一
-- 必要なポーズの検討
-- モーションの見た目比較
-- 本番制作時の参照
+## FightDebug 用シート（2026-07）
 
-Unity へそのまま取り込む完成スプライトシートではない。理由の例:
+| 項目 | 内容 |
+|---|---|
+| ファイル | `Fighter_SpriteSheet.png` + `.meta` |
+| Sprite Mode | Multiple |
+| PPU / Mesh / Filter / Compression | 100 / Full Rect / Point / None |
+| Physics Shape | Off |
+| Rect | ポーズごとに幅・高さが異なってよい。セル統一より同一キャラ内の基準位置・縮尺安定を優先 |
+| Pivot | 地上 Bottom Center。空中は足元基準 Custom |
+| sub-sprite | Idle / Punch / Walk_00 / Walk_01 / JumpStart / JumpRise / JumpApex / JumpFall / Landing |
 
-- セル寸法が 128×128 へ厳密に揃っていない
-- 透明背景ではない
-- 足元原点が完全には統一されていない
-- 必要フレームIDとの1対1対応が未確定
-- 一部ポーズは参考用で、実装仕様と厳密に一致しない
-
-全フレーム `asset_status=required`（本番素材未作成）。
-
-### デバッグ用透過試験PNG（本番ではない）
-
-FightDebugScene 確認用に、次の**透過試験素材**が `Game/Assets/Art/Characters/` にある（2026-07 時点）。
-
-- `fighter_idle_00_transparent.png`
-- `fighter_attack_punch_transparent.png`
-
-これらは段階7〜9の表示・攻撃確認用であり、**本番清書スプライトシートではない**。  
-配置正本・全ポーズ網羅・セル規格適合は未達として扱う。
+詳細な実装接続は `docs/unity_implementation_status.md` §1.1。
 
 ## 素材ステージの現状
 
@@ -40,43 +32,34 @@ FightDebugScene 確認用に、次の**透過試験素材**が `Game/Assets/Art/
 |---|---|
 | 骨格 | 未整備（制作工程の正本は `production_spritesheet_spec.md`） |
 | シルエット | 未整備 |
-| 仮ドット絵 | 未整備 |
-| 動作確認用素材 | デバッグ用透過PNGあり（Idle/Punch）。本番シートではない |
-| 本番清書素材 | **未作成** |
+| 仮ドット絵 | FightDebug シートに相当する動作確認用（本番清書ではない） |
+| 動作確認用素材 | **シート運用中**（9 ポーズ）。Walk 見た目は暫定 |
+| 本番清書素材 | **未作成**（固定セル仕様適合・清書は未達） |
 | 参考PNG | 参考のみ。完成扱いしない |
+
+## 学習メモ（素材トラブルシュート）
+
+- 画像寸法（例: 256×256）だけでは見かけサイズは揃わない
+- 単体画像を別々に生成すると、頭身・線・配色・体格・余白が不統一になりやすい
+- 1 枚のシートにまとめると比較・統一はしやすいが、**シート化だけで自然なアニメになるわけではない**
+- Walk で同じ脚が前に出る失敗が複数回あった。脚の左右入れ替えだけでは、腰・重心・接地脚・腕振り・頭部上下が弱いと「へこへこ」に見える
+- 均等 3×3 分割を必須と誤認したが、個別 Rect 運用で問題なく成立した
+- 自動スライスが不安定な場合、Alpha 連結成分から Rect を再構築できる
+- 旧素材は新参照確認前に削除しない
 
 ## 制作方針（要約）
 
-専任デザイナー不在のため、ChatGPT 支援の段階制作を正とする。
+専任デザイナー不在のため、ChatGPT 支援の段階制作を正とする。詳細は `docs/production_spritesheet_spec.md`。
 
-1. 骨格 → シルエット → 仮ドット絵 → 前後比較 → Unity連続再生 → 修正 → 清書  
-2. いきなり完成ドット絵をフレーム単位で一発生成しない  
-3. 最初の試験は Idle と StandPunch のみ  
-4. 詳細正本は `docs/production_spritesheet_spec.md`
-
-ChatGPT 生成物は無条件に完成素材としない。人間が採用可否・連続再生・判定対応を確認する。
-
-## 配置の正本
-
-- `data/sprite_frame_requirements.csv`（セル配置の正本）
-- `art/spritesheet_layout.csv`（展開表）
-- `data/frames.csv` の `sheet_x` / `sheet_y`（初期サンプル行のみ）
+仮素材のまま判定実装を進めてよい。見た目完成待ちで止めない。
 
 ## 実装との関係
 
 - ゲーム挙動の正本は `docs/rules.md`
-- Unity 到達点・次工程は `docs/unity_implementation_status.md`
-- **仮素材のまま判定実装を進めてよい**。見た目完成待ちで止めない
-- 切り出し仕様・工程は `docs/production_spritesheet_spec.md`
-
-| scope | 意味 |
-|---|---|
-| `initial` | 最初の対象（Idle / StandPunch） |
-| `planned` | 配置予約。実装済み・素材完成ではない |
+- Unity 到達点は `docs/unity_implementation_status.md`
+- 切り出し・工程の長期正本は `docs/production_spritesheet_spec.md`（固定セル方針）。FightDebug の個別 Rect 運用は学習・検証用の現行方式
 
 ## 削除した旧ファイル
 
-v2 の簡易図形スプライトは削除済み。実装素材として使用しない。
-
-- `art/fighter_spritesheet_v1.png`
-- `art/fighter_spritesheet_v1_boxes_preview.png`
+- v2 簡易図形: `art/fighter_spritesheet_v1.png` 等（実装素材として使用しない）
+- デバッグ単体 PNG（2026-07 削除）: `fighter_idle_00_transparent` / `fighter_attack_punch_transparent` / `Fighter_Walk_*` / `Fighter_Jump*` / `Fighter_Landing`（PNG+meta セット。Scene 参照ゼロ確認後）

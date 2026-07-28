@@ -100,6 +100,12 @@ namespace FightingGameTrial.Fighter
         private float jumpMaximumLogicalY;
         private bool jumpApexLogged;
 
+        /// <summary>
+        /// Apex 通過後の CombatFrame 数（通過フレームは 0）。通過前は -1。
+        /// 見た目の JumpApex 表示に使うだけで、軌道計算には使いません。
+        /// </summary>
+        private int framesSinceJumpApex = -1;
+
         private bool pendingJumpStartedEvent;
         private bool pendingJumpApexEvent;
         private bool pendingJumpLandedEvent;
@@ -194,6 +200,23 @@ namespace FightingGameTrial.Fighter
         public int LandingFramesRemaining
         {
             get { return landingFramesRemaining; }
+        }
+
+        /// <summary>
+        /// このジャンプで頂点（上昇→非上昇）を一度でも通過したか。軌道計算は変えません。
+        /// </summary>
+        public bool HasPassedJumpApex
+        {
+            get { return jumpApexLogged; }
+        }
+
+        /// <summary>
+        /// Apex 通過からの CombatFrame 数（通過フレームは 0）。未通過は -1。
+        /// JumpApex Visual 用。軌道計算には使いません。
+        /// </summary>
+        public int FramesSinceJumpApex
+        {
+            get { return framesSinceJumpApex; }
         }
 
         public bool FacingRight
@@ -373,6 +396,7 @@ namespace FightingGameTrial.Fighter
             jumpStartLogicalY = logicalY;
             jumpMaximumLogicalY = logicalY;
             jumpApexLogged = false;
+            framesSinceJumpApex = -1;
 
             // Session が slot 付きログを出すための開始イベント（文字列は作らない）
             debugStartedJumpType = jumpType;
@@ -472,6 +496,7 @@ namespace FightingGameTrial.Fighter
             // 頂点検出: 速度更新前が上昇、更新後が非上昇になった CombatFrame のみ1回
             // （毎フレームログにせず、短押し／長押しの頂点高度を比較するため）
             bool wasRising = verticalVelocity > 0f;
+            bool apexAlreadyLogged = jumpApexLogged;
             verticalVelocity = verticalVelocity - gravity;
             logicalY = logicalY + verticalVelocity;
 
@@ -483,6 +508,7 @@ namespace FightingGameTrial.Fighter
             if (wasRising && verticalVelocity <= 0f && jumpApexLogged == false)
             {
                 jumpApexLogged = true;
+                framesSinceJumpApex = 0;
                 debugApexJumpType = currentJumpType;
                 debugApexElapsedFrames = jumpElapsedFrames;
                 debugApexHeldFrames = jumpHeldFrames;
@@ -490,6 +516,14 @@ namespace FightingGameTrial.Fighter
                 debugApexHeight = jumpMaximumLogicalY - jumpStartLogicalY;
                 debugApexXDistance = Mathf.Abs(logicalX - jumpStartLogicalX);
                 pendingJumpApexEvent = true;
+            }
+            else if (apexAlreadyLogged)
+            {
+                // 見た目用: Apex 通過後の経過だけ数える（軌道式は変更しない）
+                if (framesSinceJumpApex < int.MaxValue)
+                {
+                    framesSinceJumpApex = framesSinceJumpApex + 1;
+                }
             }
 
             UpdateHorizontalJumpVelocity(
@@ -690,6 +724,7 @@ namespace FightingGameTrial.Fighter
             directionHeldFrames = 0;
             jumpHorizontalSign = 0f;
             jumpApexLogged = false;
+            framesSinceJumpApex = -1;
             landingFramesRemaining = settings.LandingFrames;
             if (landingFramesRemaining < 1)
             {
@@ -733,6 +768,7 @@ namespace FightingGameTrial.Fighter
             jumpStartLogicalY = 0f;
             jumpMaximumLogicalY = 0f;
             jumpApexLogged = false;
+            framesSinceJumpApex = -1;
             pendingJumpStartedEvent = false;
             pendingJumpApexEvent = false;
             pendingJumpLandedEvent = false;
