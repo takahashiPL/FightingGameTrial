@@ -355,8 +355,8 @@ HitStun / KO 表示色もコード側 SerializeField。Scene YAML には未保�
 | Inspector 項目 | 型 | Scene 値 | 何に使うか |
 |---|---|---|---|
 | Sprite Renderer | SpriteRenderer | 自分 | 表示先 |
-| Idle / Walk / Jump* / Landing / Attack Sequence | `FighterSpriteSequence` | `Fighter_SpriteSheet` sub-sprite | State ごとのコマ列 |
-| Walk Sequence | 2 枚 | `Fighter_Walk_00` / `_01` | WalkForward / WalkBackward 共有 |
+| Idle / Walk / Jump* / Landing / Attack Sequence | `FighterSpriteSequence` | `Fighter_SpriteSheet` sub-sprite（31 枚、GUID `dcb7851d129f2305be49fac973bf47b4`） | State ごとのコマ列 |
+| Walk Sequence | 8 枚 | `Fighter_Walk_00` … `_07` | WalkForward / WalkBackward 共有 |
 | JumpStart / JumpApex Visual Frames | int | `2` / `2` | 見た目窓（軌道非依存） |
 | Attack Pose End Frame | int | `6` | 攻撃ポーズ終了 AF |
 | Action End Frame | int | `12` | 見た目用の最終 AF（攻撃終了の正本は Stage 15 で攻撃データの TotalFrames） |
@@ -1016,13 +1016,12 @@ GC の話は「仕様の正本」ではなく、**実行時コストの学習**�
 - R による **Training Reset**: 戦闘状態＋論理位置 X/Y・ジャンプ状態・Facing 復帰＋共通 release gate（§17.7）
 - **Visual Sequence**: `FighterSpriteSequence` + `FighterVisualState`（Idle / WalkF / WalkB / Attack / JumpStart / Rise / Apex / Fall / Landing / HitStun / KO）。Session が決定、Visual が再生（§17.8・§17.9）
 - **ジャンプ基盤**: Neutral / Forward / Backward、LogicalY 軌道、飛び越し Push skip、計測ログ（§17.9）
-- **`Fighter_SpriteSheet`**（Multiple・個別 Rect・9 sub-sprite）。P1/P2 同一、P2 Tint。Walk 2 コマ動作、歩行見た目は暫定
+- **`Fighter_SpriteSheet`**（1536×1024、Multiple、31 sub-sprite、PPU 39、GUID `dcb7851d129f2305be49fac973bf47b4`）。P1/P2 同一、P2 Tint。Idle/Walk/Jump/Punch 接続済み。**Kick は素材のみ・Gameplay 未接続**
 
 ### 17.3 将来構想（方針確定・未実装）
 
 - 対戦モード用 Scene / Controller / HUD
-- 自然な歩行素材、Animator + Animation Clip
-- Kick、空中 Attack、空中被弾専用仕様
+- Kick Gameplay 接続、Punch 3 枚以上、Animator + Animation Clip
 - Character Data ScriptableObject（ジャンプ設定の正式データ化含む）
 
 （Training Reset・Visual Sequence / Sprite Sheet・ジャンプ基盤は §17.7〜§17.9 で実装済み。ここには含めない。）
@@ -1032,7 +1031,7 @@ GC の話は「仕様の正本」ではなく、**実行時コストの学習**�
 戦闘処理が足の角度や Sprite コマを直接決めない。Session が Visual State を決め、Visual が Sequence で表現する（**実装済み**）。
 
 **enum 実装済み**: Idle、WalkForward、WalkBackward、Attack、JumpStart、JumpRise、JumpApex、JumpFall、Landing、HitStun、KO。
-**将来候補**: Kick、自然な歩行素材、Animator など。
+**将来候補**: Kick Gameplay、Punch 素材改善、Animator など。
 
 前進／後退は左右キーだけで決めない。**移動方向 × Facing**（詳細・優先順位は §17.8）。
 
@@ -1064,10 +1063,10 @@ Sprite 群
 
 | 方式 | いま | 将来 |
 |---|---|---|
-| Sequence で Sprite 差し替え | **実装済み**（シート 9 ポーズ） | 学習用経路として維持可 |
+| Sequence で Sprite 差し替え | **実装済み**（31 sub-sprite、Idle/Walk/Jump/Punch 接続済み） | 学習用経路として維持可 |
 | Animator + Animation Clip | **未実装** | 導入方針あり。State 決定は Session のまま |
 
-Walk 2 コマ切替は実装済み。**自然な歩行見た目は未完了**（暫定品質）。
+Walk 8 コマ切替は実装済み・Editor 確認済み。Kick は素材切り出しのみ（Gameplay 未接続）。
 
 ### 17.7 Training Reset（位置・向き・Jump・release gate・学習用）
 
@@ -1217,8 +1216,9 @@ HitStop 中は Combat 処理をスキップするため、**直前の Visual を
 
 #### Editor 確認済み
 
-- 無入力 → Idle、Walk 2 コマ切替、Punch、Jump 各状態 → Idle
-- P1/P2 同一シート、P2 Tint 維持
+- 無入力 → Idle、Walk 8 コマ切替、Punch、Jump 各状態 → Idle
+- P1/P2 同一シート（GUID `dcb7851d129f2305be49fac973bf47b4`）、P2 Tint 維持
+- Missing Sprite なし（Editor 確認済み）
 - Training Reset 後 → Idle
 - Push / Damage / HitStop / HitStun / Knockback / KO 継続
 
@@ -1226,13 +1226,13 @@ HitStop 中は Combat 処理をスキップするため、**直前の Visual を
 
 | 項目 | 区分 |
 |---|---|
-| 歩行の見た目品質（へこへこ） | **暫定**。自然な歩行素材は未完了 |
+| Kick Gameplay 接続 | **未実装**（Kick sub-sprite 5 枚は素材のみ） |
 | P1 が HitStun / KO 中に Walk へ落ちないこと | **未確認**（優先順位コード上は上位） |
 | Development Build | **未確認** |
 
 #### 将来の接続点
 
-- 歩行素材の再制作、または Animator 導入時も State 決定は Session に残す
+- 歩行素材の再制作、Kick Gameplay、または Animator 導入時も State 決定は Session に残す
 
 ### 17.9 ジャンプ基盤（LogicalY・種類判定・Push skip・計測・学習用）
 

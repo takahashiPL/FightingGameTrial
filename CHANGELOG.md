@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## PixelLab fighter action sprites 統合
+
+- 正式 Stage 番号なし（段階15完了状態は維持）
+- PixelLab Export（116×116 連番 PNG）を 1536×1024 正本シートへ統合。旧 `Fighter_SpriteSheet`（GUID `2bb8ae7896cf21b43bcd9cf17bf228d2`）は参照ゼロ確認後に削除。正本 GUID `dcb7851d129f2305be49fac973bf47b4` を維持して `Fighter_SpriteSheet.png` に一本化（`_New` 中間名解消）
+- sub-sprite **31 枚**: Idle 8 / Walk 8 / Jump 8 / Punch 2 / Kick 5。PPU **39**（旧・新 Alpha bbox から算出。Transform Scale は未変更）
+- 各アクションを個別 Rect 再スライス。方針: 体幹中心を Rect 水平中央、接地点または最下端を Rect 下端、共通 **Bottom Center** Pivot（Idle 102×116 / Walk 96×115 / Jump 120×105 / Punch 110×113 / Kick 108×117）
+- FightDebugScene: P1/P2 とも新正本 GUID 参照。P2 Tint 維持。Idle / Walk / Jump / Punch Sequence 配線済み。JumpRise / JumpFall は `loop=false` + `holdLastFrame=true`
+- **Kick**: 素材切り出しのみ。**Gameplay 未接続**（Scene に Sequence 参照なし）
+- **Punch**: 素材 2 枚のみ（Recovery 専用コマなし）。Attack Sequence は暫定
+- Gameplay ロジック・Transform Scale・当たり判定・Scripts は未変更
+- Unity Editor 確認済み: Idle / Walk / Jump / Punch、Missing Sprite なし、動作に支障なし
+- 今後候補: Kick Gameplay 接続、Punch 3 枚以上、必要なら攻撃素材再制作
+- Docs: README / CHANGELOG / `unity_implementation_status.md` §1.1 / `sprite_art_status.md` / `rules.md` §15.5・§15.6 / `component_and_scene_guide.md` §4・§17 / `learning_and_readability.md` §4.1 / `production_spritesheet_spec.md`
+
 ## Visual Sequence + Sprite Sheet 移行
 
 - 正式 Stage 番号なし（段階15完了状態は維持）

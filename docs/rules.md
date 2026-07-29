@@ -515,9 +515,9 @@ Unity デバッグ実装の**実際の到達点**（段階1〜15）と次工程�
 前進・後退・Idle・歩行表現・ジャンプ・キック・Punch・HitStun・Knockback・KO・アニメーション状態は、**練習専用ではなく練習／対戦共通のキャラクター機能**とする。
 
 **実装済み**: `FighterVisualState` = Idle / WalkForward / WalkBackward / Attack / JumpStart / JumpRise / JumpApex / JumpFall / Landing / HitStun / KO。
-Session が状態を決定し、`DebugFighterVisual` が `FighterSpriteSequence` で Sprite を再生する。WalkForward / WalkBackward は同一 Walk 2 コマ。素材は `Fighter_SpriteSheet` の sub-sprite。Animator は未導入。**歩行見た目品質は暫定**。
+Session が状態を決定し、`DebugFighterVisual` が `FighterSpriteSequence` で Sprite を再生する。WalkForward / WalkBackward は同一 Walk 8 コマ。素材は `Fighter_SpriteSheet`（GUID `dcb7851d129f2305be49fac973bf47b4`、31 sub-sprite）の sub-sprite。Animator は未導入。
 
-**将来候補（未実装含む）**: 自然な歩行素材、Kick、HitStun・KO 専用画像、Animator など。
+**将来候補（未実装含む）**: Kick Gameplay 接続、Punch 3 枚以上、HitStun・KO 専用画像、Animator など。
 
 **責務境界（維持する）**
 
@@ -547,7 +547,7 @@ Session が状態を決定し、`DebugFighterVisual` が `FighterSpriteSequence`
 
 ### 15.6 Sprite と Animation（学習方針）
 
-**現在（実装済み）**: `Fighter_SpriteSheet.png`（Multiple、個別 Rect）。P1/P2 同一シート、P2 は Tint。`FighterSpriteSequence` で CombatFrame 基準のコマ切替。均等 3×3 セル必須ではない。
+**現在（実装済み）**: `Fighter_SpriteSheet.png`（1536×1024、Multiple、GUID `dcb7851d129f2305be49fac973bf47b4`、31 sub-sprite、PPU 39）。P1/P2 同一シート、P2 は Tint。`FighterSpriteSequence` で CombatFrame 基準のコマ切替。各アクションは個別 Rect + 共通 Bottom Center Pivot。
 
 **複数コマの用意**
 
@@ -558,7 +558,7 @@ Session が状態を決定し、`DebugFighterVisual` が `FighterSpriteSequence`
 
 複数 Sprite を用意しただけではアニメーションしない。現状はコード側 Sequence。将来候補は **Sprite 群 → Animation Clip → Animator Controller → 状態切替**。
 
-学習メモ: シート化は見た目統一に有効だが、Walk の自然さはコマ内容次第。再生速度だけでは歩行品質を「完成」としない。
+学習メモ: 192×192 共通 Rect だけではフレーム内位置ずれで SpriteRenderer が揺れて見える。**Rect 側で体幹中心・足元を揃える**。`framesPerSprite` は FPS ではなく 1 枚あたりの CombatFrame 数。Animator 導入は別候補。
 
 ### 15.7 Unity デバッグ実装のジャンプ・入力ゲート（ルール）
 

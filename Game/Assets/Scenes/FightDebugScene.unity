@@ -1018,7 +1018,7 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_MaskInteraction: 0
-  m_Sprite: {fileID: -6893699965396766270, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
+  m_Sprite: {fileID: 6416580556862122530, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -1087,51 +1087,68 @@ MonoBehaviour:
   spriteRenderer: {fileID: 700000013}
   idleSequence:
     sprites:
-    - {fileID: -6893699965396766270, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
+    - {fileID: 6416580556862122530, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: 966658086203555024, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: -8293059592220196922, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: 7521787606047754259, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: 7246347419078054826, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: 8927006553526140056, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: 5312931639414449679, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: -5601683446387270787, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
     framesPerSprite: 6
     loop: 1
     holdLastFrame: 1
   walkSequence:
     sprites:
-    - {fileID: -6173448706499852527, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
-    - {fileID: -1272312983355927443, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
+    - {fileID: 635353161213487548, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: -7396025626249946679, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: 5964273057507650123, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: -8769634361602214830, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: 9091132549315087878, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: 6854783029718337897, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: -4539027391029690831, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: 4536678039530678905, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
     framesPerSprite: 6
     loop: 1
     holdLastFrame: 1
   jumpStartSequence:
     sprites:
-    - {fileID: 2423625779142430129, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
+    - {fileID: 4414090336959396330, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
     framesPerSprite: 1
     loop: 0
     holdLastFrame: 1
   jumpRiseSequence:
     sprites:
-    - {fileID: -5042221198134202916, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
-    framesPerSprite: 6
-    loop: 1
+    - {fileID: -8256688541223394905, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: -601119878782111544, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    framesPerSprite: 4
+    loop: 0
     holdLastFrame: 1
   jumpApexSequence:
     sprites:
-    - {fileID: 935476333197682602, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
+    - {fileID: -7307160571792452778, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
     framesPerSprite: 1
     loop: 0
     holdLastFrame: 1
   jumpFallSequence:
     sprites:
-    - {fileID: 6352025079003738632, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
-    framesPerSprite: 6
-    loop: 1
+    - {fileID: -2399908528487463498, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: -220068121490847457, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    framesPerSprite: 4
+    loop: 0
     holdLastFrame: 1
   landingSequence:
     sprites:
-    - {fileID: 7950610859281020069, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
-    framesPerSprite: 1
+    - {fileID: 8369401445206851527, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: 6947291798931185141, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    framesPerSprite: 2
     loop: 0
     holdLastFrame: 1
   attackSequence:
     sprites:
-    - {fileID: -6380533871378565388, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
-    framesPerSprite: 1
+    - {fileID: -7363211071436412856, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: 5499136287484261559, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    framesPerSprite: 2
     loop: 0
     holdLastFrame: 1
   hitStunSequence:
@@ -1278,7 +1295,7 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_MaskInteraction: 0
-  m_Sprite: {fileID: -6893699965396766270, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
+  m_Sprite: {fileID: 6416580556862122530, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
   m_Color: {r: 0.65, g: 0.78, b: 0.95, a: 1}
   m_FlipX: 1
   m_FlipY: 0
@@ -1347,51 +1364,68 @@ MonoBehaviour:
   spriteRenderer: {fileID: 700000023}
   idleSequence:
     sprites:
-    - {fileID: -6893699965396766270, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
+    - {fileID: 6416580556862122530, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: 966658086203555024, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: -8293059592220196922, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: 7521787606047754259, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: 7246347419078054826, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: 8927006553526140056, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: 5312931639414449679, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: -5601683446387270787, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
     framesPerSprite: 6
     loop: 1
     holdLastFrame: 1
   walkSequence:
     sprites:
-    - {fileID: -6173448706499852527, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
-    - {fileID: -1272312983355927443, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
+    - {fileID: 635353161213487548, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: -7396025626249946679, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: 5964273057507650123, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: -8769634361602214830, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: 9091132549315087878, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: 6854783029718337897, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: -4539027391029690831, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: 4536678039530678905, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
     framesPerSprite: 6
     loop: 1
     holdLastFrame: 1
   jumpStartSequence:
     sprites:
-    - {fileID: 2423625779142430129, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
+    - {fileID: 4414090336959396330, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
     framesPerSprite: 1
     loop: 0
     holdLastFrame: 1
   jumpRiseSequence:
     sprites:
-    - {fileID: -5042221198134202916, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
-    framesPerSprite: 6
-    loop: 1
+    - {fileID: -8256688541223394905, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: -601119878782111544, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    framesPerSprite: 4
+    loop: 0
     holdLastFrame: 1
   jumpApexSequence:
     sprites:
-    - {fileID: 935476333197682602, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
+    - {fileID: -7307160571792452778, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
     framesPerSprite: 1
     loop: 0
     holdLastFrame: 1
   jumpFallSequence:
     sprites:
-    - {fileID: 6352025079003738632, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
-    framesPerSprite: 6
-    loop: 1
+    - {fileID: -2399908528487463498, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: -220068121490847457, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    framesPerSprite: 4
+    loop: 0
     holdLastFrame: 1
   landingSequence:
     sprites:
-    - {fileID: 7950610859281020069, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
-    framesPerSprite: 1
+    - {fileID: 8369401445206851527, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: 6947291798931185141, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    framesPerSprite: 2
     loop: 0
     holdLastFrame: 1
   attackSequence:
     sprites:
-    - {fileID: -6380533871378565388, guid: 2bb8ae7896cf21b43bcd9cf17bf228d2, type: 3}
-    framesPerSprite: 1
+    - {fileID: -7363211071436412856, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: 5499136287484261559, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    framesPerSprite: 2
     loop: 0
     holdLastFrame: 1
   hitStunSequence:

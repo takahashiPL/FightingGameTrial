@@ -114,34 +114,45 @@ Training Reset 共通 release gate: **実装・Editor 確認済み**（正式 St
 
 HitStun / KO は専用 State。専用 Sequence 未設定時は Idle Sequence へ fallback。色は従来どおり `ApplyDisplayColor`（HitStun 赤 > KO 暗色 > 通常 Tint）。
 
-**素材（FightDebug 正本）**: `Assets/Art/Characters/Fighter_SpriteSheet.png`（1024×1536、Multiple）。均等グリッドではない。Alpha 連結成分から 9 個別 Rect。PPU 100 / Full Rect / Point / Compression None / Physics Shape Off。地上は Bottom Center、空中は足元基準 Custom Pivot。P1/P2 同一シート参照、P2 は Tint 区別。
+**素材（FightDebug 正本）**: `Assets/Art/Characters/Fighter_SpriteSheet.png`（1536×1024、Multiple、GUID `dcb7851d129f2305be49fac973bf47b4`）。PixelLab Export を統合した **31 個別 Rect**。PPU **39** / Full Rect / Point / Compression None / Physics Shape Off。全 sub-sprite **Bottom Center**。P1/P2 同一シート参照、P2 は Tint 区別。旧 GUID `2bb8ae7896cf21b43bcd9cf17bf228d2` は削除済み。
 
-| State | sub-sprite |
+| グループ | 枚数 | Scene 接続 |
+|---|---|---|
+| Idle | 8（`Fighter_Idle_00` … `_07`） | **接続済み・確認 OK** |
+| Walk | 8（`Fighter_Walk_00` … `_07`） | **接続済み・確認 OK**（WalkF / WalkB 共有） |
+| Jump | 8（`Fighter_Jump_00` … `_07`） | **接続済み・確認 OK** |
+| Punch | 2（`Fighter_Punch_00` / `_01`） | **接続済み・確認 OK**（Recovery 専用コマなし・暫定） |
+| Kick | 5（`Fighter_Kick_00` … `_04`） | **素材のみ・Gameplay 未接続** |
+
+| State | Sequence 割当 |
 |---|---|
-| Idle | `Fighter_Idle` |
-| Attack | `Fighter_Punch` |
-| WalkForward / WalkBackward | `Fighter_Walk_00` + `Fighter_Walk_01`（2コマ） |
-| JumpStart | `Fighter_JumpStart` |
-| JumpRise | `Fighter_JumpRise` |
-| JumpApex | `Fighter_JumpApex` |
-| JumpFall | `Fighter_JumpFall` |
-| Landing | `Fighter_Landing` |
+| Idle | `Fighter_Idle_00` … `_07`（8 コマ） |
+| WalkForward / WalkBackward | `Fighter_Walk_00` … `_07`（8 コマ） |
+| JumpStart | `Fighter_Jump_00` |
+| JumpRise | `Fighter_Jump_01` / `_02`（`loop=false`, `holdLastFrame=true`） |
+| JumpApex | `Fighter_Jump_03` |
+| JumpFall | `Fighter_Jump_04` / `_05`（`loop=false`, `holdLastFrame=true`） |
+| Landing | `Fighter_Jump_06` / `_07` |
+| Attack | `Fighter_Punch_00` / `_01` |
 
-旧単体 PNG（Idle/Punch および Walk/Jump 中間素材）は参照ゼロ確認後に削除。Characters はシートのみ。
+共通 Rect サイズ: Idle 102×116 / Walk 96×115 / Jump 120×105 / Punch 110×113 / Kick 108×117。
+
+Characters フォルダは正本 PNG + `.meta` の 1 組のみ。
 
 **評価**
 
 | 項目 | 状態 |
 |---|---|
-| Sprite Sheet 運用移行 | **完了** |
-| 9 状態 sub-sprite 参照 | **完了** |
-| Walk 2 コマ切替 | **動作確認済み** |
-| Punch / Jump 各状態表示 | **動作確認済み** |
+| PixelLab 正本シート統合 | **完了** |
+| 31 sub-sprite 切り出し | **完了** |
+| Idle / Walk / Jump / Punch Sequence | **Editor 確認済み** |
+| Kick 素材 | **切り出し済み** |
+| Kick Gameplay | **未接続** |
 | P1/P2・P2 Tint | **確認済み** |
-| 歩行の見た目品質 | **暫定**（「へこへこ」に見える。自然な歩行素材は未完了） |
+| Missing Sprite | **なし（Editor 確認済み）** |
 | Gameplay ロジック変更 | **なし** |
 
-**次回改善候補**: 自然な歩行素材の再制作（コマ間の脚・腰・重心）。コードや再生速度だけでは解決済みとしない。Animator 導入は別候補。
+**次回改善候補**: Kick Gameplay 接続、Punch 3 枚以上、必要なら攻撃素材再制作。Animator 導入は別候補。
 
 詳細は教材 §17.8・§17.9、`docs/rules.md` §15.5・§15.6、`docs/sprite_art_status.md`。
 
@@ -435,9 +446,9 @@ ScriptableObject 化、Inspector 編集、Character 別攻撃データ、複数�
 - 壁バウンド等（工程番号なし残課題）
 - 攻撃データの ScriptableObject 化 / Inspector 編集 / JSON・CSV
 - 複数攻撃、弱/中/強、技コマンド、コンボ、Cancel、Counter Hit
-- 自然な歩行素材の再制作（現状 Walk 2 コマは動作するが見た目は暫定）
-- Animator + Animation Clip
-- K Kick、空中 Attack、空中被弾専用仕様
+- 自然な歩行素材の再制作（現状 Walk 8 コマは動作確認済み）
+- **Kick Gameplay 接続**（Kick sub-sprite 5 枚は素材のみ）
+- Punch 3 枚以上への素材改善
 - Character Data ScriptableObject（ジャンプ設定の正式データ化含む）
 - Jump 数値調整、Development Build Profiler
 - 練習用将来候補: ダミー回復、自動回復、ガード設定、行動記録、判定表示、フレーム表示など
@@ -476,7 +487,7 @@ Push / Hurt / Hit 可視化（11A）と Hit×Hurt 重なり判定（11B）は完
 
 その後の候補（順不同・未着手。**新工程番号は作らない**。正式な次 Stage も未定義）:
 
-- 自然な歩行素材の再制作（Walk 2 コマ切替は完了、見た目品質は暫定）
+- Kick Gameplay 接続、Punch 3 枚以上への素材改善
 - Animator + Animation Clip
 - Air Hit / Air Knockback、空中 Attack
 - K Kick、Guard
@@ -549,6 +560,6 @@ Round / Guard / 複数攻撃などの**機能 Stage とは別枠**。番号「GC
 - 段階1〜**15**まで到達。工程表の段階14（HP/Damage/KO）と段階15（攻撃データ化）は完了
 - Visual Sequence + Sprite Sheet 移行・ジャンプ基盤・計測ログ・Training Reset release gate は実装・Editor 確認済み。正式 Stage 番号なし
 - `FightDebugScene` は**練習・検証モード**。戦闘コア共通、KO 後処理はモード側（§1.1）
-- Visual: Sequence 再生 + `Fighter_SpriteSheet` 9 sub-sprite。Walk 2 コマは動作、歩行見た目は暫定。Animator 未使用
+- Visual: Sequence 再生 + `Fighter_SpriteSheet` **31 sub-sprite**（PPU 39、Idle/Walk/Jump/Punch 接続済み、Kick 素材のみ）。Animator 未使用
 - 飛び越し後 Facing 反転・左向き Walk / Jump / J Punch は Editor 確認済み。空中 Attack・空中被弾専用・Dev Build Profiler・自然な歩行素材は未実装／未完了
-- 正式な次 Stage 番号は未定義。候補は順不同（歩行素材改善、Animator、Air Hit、Kick、Guard、Character Data SO、対戦モード分離など）
+- 正式な次 Stage 番号は未定義。候補は順不同（Kick Gameplay、Punch 素材改善、Animator、Air Hit、Guard、Character Data SO、対戦モード分離など）

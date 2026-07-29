@@ -67,10 +67,14 @@
 
 ## 4.1 スプライト素材の学習メモ（FightDebug）
 
-- 画像のピクセル寸法だけでは見かけサイズは揃わない（PPU・Rect・描画内容が効く）
-- 単体 PNG を別々に生成すると頭身・線・余白が崩れやすい。シート化は比較に有効だが、自然なアニメの保証ではない
-- Walk は脚の左右だけでなく腰・重心・接地・腕振りが弱いと「へこへこ」に見える。2 コマ切替が動いても歩行品質完成とは言わない
-- 均等 3×3 分割は必須ではない。個別 Rect + 足元 Pivot で運用できる
+- 画像のピクセル寸法だけでは見かけサイズは揃わない（**PPU**・Rect・描画内容が効く）。正本は PPU **39**（旧・新 Alpha bbox から算出）。Transform Scale の場当たり調整はしない
+- PixelLab Export（116×116 連番）を 1536×1024 正本シートへ統合。想定フレーム数と実物が異なった（Idle/Walk/Jump 各 8、Punch 2、Kick 5）
+- 192×192 共通 Rect + 共通 Pivot だけでは、フレーム内キャラ位置ずれで SpriteRenderer だけが左右・上下へ動いて見える
+- **Rect 側で体幹中心（腰帯）を水平中央、接地点または最下端を Rect 下端へ揃える**。フレームごとの個別 Pivot で帳尻を合わせない
+- Alpha 全体重心だけでは手足・帯・髪に引っ張られる
+- `framesPerSprite` は FPS ではなく、**1 枚を何 CombatFrame 表示するか**
+- JumpRise / JumpFall は `loop=false` + `holdLastFrame=true` で空中姿勢の往復を防止
+- 旧・新シート並存のままコミットせず、参照検索後に新 GUID を維持して正本名へ一本化する
 - 旧素材は新 Scene 参照確認前に削除しない
 
 詳細: `docs/sprite_art_status.md` / `docs/unity_implementation_status.md` §1.1
