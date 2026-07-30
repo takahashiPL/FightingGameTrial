@@ -58,6 +58,10 @@ namespace FightingGameTrial.Fighter
         [SerializeField]
         private FighterSpriteSequence kickSequence = new FighterSpriteSequence();
 
+        [Tooltip("Ground Clash 専用。未設定なら Idle Sequence へ fallback。")]
+        [SerializeField]
+        private FighterSpriteSequence clashRecoilSequence = new FighterSpriteSequence();
+
         [Tooltip("未設定なら Idle Sequence へ fallback。")]
         [SerializeField]
         private FighterSpriteSequence hitStunSequence = new FighterSpriteSequence();
@@ -299,6 +303,9 @@ namespace FightingGameTrial.Fighter
 
                 case FighterVisualState.Kick:
                     return kickSequence;
+
+                case FighterVisualState.ClashRecoil:
+                    return clashRecoilSequence;
 
                 case FighterVisualState.HitStun:
                     return hitStunSequence;

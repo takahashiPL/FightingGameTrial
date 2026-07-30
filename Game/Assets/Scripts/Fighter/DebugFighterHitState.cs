@@ -47,6 +47,13 @@ namespace FightingGameTrial.Fighter
     {
         private int totalHitCount;
         private int hitStunRemainingFrames;
+
+        /// <summary>
+        /// Ground Clash 成立後の専用反動残り Combat Frame。
+        /// 通常 HitStun とは分け、被弾回数や赤表示へ混ぜません。
+        /// </summary>
+        private int clashRecoilRemainingFrames;
+
         private bool wasHitThisCombatFrame;
         private int lastHitCombatFrame = -1;
 
@@ -71,6 +78,28 @@ namespace FightingGameTrial.Fighter
         public bool IsInHitStun
         {
             get { return hitStunRemainingFrames > 0; }
+        }
+
+        public int ClashRecoilRemainingFrames
+        {
+            get { return clashRecoilRemainingFrames; }
+        }
+
+        /// <summary>
+        /// Ground Clash の専用反動中か。通常 HitStun とは別状態です。
+        /// </summary>
+        public bool IsInClashRecoil
+        {
+            get { return clashRecoilRemainingFrames > 0; }
+        }
+
+        /// <summary>
+        /// 入力不能・ノックバック継続の対象となる戦闘リアクション中か。
+        /// 通常 HitStun と Ground Clash 反動をまとめて判定するときだけ使います。
+        /// </summary>
+        public bool IsInCombatReaction
+        {
+            get { return IsInHitStun || IsInClashRecoil; }
         }
 
         public bool WasHitThisCombatFrame
@@ -126,12 +155,38 @@ namespace FightingGameTrial.Fighter
                 hitStunFrames = 0;
             }
 
+            // 通常 Hit が成立した時点で、Clash 専用反動は終了します。
+            clashRecoilRemainingFrames = 0;
             hitStunRemainingFrames = hitStunFrames;
             knockbackVelocityX = knockbackVelocity;
         }
 
         /// <summary>
-        /// 1 Combat Frame 分だけ HitStun を消費します。
+        /// Ground Clash 成立時の専用反動を開始します。
+        ///
+        /// 通常 Hit との違い:
+        /// - TotalHitCount を増やさない
+        /// - WasHitThisCombatFrame / LastHitCombatFrame を変更しない
+        /// - Damage は扱わない
+        /// - Clash 専用表示のため、通常 HitStun とは別の残り時間を持つ
+        ///
+        /// HitStop は試合全体の共有時間なので Session が設定します。
+        /// </summary>
+        public void BeginClashRecoil(int recoilFrames, float knockbackVelocity)
+        {
+            if (recoilFrames < 0)
+            {
+                recoilFrames = 0;
+            }
+
+            // Clash は通常被弾ではないため、HitStun を使い回さない。
+            hitStunRemainingFrames = 0;
+            clashRecoilRemainingFrames = recoilFrames;
+            knockbackVelocityX = knockbackVelocity;
+        }
+
+        /// <summary>
+        /// 1 Combat Frame 分だけ通常 HitStun または ClashRecoil を消費します。
         ///
         /// 呼び出し側（Session）は HitStop 外の Combat 処理の末尾で、
         /// 参加者ごとに1回だけ呼ぶこと。SimulationTick 単位では呼ばない。
@@ -139,15 +194,22 @@ namespace FightingGameTrial.Fighter
         /// </summary>
         public void TickCombatFrame()
         {
-            if (hitStunRemainingFrames <= 0)
+            if (hitStunRemainingFrames > 0)
             {
-                return;
+                hitStunRemainingFrames = hitStunRemainingFrames - 1;
+                if (hitStunRemainingFrames < 0)
+                {
+                    hitStunRemainingFrames = 0;
+                }
             }
 
-            hitStunRemainingFrames = hitStunRemainingFrames - 1;
-            if (hitStunRemainingFrames < 0)
+            if (clashRecoilRemainingFrames > 0)
             {
-                hitStunRemainingFrames = 0;
+                clashRecoilRemainingFrames = clashRecoilRemainingFrames - 1;
+                if (clashRecoilRemainingFrames < 0)
+                {
+                    clashRecoilRemainingFrames = 0;
+                }
             }
         }
 
@@ -203,6 +265,7 @@ namespace FightingGameTrial.Fighter
         {
             totalHitCount = 0;
             hitStunRemainingFrames = 0;
+            clashRecoilRemainingFrames = 0;
             wasHitThisCombatFrame = false;
             lastHitCombatFrame = -1;
             knockbackVelocityX = 0f;

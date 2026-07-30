@@ -7,8 +7,13 @@ namespace FightingGameTrial.Fighter
     /// 表示素材は複数状態で共有してよい（例: WalkForward/Backward で同じ歩行列）。
     /// 状態の決定は Session、Sprite 割り当ては Visual の責務です。
     ///
-    /// HitStun / KO は専用 State を持ちつつ、専用 Sprite が無い間は Idle 画像へ fallback します。
-    /// 色による被弾／KO 表現（Participant.ApplyDisplayColor）は維持します。
+    /// HitStun / KO / ClashRecoil は専用 State を持ちつつ、
+    /// 専用 Sprite が無い間は Idle 画像へ fallback します。
+    /// 色による通常被弾／KO／Clash 表現は Participant.ApplyDisplayColor が担当します。
+    ///
+    /// enum 値を明示する理由:
+    /// Unity の Scene / Prefab では enum が整数として保存されるため、
+    /// 既存項目の番号を変えず、新規項目は末尾へ追加します。
     /// </summary>
     public enum FighterVisualState
     {
@@ -23,7 +28,11 @@ namespace FightingGameTrial.Fighter
         JumpApex = 8,
         HitStun = 9,
         KO = 10,
+
         /// <summary>地上 Kick 攻撃ポーズ。Attack（Punch）とは別 Sequence を使う。</summary>
-        Kick = 11
+        Kick = 11,
+
+        /// <summary>Ground Clash 成立後の専用反動表示。</summary>
+        ClashRecoil = 12
     }
 }

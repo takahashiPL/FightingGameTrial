@@ -725,10 +725,10 @@ namespace FightingGameTrial.Simulation
         /// 1体分の Visual を AttackState / HitState / KO / Jump / 移動入力から反映します。
         ///
         /// Sprite 優先:
-        /// KO → HitStun → Attack(Punch) → Kick → JumpStart → JumpRise → JumpApex → JumpFall → Landing
+        /// ClashRecoil → KO → HitStun → Attack(Punch) → Kick → JumpStart → JumpRise → JumpApex → JumpFall → Landing
         /// → WalkForward / WalkBackward → Idle
         ///
-        /// 色は Participant.ApplyDisplayColor（HitStun 赤 &gt; KO 暗色 &gt; 通常）。
+        /// 色は Participant.ApplyDisplayColor（Clash 専用色 &gt; HitStun 赤 &gt; KO 暗色 &gt; 通常）。
         /// color は Visual では触らない。
         /// </summary>
         private void RefreshOneFighterVisual(
@@ -748,10 +748,15 @@ namespace FightingGameTrial.Simulation
         /// <summary>
         /// 1体の Visual State を決定します（見た目の正本決定。Sprite 差し替えは Visual）。
         ///
-        /// 優先: KO → HitStun → Attack → Kick → JumpStart → JumpRise → JumpApex → JumpFall → Landing → Walk → Idle
+        /// 優先: ClashRecoil → KO → HitStun → Attack → Kick → JumpStart → JumpRise → JumpApex → JumpFall → Landing → Walk → Idle
         /// </summary>
         private FighterVisualState ResolveFighterVisualState(DebugFighterParticipant participant)
         {
+            if (participant.IsInClashRecoil)
+            {
+                return FighterVisualState.ClashRecoil;
+            }
+
             if (participant.IsKnockedOut)
             {
                 return FighterVisualState.KO;
@@ -984,7 +989,7 @@ namespace FightingGameTrial.Simulation
                 return false;
             }
 
-            if (participant.IsInHitStun)
+            if (participant.IsInCombatReaction)
             {
                 return false;
             }
@@ -1146,7 +1151,7 @@ namespace FightingGameTrial.Simulation
             // 空中軌道は HitStun / KO 中も重力落下を進める（入力による空中制御は Motor 側で入力 null 相当にできる）
             if (motor.IsGrounded == false)
             {
-                if (participant.IsKnockedOut || participant.IsInHitStun)
+                if (participant.IsKnockedOut || participant.IsInCombatReaction)
                 {
                     // プレイヤー空中制御なし（Up/左右を無視した軌道継続）
                     motor.ProcessOneAirborneCombatFrame(null);
@@ -1166,7 +1171,7 @@ namespace FightingGameTrial.Simulation
             }
 
             // HitStun 中は本人の移動だけ無効。Push / ノックバックは後段で効く。
-            if (participant.IsInHitStun)
+            if (participant.IsInCombatReaction)
             {
                 return;
             }
@@ -1211,7 +1216,7 @@ namespace FightingGameTrial.Simulation
                 return;
             }
 
-            if (participant.IsKnockedOut || participant.IsInHitStun)
+            if (participant.IsKnockedOut || participant.IsInCombatReaction)
             {
                 return;
             }
@@ -1427,7 +1432,7 @@ namespace FightingGameTrial.Simulation
             }
 
             // ノックバックは HitStun 中だけ適用する。
-            if (participant.IsInHitStun == false)
+            if (participant.IsInCombatReaction == false)
             {
                 return;
             }
@@ -1871,13 +1876,11 @@ namespace FightingGameTrial.Simulation
                 p2.AttackState.EndAttackAsClash();
             }
 
-            p1.ReceiveHit(
-                timeState.CombatFrame,
+            p1.ReceiveGroundClashRecoil(
                 DebugClashTuning.ClashStunFrames,
                 p1Knockback
             );
-            p2.ReceiveHit(
-                timeState.CombatFrame,
+            p2.ReceiveGroundClashRecoil(
                 DebugClashTuning.ClashStunFrames,
                 p2Knockback
             );

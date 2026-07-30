@@ -104,6 +104,13 @@ namespace FightingGameTrial.Fighter
         private Color hitStunDisplayColor = new Color(1f, 0.35f, 0.35f, 1f);
 
         [Tooltip(
+            "Ground Clash 反動中の専用表示色です。"
+            + " 通常被弾の赤色と区別し、Damage 0 の相打ちであることを見分けます。"
+        )]
+        [SerializeField]
+        private Color clashRecoilDisplayColor = new Color(1f, 0.85f, 0.2f, 1f);
+
+        [Tooltip(
             "KO 中の表示色です（段階14B）。"
             + " 被 Hit 表示（HitStun 中）が終わったあとだけ適用します。"
             + " Scene / Prefab 変更なしで既定の暗いグレーを使います。"
@@ -352,6 +359,37 @@ namespace FightingGameTrial.Fighter
                 }
 
                 return hitState.IsInHitStun;
+            }
+        }
+
+        /// <summary>Ground Clash 専用反動中か。</summary>
+        public bool IsInClashRecoil
+        {
+            get
+            {
+                if (hitState == null)
+                {
+                    return false;
+                }
+
+                return hitState.IsInClashRecoil;
+            }
+        }
+
+        /// <summary>
+        /// 入力・通常移動を止める戦闘リアクション中か。
+        /// 通常 HitStun と Ground Clash 反動の共通ゲートに使います。
+        /// </summary>
+        public bool IsInCombatReaction
+        {
+            get
+            {
+                if (hitState == null)
+                {
+                    return false;
+                }
+
+                return hitState.IsInCombatReaction;
             }
         }
 
@@ -902,6 +940,30 @@ namespace FightingGameTrial.Fighter
         }
 
         /// <summary>
+        /// Ground Clash 成立後の専用反動を開始します。
+        ///
+        /// 通常 ReceiveHit と分ける理由:
+        /// - Damage 0 の Clash を被弾回数へ加算しない
+        /// - 赤い HitStun 表示ではなく Clash 専用色を使う
+        /// - HUD / Visual State で ClashRecoil と判別できるようにする
+        ///
+        /// 攻撃終了は Session が EndAttackAsClash を先に呼びます。
+        /// HitStop は共有時間なので Session が設定します。
+        /// </summary>
+        public void ReceiveGroundClashRecoil(
+            int recoilFrameCount,
+            float knockbackVelocityX)
+        {
+            if (hitState == null)
+            {
+                hitState = new DebugFighterHitState();
+            }
+
+            hitState.BeginClashRecoil(recoilFrameCount, knockbackVelocityX);
+            ApplyDisplayColor();
+        }
+
+        /// <summary>
         /// Damage を適用し、実際に減った HP 量を返します（段階14A）。
         ///
         /// 何をするか:
@@ -1025,13 +1087,13 @@ namespace FightingGameTrial.Fighter
                 return;
             }
 
-            bool wasInHitStun = hitState.IsInHitStun;
+            bool wasInCombatReaction = hitState.IsInCombatReaction;
             hitState.TickCombatFrame();
 
-            if (wasInHitStun && hitState.IsInHitStun == false)
+            if (wasInCombatReaction && hitState.IsInCombatReaction == false)
             {
-                // HitStun 終了時に残速度を 0 へ（ノックバックは Stun 中だけ適用）。
-                // KO 中でも Stun 終了はするが、isKnockedOut は維持する。
+                // 通常 HitStun / ClashRecoil の終了時に残速度を 0 へ。
+                // KO 中でもリアクション終了はするが、isKnockedOut は維持する。
                 hitState.ClearKnockback();
                 ApplyDisplayColor();
             }
@@ -1059,12 +1121,17 @@ namespace FightingGameTrial.Fighter
         }
 
         /// <summary>
-        /// HUD 用: Idle / Attack / HitStop / HitStun / KO の短い状態名。
+        /// HUD 用: Idle / Attack / HitStop / HitStun / ClashRecoil / KO の短い状態名。
         /// KO 中でも最後の一撃の HitStop/HitStun 表示は優先（併存確認用）。
         /// HitStun 終了後は KO を返す。
         /// </summary>
         public string BuildDebugStateLabel(int sharedHitStopRemaining)
         {
+            if (hitState != null && hitState.IsInClashRecoil)
+            {
+                return "ClashRecoil";
+            }
+
             if (hitState != null && hitState.IsInHitStun)
             {
                 if (sharedHitStopRemaining > 0)
@@ -1122,8 +1189,8 @@ namespace FightingGameTrial.Fighter
         }
 
         /// <summary>
-        /// 表示色の正本を反映します（段階12A / 14B / 15 回帰）。
-        /// 優先: **被 Hit 表示（IsInHitStun）&gt; KO 暗色 &gt; 通常 Tint**。
+        /// 表示色の正本を反映します（段階12A / 14B / 15 / Ground Clash）。
+        /// 優先: **Clash 専用色 &gt; 被 Hit 表示 &gt; KO 暗色 &gt; 通常 Tint**。
         ///
         /// KO 状態の正本（isKnockedOut）や TryEnterKnockout の呼び出し順は変えない。
         /// 最後の一撃でも HitStun 中は通常 Hit と同じ赤表示にし、
@@ -1137,8 +1204,15 @@ namespace FightingGameTrial.Fighter
                 return;
             }
 
-            // 既存の通常 Hit と同じ条件（点滅専用フラグは持たない）。
-            // HitStop 中も HitStun 残りが維持されるため、従来どおり赤になる。
+            // Ground Clash は Damage 0 なので、通常被弾の赤色と分ける。
+            // HitStop 中も ClashRecoil 残りは維持されるため専用色のまま止まる。
+            if (hitState != null && hitState.IsInClashRecoil)
+            {
+                spriteRenderer.color = clashRecoilDisplayColor;
+                return;
+            }
+
+            // 通常 Hit は従来どおり赤表示。
             if (hitState != null && hitState.IsInHitStun)
             {
                 spriteRenderer.color = hitStunDisplayColor;
