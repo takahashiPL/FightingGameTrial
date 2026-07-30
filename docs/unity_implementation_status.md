@@ -153,7 +153,7 @@ Characters フォルダは正本 PNG + `.meta` の 1 組のみ。
 | Missing Sprite | **なし（Editor 確認済み）** |
 | Gameplay ロジック変更 | **なし** |
 
-**次回改善候補**: Ground Clash 専用実測、Punch 3 枚以上、必要なら攻撃素材再制作。Animator 導入は別候補。
+**次回改善候補**: Ground Clash専用表示の整理、Punch 3 枚以上、必要なら攻撃素材再制作。Animator 導入は別候補。
 
 詳細は教材 §17.8・§17.9、`docs/rules.md` §15.5・§15.6、`docs/sprite_art_status.md`。
 
@@ -448,7 +448,7 @@ ScriptableObject 化、Inspector 編集、Character 別攻撃データ、複数�
 - 攻撃データの ScriptableObject 化 / Inspector 編集 / JSON・CSV
 - 複数攻撃、弱/中/強、技コマンド、コンボ、Cancel、Counter Hit
 - 自然な歩行素材の再制作（現状 Walk 8 コマは動作確認済み）
-- **Ground Clash 専用実測**（P2同時攻撃デバッグ経路。通常保存値はOFF）
+- **Ground Clash専用表示の整理**（P2同時攻撃デバッグ経路。通常保存値はOFF）
 - Punch 3 枚以上への素材改善
 - Character Data ScriptableObject（ジャンプ設定の正式データ化含む）
 - Jump 数値調整、Development Build Profiler
@@ -488,7 +488,7 @@ Push / Hurt / Hit 可視化（11A）と Hit×Hurt 重なり判定（11B）は完
 
 その後の候補（順不同・未着手。**新工程番号は作らない**。正式な次 Stage も未定義）:
 
-- Ground Clash専用実測、Punch 3 枚以上への素材改善
+- Ground Clash専用表示の整理、Punch 3 枚以上への素材改善
 - Animator + Animation Clip
 - Air Hit / Air Knockback（**空中被弾**。空中攻撃ではない）
 - Guard
@@ -563,8 +563,8 @@ Round / Guard / 複数攻撃などの**機能 Stage とは別枠**。番号「GC
 - Visual Sequence + Sprite Sheet 移行・ジャンプ基盤・計測ログ・Training Reset release gate は実装・Editor 確認済み。正式 Stage 番号なし
 - `FightDebugScene` は**練習・検証モード**。戦闘コア共通、KO 後処理はモード側（§1.1）
 - Visual: Sequence 再生 + `Fighter_SpriteSheet` **31 sub-sprite**（PPU 39、Idle/Walk/Jump/Punch/Ground Kick 接続済み）。Animator 未使用
-- 飛び越し後 Facing 反転・左向き Walk / Jump / J Punch は Editor 確認済み。J Punch は地上専用（ジャンプ中開始不可）。Air Hit / Air Knockback・Ground Clash専用実測・Dev Build Profiler は未実装／未確認
-- 正式な次 Stage 番号は未定義。候補は順不同（Ground Clash専用実測、Punch 素材改善、Animator、Air Hit/KB、Guard、Character Data SO、対戦モード分離など。将来の空中攻撃は仕様未定）
+- 飛び越し後 Facing 反転・左向き Walk / Jump / J Punch は Editor 確認済み。J Punch は地上専用（ジャンプ中開始不可）。Air Hit / Air Knockback・Ground Clash専用表示の整理・Dev Build Profiler は未実装／未確認
+- 正式な次 Stage 番号は未定義。候補は順不同（Ground Clash専用表示の整理、Punch 素材改善、Animator、Air Hit/KB、Guard、Character Data SO、対戦モード分離など。将来の空中攻撃は仕様未定）
 
 ## 6. Ground Kick + 共通 Hit 解決基盤（2026-07-30）
 
@@ -595,4 +595,14 @@ Round / Guard / 複数攻撃などの**機能 Stage とは別枠**。番号「GC
 
 ### 共通 Hit 解決基盤
 
-`DebugAttackId`、`DebugAttackPhase`、`DebugPendingHit`、`DebugHitResolutionType`、`DebugClashTuning` を追加。各方向のHit候補を同一 CombatFrame で収集後に解決する構造へ移行した。Ground Clash のコード土台と `debugForceP2AttackWithP1ForClashTest`（Scene保存値OFF）を含むが、P2同時攻撃による専用実測は未確認であり、完了扱いにしない。
+`DebugAttackId`、`DebugAttackPhase`、`DebugPendingHit`、`DebugHitResolutionType`、`DebugClashTuning` を追加。各方向のHit候補を同一 CombatFrame で収集後に解決する構造へ移行した。`debugForceP2AttackWithP1ForClashTest`を一時的にONとして、JPunch同士／Ground Kick同士のGround ClashをEditor実測済み。Damage 0、HitStop、双方反動、攻撃終了、Idle復帰を確認し、検証後はScene保存値をOFFへ戻した。現状のClashリアクションは被弾用の赤色と`HitStun`表示を暫定流用しており、専用表示への分離が残課題。
+
+
+### Ground Clash専用実測（2026-07-30）
+
+- JPunch同士: CombatFrame同時成立、Damage 0、HitStop、双方反動、攻撃終了、Idle復帰
+- Ground Kick同士: 同内容を確認
+- 通常Hitではなく`AttackResult=Clash`になる
+- Clash時の赤色／`HitStun`表示は被弾演出の暫定流用であり、実ダメージを示さない
+- HUDの`HitCount`がClashでも増えるため、将来は`ClashCount`等への分離を検討
+- `debugForceP2AttackWithP1ForClashTest`は通常OFF、検証後もOFFで保存

@@ -520,7 +520,7 @@ Unity デバッグ実装の**実際の到達点**（段階1〜15）と次工程�
 **実装済み**: `FighterVisualState` = Idle / WalkForward / WalkBackward / Attack / JumpStart / JumpRise / JumpApex / JumpFall / Landing / HitStun / KO。
 Session が状態を決定し、`DebugFighterVisual` が `FighterSpriteSequence` で Sprite を再生する。WalkForward / WalkBackward は同一 Walk 8 コマ。素材は `Fighter_SpriteSheet`（GUID `dcb7851d129f2305be49fac973bf47b4`、31 sub-sprite）の sub-sprite。Animator は未導入。
 
-**将来候補（未実装含む）**: Ground Clash専用実測、Punch 3 枚以上、HitStun・KO 専用画像、Animator など。
+**将来候補（未実装含む）**: Ground Clash専用表示（被弾用の赤色／HitStun表示との分離）、Punch 3 枚以上、HitStun・KO 専用画像、Animator など。
 
 **責務境界（維持する）**
 
@@ -608,4 +608,5 @@ Session が状態を決定し、`DebugFighterVisual` が `FighterSpriteSequence`
 - Ground Kickは Startup 8 / Active 3 / Recovery 4、Damage 14、HitStop 7、HitStun 14、横KB 0.24
 - local Hit Boxは Facing Right基準 center `(0.95, 0.55)`、half `(0.60, 0.25)`。Facing LeftではParticipantが反転する
 - 1攻撃1Hit。Active中の複数CombatFrameで重なっても追加Damageしない
-- 同一CombatFrameの両方向Hit候補を収集してから解決する。Ground Clashの土台は実装済みだが、専用実測は未確認
+- 同一CombatFrameの両方向Hit候補を収集してから解決する。Ground ClashはJPunch同士／Ground Kick同士でEditor実測済み（Damage 0、HitStop、双方反動、攻撃終了）
+- 現状のClash表示は被弾用の赤色と`HitStun`を暫定流用する。実ダメージとは区別し、将来はClash専用表示へ分離する

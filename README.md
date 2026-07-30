@@ -49,7 +49,7 @@ Training Reset 共通 release gate（全操作 release まで入力抑制）: **
 | 区分 | 内容 |
 |---|---|
 | **実装済み** | 60Hz SimulationTick、Pause/Step、HUD（左上状態／左下操作・JPunch Data）、HitStop、入力、左右移動、Facing分離、2体共通 Participant / AttackState / HitState、Push Box、壁際 Push 再配分、Box 可視化、Hit×Hurt 重なり判定、Jパンチ、1攻撃1Hit、Hit時6F HitStop、HitStun 12CF・被Hit表示、横ノックバック、HP/Damage（max100・J Punch10）、**KO状態・遷移（Life表示）**、**`DebugAttackData` による J Punch / Ground Kick 攻撃設定正本**、**Training Reset（R）: 戦闘状態＋論理位置 X/Y・ジャンプ状態・Facing を Scene 開始時へ復帰**、**共通 release gate（全ゲーム操作を一度離すまで有効入力 Neutral）**、**Visual Sequence（Idle 8 / Walk 8 / Jump 8 / Punch 2 / Kick 5 / Attack / Kick / JumpStart / Rise / Apex / Fall / Landing / HitStun / KO）+ `Fighter_SpriteSheet` 31 sub-sprite（GUID `dcb7851d129f2305be49fac973bf47b4`、PPU 39）**、**ジャンプ基盤（Neutral / Forward / Backward、キャラ別 Min/Max 高さ・時間・距離、押下時間補間、CombatFrame LogicalY 軌道、飛び越し時 Push skip、Jump 計測ログ）** |
-| **暫定** | Push 等分＋壁際再配分。攻撃数値はコード内不変データ（SO 未使用）。KO 視覚は色変更のみ（優先: HitStun赤 > KO暗色 > 通常Tint）。Motor minX/maxX（±7）。同一 CombatFrame の両方向 Hit 候補収集と Ground Clash 解決の土台を実装（通常は P2 Neutral、Scene の検証フラグは OFF）。見た目は Sequence による Sprite 差し替え（Animator 未使用）。**Punch は素材 2 枚のみ（Recovery 専用コマなし）**。ジャンプ数値はコード内 `FighterJumpSettings`（正式 Character Data SO ではない）。実測高さは設定 Min/Max より少し上回る場合あり |
+| **暫定** | Push 等分＋壁際再配分。攻撃数値はコード内不変データ（SO 未使用）。KO 視覚は色変更のみ（優先: HitStun赤 > KO暗色 > 通常Tint）。Motor minX/maxX（±7）。同一 CombatFrame の両方向 Hit 候補収集と Ground Clash 解決を実装し、JPunch同士／Ground Kick同士でEditor実測済み（Damage 0、HitStop、双方反動、攻撃終了）。通常は P2 Neutral、Scene の検証フラグは OFF。Clash時の赤色・HitStun表示は被弾演出の暫定流用。見た目は Sequence による Sprite 差し替え（Animator 未使用）。**Punch は素材 2 枚のみ（Recovery 専用コマなし）**。ジャンプ数値はコード内 `FighterJumpSettings`（正式 Character Data SO ではない）。実測高さは設定 Min/Max より少し上回る場合あり |
 | **未実装（方針確定含む）** | 対戦モード進行（Round/勝敗/WIN・LOSE/タイマー等）、HPバー、Guard、壁バウンド等、Animator + Animation Clip、**Air Hit / Air Knockback（空中被弾専用・空中攻撃ではない）**、正式 Character Data ScriptableObject、複数 Hurt/Hit Box、攻撃データ SO 化（要否は後続判断）、複数攻撃・コンボ・Cancel、Punch 3 枚以上への素材改善。**将来の空中攻撃は仕様未定（空中パンチは採用しない）** |
 
 詳細・次工程は **`docs/unity_implementation_status.md`** を正とする。
@@ -120,7 +120,7 @@ Git 管理外: `Game/Library`、`Temp`、`Logs`、`UserSettings`、`obj` など
 
 正式な優先順位・次工程番号は**未決定**（順不同・新 Stage 番号は作らない）。
 
-1. Ground Clash の専用検証（P2 同時攻撃用デバッグ経路を使った実測）
+1. Ground Clash専用表示の整理（被弾用の赤色／HitStun表示との分離）
 2. Punch 3 枚以上への素材改善（Recovery 含む）
 3. Animator + Animation Clip
 4. Air Hit / Air Knockback（**空中被弾**専用。空中攻撃とは別）
@@ -204,4 +204,4 @@ Unity_FightingGameTrial
 - local Hit Box: center `(0.95, 0.55)`、half `(0.60, 0.25)`。左右 Facing 反転を確認済み
 - Sprite: `Fighter_Kick_00`〜`_04`、3 CombatFrame/枚、Loop OFF、Hold Last Frame ON（P1/P2）
 - Editor確認: 通常 Hit、1攻撃1Hit、14 damage、HitStop、ノックバック、左右向き、空中開始禁止、Punch/Kick相互キャンセルなし
-- Ground Clash はコード基盤を含むが、P2同時攻撃の専用実測は未確認
+- Ground ClashはP2同時攻撃デバッグ経路でEditor実測済み。JPunch同士／Ground Kick同士とも Damage 0、HitStop、双方反動、攻撃終了、Idle復帰を確認。Clash時の赤色・`HitStun`表示は被弾演出の暫定流用で、専用表示への分離が残課題

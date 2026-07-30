@@ -614,7 +614,7 @@ HUD の数字は便利な鏡です。**戦闘データの正本は Session / Par
 - 複数攻撃・コンボ・Cancel・Counter Hit
 - 2P 実操作（現在 P2 は Neutral）
 - 壁バウンド・壁やられ など
-- Walk 見た目品質改善、Animator、Ground Clash専用実測、Air Hit / Air Knockback（空中被弾）
+- Walk 見た目品質改善、Animator、Ground Clash専用表示の整理、Air Hit / Air Knockback（空中被弾）
 - 正式 Character Data ScriptableObject
 - 将来の空中攻撃（仕様未定・空中パンチは対象外）
 
@@ -1022,7 +1022,7 @@ GC の話は「仕様の正本」ではなく、**実行時コストの学習**�
 ### 17.3 将来構想（方針確定・未実装）
 
 - 対戦モード用 Scene / Controller / HUD
-- Ground Clash専用実測、Punch 3 枚以上、Animator + Animation Clip
+- Ground Clash専用表示の整理、Punch 3 枚以上、Animator + Animation Clip
 - Character Data ScriptableObject（ジャンプ設定の正式データ化含む）
 
 （Training Reset・Visual Sequence / Sprite Sheet・ジャンプ基盤は §17.7〜§17.9 で実装済み。ここには含めない。）
@@ -1032,7 +1032,7 @@ GC の話は「仕様の正本」ではなく、**実行時コストの学習**�
 戦闘処理が足の角度や Sprite コマを直接決めない。Session が Visual State を決め、Visual が Sequence で表現する（**実装済み**）。
 
 **enum 実装済み**: Idle、WalkForward、WalkBackward、Attack、JumpStart、JumpRise、JumpApex、JumpFall、Landing、HitStun、KO。
-**将来候補**: Ground Clash専用実測、Punch 素材改善、Animator など。
+**将来候補**: Ground Clash専用表示の整理、Punch 素材改善、Animator など。
 
 前進／後退は左右キーだけで決めない。**移動方向 × Facing**（詳細・優先順位は §17.8）。
 
@@ -1310,7 +1310,7 @@ DebugGameplayInput（物理 Held）
 - Character Data SO へ Jump 設定を移す
 - Animator / 専用 Sprite を Visual に接続（State 決定は Session のまま）
 - Air Hit / Air Knockback（空中被弾）
-- Ground Clash専用実測。将来の空中攻撃は仕様未定（空中パンチは対象外）
+- Ground Clash専用表示の整理。将来の空中攻撃は仕様未定（空中パンチは対象外）
 
 ## 18. Ground Kick と共通 Hit 解決の確認ガイド
 
@@ -1323,7 +1323,7 @@ P1/P2の `DebugFighterVisual > Kick Sequence`:
 - Loop: OFF
 - Hold Last Frame: ON
 
-`SimulationSession.debugForceP2AttackWithP1ForClashTest` は通常 **OFF**。Ground Clash専用検証時だけ使う候補で、現時点では実測未確認。
+`SimulationSession.debugForceP2AttackWithP1ForClashTest` は通常 **OFF**。Ground Clash専用検証時だけONにする。2026-07-30にJPunch同士／Ground Kick同士でEditor実測済み。検証後はOFFへ戻し、Scene保存済み。
 
 ### 18.2 Ground Kickの確認値
 
@@ -1337,3 +1337,15 @@ P1/P2の `DebugFighterVisual > Kick Sequence`:
 4. 左右Facing双方で相手方向へHit Box、相手が離れる方向へKB
 5. 空中K／空中保持着地では開始せず、離して押し直すと開始
 6. Punch/Kick中の相互切替なし。近いJ+K入力はJ Punch優先
+
+### 18.3 Ground ClashのEditor実測結果
+
+P1をP2へPush Box最小距離まで近づけ、`debugForceP2AttackWithP1ForClashTest`を一時的にONとして確認した。
+
+- JPunch同士: `Ground Clash`成立、Damage 0、HitStop、双方反動、攻撃終了、Idle復帰
+- Ground Kick同士: 同じ結果を確認
+- Clash後の位置は双方が離れる方向へ更新される
+- 現状のClashリアクションは被弾用の赤色と`HitStun`表示を暫定流用するため、ダメージを受けたように見える。ただしログ上のDamageは0
+- `P2HitCount`がClash時にも増える表示があり、将来はHit回数とClash回数を分離する候補
+
+通常作業では検証フラグをOFFのまま使う。

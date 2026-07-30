@@ -104,3 +104,8 @@
 - 3 CombatFrame/枚、Loop OFF、Hold Last Frame ON
 - Gameplay側の Active は AF 8〜10 付近となり、伸びた蹴りポーズと赤い Hit Box が概ね一致するよう調整
 - 本番清書ではなく、現素材を使った学習・判定確認用の暫定品質
+
+
+## Ground Clash表示（2026-07-30）
+
+Ground Clash自体はJPunch同士／Ground Kick同士でEditor確認済み。現状は専用Spriteや専用色を持たず、被弾時の赤色と`HitStun`表示を暫定流用している。Damageは0だが被弾に見えるため、将来はClashRecoil専用Sprite、専用色、または短い白／黄フラッシュへ分離する候補。

@@ -8,9 +8,11 @@
 - local Hit Box を脚へ合わせ `centerX=0.95 / centerY=0.55 / halfWidth=0.60 / halfHeight=0.25` に調整
 - `Fighter_Kick_00`〜`_04` を P1/P2 の `kickSequence` へ接続（3CF/枚、Loop OFF、Hold Last Frame ON）
 - `DebugAttackId` / `DebugAttackPhase` / `DebugPendingHit` / `DebugHitResolutionType` / `DebugClashTuning` を追加
-- 同一 CombatFrame の両方向 Hit 候補を収集してから解決する共通経路を追加。Ground Clash の土台を含む
+- 同一 CombatFrame の両方向 Hit 候補を収集してから解決する共通経路を追加
+- Ground ClashをEditor実測: JPunch同士／Ground Kick同士で Damage 0、HitStop、双方反動、攻撃終了、Idle復帰を確認
+- Clash時は現状、被弾用の赤色と`HitStun`表示を暫定流用。実ダメージは0で、専用表示への分離を今後の改善候補とする
 - Editor確認: 通常 Hit、14 damage、1攻撃1Hit、HitStop、ノックバック、左右 Facing、空中開始禁止、押しっぱなし着地予約なし、Punch/Kick相互キャンセルなし
-- 未確認: P2同時攻撃を使った Ground Clash の専用実測、Development Build
+- 未確認: Development Build。Ground Clashの専用実測は完了
 
 ## Docs: 空中パンチ前提の記述整理
 
