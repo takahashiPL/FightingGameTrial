@@ -2,7 +2,7 @@
 
 最終更新: 2026-07-30
 対象ブランチ: `unity`
-最新コミット済み HEAD: **`bc80ddb`**（Add ground kick and shared hit resolution groundwork）・push 済み
+最新コミット済み HEAD: **`78c4e94`**（Separate ground clash recoil from normal hit state）・push 済み
 段階14全体（14A+14B）・段階15（攻撃データ化）: **完了・push 済み**
 GC-1 / GC-2（補助改善・正式 Stage ではない）: **完了・push 済み**
 Training Reset 位置・向き復帰: **実装・Editor 確認済み**（正式 Stage 番号なし）
@@ -10,6 +10,7 @@ Visual Sequence + Sprite Sheet 移行: **実装・Editor 確認済み**（正式
 ジャンプ基盤・Jump Visual・計測ログ: **実装・Editor 確認済み**（正式 Stage 番号なし）
 Training Reset 共通 release gate: **実装・Editor 確認済み**（正式 Stage 番号なし）
 Ground Kick + shared hit resolution groundwork: **実装・Editor確認済み・push済み**（正式 Stage 番号なし）
+Ground Clash recoil separation: **実装・Editor確認済み・push済み**（`ClashRecoil`専用状態・黄色系表示・通常HitCount非加算。正式 Stage 番号なし）
 正式な次工程番号: **未定義**（新 Stage 番号は作らない）
 
 このファイルは、Unity 側の**実装済み / 暫定 / 未実装 / 次回候補 / 正式方針**を混同せずに追うための正本です。
@@ -107,13 +108,13 @@ Ground Kick + shared hit resolution groundwork: **実装・Editor確認済み・
 |---|---|
 | `FighterSpriteSequence` | `sprites[]` / `framesPerSprite` / `loop` / `holdLastFrame`。CombatFrame 経過でコマ解決 |
 | `DebugFighterVisual` | State ごと Sequence。`Apply(state, advanceElapsed)`。WalkF/B は同一 `walkSequence` |
-| `FighterVisualState` | Idle / WalkForward / WalkBackward / Attack / JumpStart / JumpRise / JumpApex / JumpFall / Landing / HitStun / KO |
+| `FighterVisualState` | Idle / WalkForward / WalkBackward / Attack / JumpStart / JumpRise / JumpApex / JumpFall / Landing / HitStun / KO / Kick / ClashRecoil |
 | `SimulationSession` | Visual 優先解決。JumpStart / Apex は見た目用窓（軌道計算には使わない） |
 | `DebugFighterMotor` | `HasPassedJumpApex` / `FramesSinceJumpApex`（表示専用） |
 
-**優先順位（Sprite）**: KO → HitStun → Attack → JumpStart → JumpRise → JumpApex → JumpFall → Landing → WalkForward / WalkBackward → Idle
+**優先順位（Sprite）**: KO → ClashRecoil → HitStun → Attack / Kick → JumpStart → JumpRise → JumpApex → JumpFall → Landing → WalkForward / WalkBackward → Idle
 
-HitStun / KO は専用 State。専用 Sequence 未設定時は Idle Sequence へ fallback。色は従来どおり `ApplyDisplayColor`（HitStun 赤 > KO 暗色 > 通常 Tint）。
+HitStun / ClashRecoil / KO は専用 State。専用 Sequence 未設定時は Idle Sequence へ fallback。色は`ApplyDisplayColor`で分離し、ClashRecoilは黄色系、HitStunは赤、KOは暗色、通常時はTint。
 
 **素材（FightDebug 正本）**: `Assets/Art/Characters/Fighter_SpriteSheet.png`（1536×1024、Multiple、GUID `dcb7851d129f2305be49fac973bf47b4`）。PixelLab Export を統合した **31 個別 Rect**。PPU **39** / Full Rect / Point / Compression None / Physics Shape Off。全 sub-sprite **Bottom Center**。P1/P2 同一シート参照、P2 は Tint 区別。旧 GUID `2bb8ae7896cf21b43bcd9cf17bf228d2` は削除済み。
 
@@ -153,7 +154,7 @@ Characters フォルダは正本 PNG + `.meta` の 1 組のみ。
 | Missing Sprite | **なし（Editor 確認済み）** |
 | Gameplay ロジック変更 | **なし** |
 
-**次回改善候補**: Ground Clash専用表示の整理、Punch 3 枚以上、必要なら攻撃素材再制作。Animator 導入は別候補。
+**次回改善候補**: ClashRecoil専用Sprite／演出、Punch 3 枚以上、必要なら攻撃素材再制作。Animator 導入は別候補。
 
 詳細は教材 §17.8・§17.9、`docs/rules.md` §15.5・§15.6、`docs/sprite_art_status.md`。
 
@@ -448,7 +449,7 @@ ScriptableObject 化、Inspector 編集、Character 別攻撃データ、複数�
 - 攻撃データの ScriptableObject 化 / Inspector 編集 / JSON・CSV
 - 複数攻撃、弱/中/強、技コマンド、コンボ、Cancel、Counter Hit
 - 自然な歩行素材の再制作（現状 Walk 8 コマは動作確認済み）
-- **Ground Clash専用表示の整理**（P2同時攻撃デバッグ経路。通常保存値はOFF）
+- **ClashRecoil専用Sprite／演出の追加**（状態・専用色・通常HitCount非加算は実装済み。P2同時攻撃デバッグ経路の通常保存値はOFF）
 - Punch 3 枚以上への素材改善
 - Character Data ScriptableObject（ジャンプ設定の正式データ化含む）
 - Jump 数値調整、Development Build Profiler
@@ -488,7 +489,7 @@ Push / Hurt / Hit 可視化（11A）と Hit×Hurt 重なり判定（11B）は完
 
 その後の候補（順不同・未着手。**新工程番号は作らない**。正式な次 Stage も未定義）:
 
-- Ground Clash専用表示の整理、Punch 3 枚以上への素材改善
+- ClashRecoil専用Sprite／演出の追加、Punch 3 枚以上への素材改善
 - Animator + Animation Clip
 - Air Hit / Air Knockback（**空中被弾**。空中攻撃ではない）
 - Guard
@@ -563,8 +564,8 @@ Round / Guard / 複数攻撃などの**機能 Stage とは別枠**。番号「GC
 - Visual Sequence + Sprite Sheet 移行・ジャンプ基盤・計測ログ・Training Reset release gate は実装・Editor 確認済み。正式 Stage 番号なし
 - `FightDebugScene` は**練習・検証モード**。戦闘コア共通、KO 後処理はモード側（§1.1）
 - Visual: Sequence 再生 + `Fighter_SpriteSheet` **31 sub-sprite**（PPU 39、Idle/Walk/Jump/Punch/Ground Kick 接続済み）。Animator 未使用
-- 飛び越し後 Facing 反転・左向き Walk / Jump / J Punch は Editor 確認済み。J Punch は地上専用（ジャンプ中開始不可）。Air Hit / Air Knockback・Ground Clash専用表示の整理・Dev Build Profiler は未実装／未確認
-- 正式な次 Stage 番号は未定義。候補は順不同（Ground Clash専用表示の整理、Punch 素材改善、Animator、Air Hit/KB、Guard、Character Data SO、対戦モード分離など。将来の空中攻撃は仕様未定）
+- 飛び越し後 Facing 反転・左向き Walk / Jump / J Punch は Editor 確認済み。J Punch は地上専用（ジャンプ中開始不可）。Air Hit / Air Knockback・ClashRecoil専用Sprite／演出・Dev Build Profiler は未実装／未確認
+- 正式な次 Stage 番号は未定義。候補は順不同（ClashRecoil専用Sprite／演出、Punch 素材改善、Animator、Air Hit/KB、Guard、Character Data SO、対戦モード分離など。将来の空中攻撃は仕様未定）
 
 ## 6. Ground Kick + 共通 Hit 解決基盤（2026-07-30）
 
@@ -595,7 +596,7 @@ Round / Guard / 複数攻撃などの**機能 Stage とは別枠**。番号「GC
 
 ### 共通 Hit 解決基盤
 
-`DebugAttackId`、`DebugAttackPhase`、`DebugPendingHit`、`DebugHitResolutionType`、`DebugClashTuning` を追加。各方向のHit候補を同一 CombatFrame で収集後に解決する構造へ移行した。`debugForceP2AttackWithP1ForClashTest`を一時的にONとして、JPunch同士／Ground Kick同士のGround ClashをEditor実測済み。Damage 0、HitStop、双方反動、攻撃終了、Idle復帰を確認し、検証後はScene保存値をOFFへ戻した。現状のClashリアクションは被弾用の赤色と`HitStun`表示を暫定流用しており、専用表示への分離が残課題。
+`DebugAttackId`、`DebugAttackPhase`、`DebugPendingHit`、`DebugHitResolutionType`、`DebugClashTuning` を追加。各方向のHit候補を同一 CombatFrame で収集後に解決する構造へ移行した。`debugForceP2AttackWithP1ForClashTest`を一時的にONとして、JPunch同士／Ground Kick同士のGround ClashをEditor実測済み。Damage 0、HitStop、双方反動、攻撃終了、Idle復帰を確認した。コミット`78c4e94`で通常Hitから専用`ClashRecoil`状態へ分離し、黄色系表示と通常HitCount非加算を確認。検証後のScene保存値はOFF。
 
 
 ### Ground Clash専用実測（2026-07-30）
@@ -603,6 +604,7 @@ Round / Guard / 複数攻撃などの**機能 Stage とは別枠**。番号「GC
 - JPunch同士: CombatFrame同時成立、Damage 0、HitStop、双方反動、攻撃終了、Idle復帰
 - Ground Kick同士: 同内容を確認
 - 通常Hitではなく`AttackResult=Clash`になる
-- Clash時の赤色／`HitStun`表示は被弾演出の暫定流用であり、実ダメージを示さない
-- HUDの`HitCount`がClashでも増えるため、将来は`ClashCount`等への分離を検討
-- `debugForceP2AttackWithP1ForClashTest`は通常OFF、検証後もOFFで保存
+- `ClashRecoil`専用状態と黄色系専用色を表示し、HUD状態名も`ClashRecoil`となる
+- Clashでは通常HitCountを増やさず、JPunch同士／Ground Kick同士とも`P2HitCount=0`を確認
+- 専用Sprite Sequence未設定時はIdleへfallback。Scene差分なし、コード側初期値で同動作を再確認
+- `debugForceP2AttackWithP1ForClashTest`は通常OFF。検証時のみPlay中にON

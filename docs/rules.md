@@ -515,21 +515,21 @@ Unity デバッグ実装の**実際の到達点**（段階1〜15）と次工程�
 
 ### 15.5 キャラクター機能と Visual State
 
-前進・後退・Idle・歩行表現・ジャンプ・キック・Punch・HitStun・Knockback・KO・アニメーション状態は、**練習専用ではなく練習／対戦共通のキャラクター機能**とする。
+前進・後退・Idle・歩行表現・ジャンプ・キック・Punch・HitStun・ClashRecoil・Knockback・KO・アニメーション状態は、**練習専用ではなく練習／対戦共通のキャラクター機能**とする。
 
-**実装済み**: `FighterVisualState` = Idle / WalkForward / WalkBackward / Attack / JumpStart / JumpRise / JumpApex / JumpFall / Landing / HitStun / KO。
+**実装済み**: `FighterVisualState` = Idle / WalkForward / WalkBackward / Attack / JumpStart / JumpRise / JumpApex / JumpFall / Landing / HitStun / KO / Kick / ClashRecoil。
 Session が状態を決定し、`DebugFighterVisual` が `FighterSpriteSequence` で Sprite を再生する。WalkForward / WalkBackward は同一 Walk 8 コマ。素材は `Fighter_SpriteSheet`（GUID `dcb7851d129f2305be49fac973bf47b4`、31 sub-sprite）の sub-sprite。Animator は未導入。
 
-**将来候補（未実装含む）**: Ground Clash専用表示（被弾用の赤色／HitStun表示との分離）、Punch 3 枚以上、HitStun・KO 専用画像、Animator など。
+**将来候補（未実装含む）**: ClashRecoil専用Sprite／演出、Punch 3 枚以上、HitStun・KO 専用画像、Animator など。
 
 **責務境界（維持する）**
 
 | 担当 | 内容 |
 |---|---|
-| `SimulationSession` | Visual State の決定（入力 × Facing、Attack / Jump / HitStun / KO 優先） |
+| `SimulationSession` | Visual State の決定（入力 × Facing、Attack / Jump / ClashRecoil / HitStun / KO 優先） |
 | `DebugFighterVisual` | 描画専用（Sequence 再生。入力を読まない） |
 | `DebugFighterMotor` | 論理位置（X/Y）と Facing、ジャンプ軌道（Apex 表示用フラグ含む） |
-| `DebugFighterParticipant` | 戦闘状態（HP / KO / HitStun 等） |
+| `DebugFighterParticipant` | 戦闘状態（HP / KO / HitStun / ClashRecoil 等） |
 
 戦闘処理が足の角度や Sprite のコマを直接決めない。戦闘状態を Visual State へ変換し、見た目側が Animator または Sprite 差し替えで表現する。Animator 導入後もこの責務境界を維持する。
 
@@ -544,7 +544,7 @@ Session が状態を決定し、`DebugFighterVisual` が `FighterSpriteSequence`
 
 判定は**入力意図**を基準とする。壁際で論理 X が変化しなくても方向入力中は Walk とする。Push / Knockback による受動移動だけでは Walk にしない。
 
-**優先（Sprite）**: KO → HitStun → Attack → JumpStart → JumpRise → JumpApex → JumpFall → Landing → WalkForward / WalkBackward → Idle。
+**優先（Sprite）**: KO → ClashRecoil → HitStun → Attack / Kick → JumpStart → JumpRise → JumpApex → JumpFall → Landing → WalkForward / WalkBackward → Idle。
 
 左向き Walk / Jump / J Punch は飛び越し後に Editor で確認済み。
 
@@ -609,4 +609,4 @@ Session が状態を決定し、`DebugFighterVisual` が `FighterSpriteSequence`
 - local Hit Boxは Facing Right基準 center `(0.95, 0.55)`、half `(0.60, 0.25)`。Facing LeftではParticipantが反転する
 - 1攻撃1Hit。Active中の複数CombatFrameで重なっても追加Damageしない
 - 同一CombatFrameの両方向Hit候補を収集してから解決する。Ground ClashはJPunch同士／Ground Kick同士でEditor実測済み（Damage 0、HitStop、双方反動、攻撃終了）
-- 現状のClash表示は被弾用の赤色と`HitStun`を暫定流用する。実ダメージとは区別し、将来はClash専用表示へ分離する
+- Clashは通常Hitとは別の`ClashRecoil`状態で表示する。Damage 0、通常HitCount非加算、黄色系専用色、専用Sprite未設定時Idle fallbackをEditor確認済み

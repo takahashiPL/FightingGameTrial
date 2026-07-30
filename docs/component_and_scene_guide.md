@@ -5,7 +5,7 @@
 対象コミット（資料作成時点）: **`2341e4c`**（Add component and scene learning guide）
 方針追記時点の HEAD: **`dfcb9e0`**（Reduce status HUD allocations）※コード変更なしの Docs 追記
 対象 Scene: `Game/Assets/Scenes/FightDebugScene.unity`
-実装到達点: **Stage 15完了後 + Ground Kick / 共通Hit解決基盤（`bc80ddb`）**
+実装到達点: **Stage 15完了後 + Ground Kick / 共通Hit解決基盤（`bc80ddb`）+ Ground Clash recoil separation（`78c4e94`）**
 Scene の役割: **正式な練習・検証モード**（対戦モードではない。§2・§17）
 
 ---
@@ -337,7 +337,7 @@ Help 用 TMP は Inspector 項目なし（Awake で生成）。
 | Push Box Half Width | 0.5 | Push 用 |
 | Box Origin / Boxes / AttackState / HitState 等 | コード既定 | AttackState/HitState は実行時状態の入れ物 |
 
-HitStun / KO 表示色もコード側 SerializeField。Scene YAML には未保存（未確認: Editor で開いたときにデフォルト表示されるか）。
+HitStun / ClashRecoil / KO 表示色はコード側 SerializeField。`ClashRecoil`の黄色系既定色はScene YAMLへ保存せず、コード初期値のままEditor動作確認済み。専用Sequence未設定時はIdleへfallbackする。
 
 ### DebugFighterMotor（両体とも Scene 値は同一）
 
@@ -355,7 +355,7 @@ HitStun / KO 表示色もコード側 SerializeField。Scene YAML には未保�
 | Inspector 項目 | 型 | Scene 値 | 何に使うか |
 |---|---|---|---|
 | Sprite Renderer | SpriteRenderer | 自分 | 表示先 |
-| Idle / Walk / Jump* / Landing / Attack Sequence | `FighterSpriteSequence` | `Fighter_SpriteSheet` sub-sprite（31 枚、GUID `dcb7851d129f2305be49fac973bf47b4`） | State ごとのコマ列 |
+| Idle / Walk / Jump* / Landing / Attack / Kick / ClashRecoil Sequence | `FighterSpriteSequence` | `Fighter_SpriteSheet` sub-sprite（31 枚、GUID `dcb7851d129f2305be49fac973bf47b4`） | State ごとのコマ列。ClashRecoil専用Spriteは未設定でIdle fallback |
 | Walk Sequence | 8 枚 | `Fighter_Walk_00` … `_07` | WalkForward / WalkBackward 共有 |
 | JumpStart / JumpApex Visual Frames | int | `2` / `2` | 見た目窓（軌道非依存） |
 | Attack Pose End Frame | int | `6` | 攻撃ポーズ終了 AF |
@@ -614,7 +614,7 @@ HUD の数字は便利な鏡です。**戦闘データの正本は Session / Par
 - 複数攻撃・コンボ・Cancel・Counter Hit
 - 2P 実操作（現在 P2 は Neutral）
 - 壁バウンド・壁やられ など
-- Walk 見た目品質改善、Animator、Ground Clash専用表示の整理、Air Hit / Air Knockback（空中被弾）
+- Walk 見た目品質改善、Animator、ClashRecoil専用Sprite／演出、Air Hit / Air Knockback（空中被弾）
 - 正式 Character Data ScriptableObject
 - 将来の空中攻撃（仕様未定・空中パンチは対象外）
 
@@ -1022,7 +1022,7 @@ GC の話は「仕様の正本」ではなく、**実行時コストの学習**�
 ### 17.3 将来構想（方針確定・未実装）
 
 - 対戦モード用 Scene / Controller / HUD
-- Ground Clash専用表示の整理、Punch 3 枚以上、Animator + Animation Clip
+- ClashRecoil専用Sprite／演出の追加、Punch 3 枚以上、Animator + Animation Clip
 - Character Data ScriptableObject（ジャンプ設定の正式データ化含む）
 
 （Training Reset・Visual Sequence / Sprite Sheet・ジャンプ基盤は §17.7〜§17.9 で実装済み。ここには含めない。）
@@ -1031,8 +1031,8 @@ GC の話は「仕様の正本」ではなく、**実行時コストの学習**�
 
 戦闘処理が足の角度や Sprite コマを直接決めない。Session が Visual State を決め、Visual が Sequence で表現する（**実装済み**）。
 
-**enum 実装済み**: Idle、WalkForward、WalkBackward、Attack、JumpStart、JumpRise、JumpApex、JumpFall、Landing、HitStun、KO。
-**将来候補**: Ground Clash専用表示の整理、Punch 素材改善、Animator など。
+**enum 実装済み**: Idle、WalkForward、WalkBackward、Attack、JumpStart、JumpRise、JumpApex、JumpFall、Landing、HitStun、KO、Kick、ClashRecoil。
+**将来候補**: ClashRecoil専用Sprite／演出、Punch 素材改善、Animator など。
 
 前進／後退は左右キーだけで決めない。**移動方向 × Facing**（詳細・優先順位は §17.8）。
 
@@ -1310,7 +1310,7 @@ DebugGameplayInput（物理 Held）
 - Character Data SO へ Jump 設定を移す
 - Animator / 専用 Sprite を Visual に接続（State 決定は Session のまま）
 - Air Hit / Air Knockback（空中被弾）
-- Ground Clash専用表示の整理。将来の空中攻撃は仕様未定（空中パンチは対象外）
+- ClashRecoil専用Sprite／演出の追加。将来の空中攻撃は仕様未定（空中パンチは対象外）
 
 ## 18. Ground Kick と共通 Hit 解決の確認ガイド
 
@@ -1345,7 +1345,8 @@ P1をP2へPush Box最小距離まで近づけ、`debugForceP2AttackWithP1ForClas
 - JPunch同士: `Ground Clash`成立、Damage 0、HitStop、双方反動、攻撃終了、Idle復帰
 - Ground Kick同士: 同じ結果を確認
 - Clash後の位置は双方が離れる方向へ更新される
-- 現状のClashリアクションは被弾用の赤色と`HitStun`表示を暫定流用するため、ダメージを受けたように見える。ただしログ上のDamageは0
-- `P2HitCount`がClash時にも増える表示があり、将来はHit回数とClash回数を分離する候補
+- コミット`78c4e94`で通常Hitから専用`ClashRecoil`状態へ分離。黄色系専用色を表示し、HUD状態名も`ClashRecoil`となる
+- Clashでは通常HitCountを増やさず、JPunch同士／Ground Kick同士とも`P2HitCount=0`を確認
+- 専用Sprite Sequenceは未設定で、Idle Sequenceへfallbackする。Scene差分は持たずコード初期値で動作確認済み
 
 通常作業では検証フラグをOFFのまま使う。

@@ -108,4 +108,4 @@
 
 ## Ground Clash表示（2026-07-30）
 
-Ground Clash自体はJPunch同士／Ground Kick同士でEditor確認済み。現状は専用Spriteや専用色を持たず、被弾時の赤色と`HitStun`表示を暫定流用している。Damageは0だが被弾に見えるため、将来はClashRecoil専用Sprite、専用色、または短い白／黄フラッシュへ分離する候補。
+Ground ClashはJPunch同士／Ground Kick同士でEditor確認済み。コミット`78c4e94`で通常Hitから専用`ClashRecoil`状態へ分離し、黄色系の専用色、Damage 0、通常HitCount非加算を確認した。専用Sprite Sequenceは未設定でIdleへfallbackする。今後はClashRecoil専用Spriteや短い白／黄フラッシュなど、演出品質の改善が候補。

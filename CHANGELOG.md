@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## Ground Clash recoil separation（`78c4e94`）
+
+- 2026-07-30、`unity` / `origin/unity` へ push 済み
+- Ground Clashを通常`ReceiveHit` / `HitStun`経路から分離し、専用状態`ClashRecoil`を追加
+- ClashではDamage 0、HitStop、双方反動、攻撃終了、Idle復帰を維持
+- Clash時は通常HitCountへ加算しない。JPunch同士／Ground Kick同士で`P2HitCount=0`をEditor確認
+- Clash専用色を黄色系として追加。専用Sprite Sequence未設定時はIdleへfallback
+- Scene差分なし。コード側の初期値で同動作を再確認
+- `debugForceP2AttackWithP1ForClashTest`は通常OFF。検証時のみPlay中にON
+
 ## Ground Kick + shared hit resolution groundwork（`bc80ddb`）
 
 - 2026-07-30、`unity` / `origin/unity` へ push 済み
@@ -10,7 +20,7 @@
 - `DebugAttackId` / `DebugAttackPhase` / `DebugPendingHit` / `DebugHitResolutionType` / `DebugClashTuning` を追加
 - 同一 CombatFrame の両方向 Hit 候補を収集してから解決する共通経路を追加
 - Ground ClashをEditor実測: JPunch同士／Ground Kick同士で Damage 0、HitStop、双方反動、攻撃終了、Idle復帰を確認
-- Clash時は現状、被弾用の赤色と`HitStun`表示を暫定流用。実ダメージは0で、専用表示への分離を今後の改善候補とする
+- このコミット時点では、Clash時に被弾用の赤色と`HitStun`表示を暫定流用していた（後続`78c4e94`で`ClashRecoil`へ分離済み）
 - Editor確認: 通常 Hit、14 damage、1攻撃1Hit、HitStop、ノックバック、左右 Facing、空中開始禁止、押しっぱなし着地予約なし、Punch/Kick相互キャンセルなし
 - 未確認: Development Build。Ground Clashの専用実測は完了
 
