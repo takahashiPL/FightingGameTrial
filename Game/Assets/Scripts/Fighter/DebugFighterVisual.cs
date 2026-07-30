@@ -54,6 +54,10 @@ namespace FightingGameTrial.Fighter
         [SerializeField]
         private FighterSpriteSequence attackSequence = new FighterSpriteSequence();
 
+        [Tooltip("地上 Kick 用。Attack（Punch）Sequence とは別です。")]
+        [SerializeField]
+        private FighterSpriteSequence kickSequence = new FighterSpriteSequence();
+
         [Tooltip("未設定なら Idle Sequence へ fallback。")]
         [SerializeField]
         private FighterSpriteSequence hitStunSequence = new FighterSpriteSequence();
@@ -162,6 +166,11 @@ namespace FightingGameTrial.Fighter
                 Debug.LogError("DebugFighterVisual: attackSequence に有効な Sprite がありません。");
             }
 
+            if (kickSequence == null || kickSequence.IsValid == false)
+            {
+                Debug.LogError("DebugFighterVisual: kickSequence に有効な Sprite がありません。");
+            }
+
             ResetToIdle();
         }
 
@@ -215,6 +224,10 @@ namespace FightingGameTrial.Fighter
             Apply(visualState, false);
         }
 
+        /// <summary>
+        /// J Punch の攻撃ポーズ表示窓です（既存挙動維持）。
+        /// AF 1〜attackPoseEndFrame のあいだ Attack Sequence を出します。
+        /// </summary>
         public bool IsAttackPoseActive(bool isActionPlaying, int actionFrame, bool isJPunchAttack)
         {
             if (isJPunchAttack == false || isActionPlaying == false)
@@ -223,6 +236,35 @@ namespace FightingGameTrial.Fighter
             }
 
             return actionFrame >= 1 && actionFrame <= attackPoseEndFrame;
+        }
+
+        /// <summary>
+        /// 地上 Kick の攻撃ポーズ表示です。
+        /// AF 1 以上かつ TotalFrames 未満のあいだ Kick Sequence を出します
+        /// （終了判定の正本は AttackData.TotalFrames。Sequence 長ではない）。
+        /// </summary>
+        public bool IsKickPoseActive(
+            bool isActionPlaying,
+            int actionFrame,
+            bool isGroundKickAttack,
+            int kickTotalFrames)
+        {
+            if (isGroundKickAttack == false || isActionPlaying == false)
+            {
+                return false;
+            }
+
+            if (actionFrame < 1)
+            {
+                return false;
+            }
+
+            if (kickTotalFrames <= 0)
+            {
+                return false;
+            }
+
+            return actionFrame < kickTotalFrames;
         }
 
         /// <summary>
@@ -254,6 +296,9 @@ namespace FightingGameTrial.Fighter
 
                 case FighterVisualState.Attack:
                     return attackSequence;
+
+                case FighterVisualState.Kick:
+                    return kickSequence;
 
                 case FighterVisualState.HitStun:
                     return hitStunSequence;

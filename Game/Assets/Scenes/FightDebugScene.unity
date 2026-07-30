@@ -263,10 +263,12 @@ MonoBehaviour:
       Up: 0
       Down: 0
       Attack: 0
+      Kick: 0
       SampledAtSimulationTick: 0
       SampleSequence: 0
   consoleLogIntervalTicks: 60
   enableJumpDebugLog: 1
+  debugForceP2AttackWithP1ForClashTest: 0
 --- !u!1 &400000001
 GameObject:
   m_ObjectHideFlags: 0
@@ -1026,7 +1028,7 @@ SpriteRenderer:
   m_Size: {x: 2.56, y: 2.56}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
-  m_WasSpriteAssigned: 0
+  m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
 --- !u!114 &700000014
 MonoBehaviour:
@@ -1149,6 +1151,16 @@ MonoBehaviour:
     - {fileID: -7363211071436412856, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
     - {fileID: 5499136287484261559, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
     framesPerSprite: 2
+    loop: 0
+    holdLastFrame: 1
+  kickSequence:
+    sprites:
+    - {fileID: -6345471646519721461, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: -1609875405021310070, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: 6725173032045786517, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: -8498120603923588613, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: -696088642884363206, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    framesPerSprite: 3
     loop: 0
     holdLastFrame: 1
   hitStunSequence:
@@ -1303,7 +1315,7 @@ SpriteRenderer:
   m_Size: {x: 2.56, y: 2.56}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
-  m_WasSpriteAssigned: 0
+  m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
 --- !u!114 &700000025
 MonoBehaviour:
@@ -1426,6 +1438,16 @@ MonoBehaviour:
     - {fileID: -7363211071436412856, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
     - {fileID: 5499136287484261559, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
     framesPerSprite: 2
+    loop: 0
+    holdLastFrame: 1
+  kickSequence:
+    sprites:
+    - {fileID: -6345471646519721461, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: -1609875405021310070, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: 6725173032045786517, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: -8498120603923588613, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    - {fileID: -696088642884363206, guid: dcb7851d129f2305be49fac973bf47b4, type: 3}
+    framesPerSprite: 3
     loop: 0
     holdLastFrame: 1
   hitStunSequence:

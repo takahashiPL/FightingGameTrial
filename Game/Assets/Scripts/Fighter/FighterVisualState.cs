@@ -22,6 +22,8 @@ namespace FightingGameTrial.Fighter
         JumpStart = 7,
         JumpApex = 8,
         HitStun = 9,
-        KO = 10
+        KO = 10,
+        /// <summary>地上 Kick 攻撃ポーズ。Attack（Punch）とは別 Sequence を使う。</summary>
+        Kick = 11
     }
 }

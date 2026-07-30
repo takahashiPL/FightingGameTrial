@@ -9,11 +9,6 @@ namespace FightingGameTrial.Input
     /// 物理入力（キーボードの今この瞬間）とは別物です。
     /// DebugGameplayInput が Update で持つ最新状態を、
     /// SimulationSession が SimulationTick 開始時にここへコピーして確定します。
-    ///
-    /// class にしている理由（学習用）:
-    /// SimulationTimeState.CurrentInput が同じインスタンスを指し続け、
-    /// フィールドを上書き更新する形にします。
-    /// struct だと「コピーして捨てる」見え方になりやすいため、今回は class を選びます。
     /// </summary>
     [Serializable]
     public class SimulationInputState
@@ -31,10 +26,16 @@ namespace FightingGameTrial.Input
         public bool Down;
 
         [Tooltip(
-            "Attack が押されているか（Held状態の論理入力）。キー J。"
-            + " 押した瞬間・離した瞬間・バッファはまだ持ちません。"
+            "Attack（J Punch）が押されているか（Held）。キー J。"
+            + " 押した瞬間・バッファは持ちません。"
         )]
         public bool Attack;
+
+        [Tooltip(
+            "Kick（Ground Kick）が押されているか（Held）。キー K。"
+            + " 押した瞬間・バッファは持ちません。"
+        )]
+        public bool Kick;
 
         [Tooltip("この入力状態を確定した SimulationTick 番号です。")]
         public int SampledAtSimulationTick;
@@ -45,9 +46,6 @@ namespace FightingGameTrial.Input
         )]
         public int SampleSequence;
 
-        /// <summary>
-        /// 初期状態（すべて未入力）へ戻します。
-        /// </summary>
         public void ResetToInitialValues()
         {
             ClearGameplayHeldButtons();
@@ -56,11 +54,8 @@ namespace FightingGameTrial.Input
         }
 
         /// <summary>
-        /// ゲーム操作の Held ボタンだけをニュートラルにします。
-        /// SampleSequence / SampledAtSimulationTick は維持します。
-        ///
-        /// Training Reset 後の入力抑制中に、Simulation へ渡す有効入力だけを落とす用途です。
-        /// 将来 Kick / Guard / Dash 等を追加したら、ここにも false 代入を足してください。
+        /// ゲーム操作の Held だけをニュートラルにします。
+        /// Training Reset 後の入力抑制用。Kick もここに含めます。
         /// </summary>
         public void ClearGameplayHeldButtons()
         {
@@ -69,46 +64,32 @@ namespace FightingGameTrial.Input
             Up = false;
             Down = false;
             Attack = false;
+            Kick = false;
         }
 
-        /// <summary>
-        /// いずれかのゲーム操作 Held が true か。
-        /// Training Reset 後の共通 release gate 解除判定に使います。
-        /// R（Training Reset）はゲーム操作に含めません。
-        /// 将来 Kick / Guard / Dash 等を追加したら、ここにも OR 条件を足してください。
-        /// </summary>
         public bool HasAnyGameplayInputHeld()
         {
-            return HasAnyGameplayInputHeld(Left, Right, Up, Down, Attack);
+            return HasAnyGameplayInputHeld(Left, Right, Up, Down, Attack, Kick);
         }
 
-        /// <summary>
-        /// サンプリング直前の物理 Held から、ゲーム操作が残っているかを判定します。
-        /// 毎フレーム new / LINQ は使いません。
-        /// </summary>
         public static bool HasAnyGameplayInputHeld(
             bool left,
             bool right,
             bool up,
             bool down,
-            bool attack)
+            bool attack,
+            bool kick)
         {
-            return left || right || up || down || attack;
+            return left || right || up || down || attack || kick;
         }
 
-        /// <summary>
-        /// 物理入力の現在値を、この論理入力オブジェクトへコピーして確定します。
-        /// 新しいインスタンスは作りません（同じ CurrentInput を更新します）。
-        ///
-        /// 同時方向（Left+Right など）もそのまま保持します。
-        /// 左右相殺や8方向化は行いません。方向解決は後段の入力解釈責務です。
-        /// </summary>
         public void CopyFromPhysicalAndCommit(
             bool left,
             bool right,
             bool up,
             bool down,
             bool attack,
+            bool kick,
             int simulationTick)
         {
             Left = left;
@@ -116,6 +97,7 @@ namespace FightingGameTrial.Input
             Up = up;
             Down = down;
             Attack = attack;
+            Kick = kick;
 
             SampledAtSimulationTick = simulationTick;
             SampleSequence = SampleSequence + 1;

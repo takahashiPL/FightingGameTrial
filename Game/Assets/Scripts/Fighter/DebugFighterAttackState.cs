@@ -1,4 +1,5 @@
 using System;
+using FightingGameTrial.Combat;
 
 namespace FightingGameTrial.Fighter
 {
@@ -6,44 +7,28 @@ namespace FightingGameTrial.Fighter
     /// 1体のFighterが持つ、現在の攻撃進行状態です。
     ///
     /// 何を保持するか:
-    /// - 攻撃ボタンの前tick状態
-    /// - 今tickで攻撃ボタンが押されたか
-    /// - 現在攻撃中か
-    /// - 現在のActionFrame
-    /// - 現在の攻撃がすでにHitしたか
-    /// - 直近の攻撃結果
+    /// - Attack / Kick ボタンの前tick状態と今tick押下エッジ
+    /// - 現在攻撃中か・どの攻撃か（DebugAttackId + DebugAttackData）
+    /// - 攻撃開始 CombatFrame・ActionFrame・Hit 済みか
+    /// - 直近の攻撃結果ラベル（Hit / Miss / Clash）
     ///
-    /// なぜFighter単位で持つか:
-    /// 従来はSimulationSession / SimulationTimeStateに
-    /// P1専用の攻撃状態が置かれていました。
-    ///
-    /// その構造ではP2が攻撃するときに、
-    /// P1用変数を複製する必要があります。
-    ///
-    /// Fighterごとに本クラスを1つ持たせることで、
-    /// P1とP2が同じ攻撃開始・進行・Hit処理を使用できます。
-    ///
-    /// やらないこと:
-    /// - UnityのUpdateを持たない
-    /// - 入力デバイスを直接読まない
-    /// - Hit判定を実行しない
-    /// - Spriteを直接変更しない
-    ///
-    /// 実際の処理順はSimulationSessionが管理し、
-    /// このクラスは状態の保持と初期化だけを担当します。
+    /// Punch と Kick は同時再生しません（IsActionPlaying が共通ゲート）。
+    /// 将来の空中 Kick は別 AttackId / 別 Data で StartAttack する想定です。
     /// </summary>
     [Serializable]
     public class DebugFighterAttackState
     {
         private bool previousAttackHeld;
         private bool attackPressedThisTick;
+        private bool previousKickHeld;
+        private bool kickPressedThisTick;
 
         private bool isActionPlaying;
-        private bool isJPunchAttack;
-        private bool hasCurrentJPunchHit;
-
+        private DebugAttackId currentAttackId;
+        private DebugAttackData currentAttackData;
+        private int attackStartedCombatFrame;
+        private bool hasCurrentAttackHit;
         private int actionFrame;
-
         private string lastAttackResult = "None";
 
         public bool PreviousAttackHeld
@@ -56,19 +41,52 @@ namespace FightingGameTrial.Fighter
             get { return attackPressedThisTick; }
         }
 
+        public bool KickPressedThisTick
+        {
+            get { return kickPressedThisTick; }
+        }
+
         public bool IsActionPlaying
         {
             get { return isActionPlaying; }
         }
 
-        public bool IsJPunchAttack
+        public DebugAttackId CurrentAttackId
         {
-            get { return isJPunchAttack; }
+            get { return currentAttackId; }
         }
 
+        public DebugAttackData CurrentAttackData
+        {
+            get { return currentAttackData; }
+        }
+
+        public int AttackStartedCombatFrame
+        {
+            get { return attackStartedCombatFrame; }
+        }
+
+        /// <summary>互換: 現在が J Punch か。</summary>
+        public bool IsJPunchAttack
+        {
+            get { return isActionPlaying && currentAttackId == DebugAttackId.JPunch; }
+        }
+
+        /// <summary>現在が地上 Kick か。</summary>
+        public bool IsGroundKickAttack
+        {
+            get { return isActionPlaying && currentAttackId == DebugAttackId.GroundKick; }
+        }
+
+        /// <summary>互換: J Punch 再生中かつその攻撃で Hit 済みか。</summary>
         public bool HasCurrentJPunchHit
         {
-            get { return hasCurrentJPunchHit; }
+            get { return IsJPunchAttack && hasCurrentAttackHit; }
+        }
+
+        public bool HasCurrentAttackHit
+        {
+            get { return hasCurrentAttackHit; }
         }
 
         public int ActionFrame
@@ -81,38 +99,81 @@ namespace FightingGameTrial.Fighter
             get { return lastAttackResult; }
         }
 
+        public DebugAttackPhase CurrentPhase
+        {
+            get
+            {
+                if (isActionPlaying == false || currentAttackData == null)
+                {
+                    return DebugAttackPhase.None;
+                }
+
+                return currentAttackData.GetPhase(actionFrame);
+            }
+        }
+
         /// <summary>
-        /// 現在入力と前tick入力を比較し、
-        /// 攻撃ボタンが今tickで押されたかを確定します。
-        ///
-        /// HitStop中にも入力の押下状態だけは更新する、
-        /// という現在のSession仕様を維持できるよう、
-        /// ActionFrame進行とは分離しています。
+        /// Attack(J) と Kick(K) の押下エッジをサンプリングします。
+        /// Held（押しっぱなし）ではエッジは立ちません。バッファも持ちません。
+        /// HitStop 中も呼ばれ、ActionFrame 進行とは分離します。
         /// </summary>
-        public void SampleAttackInput(bool attackHeldNow)
+        public void SampleAttackButtons(bool attackHeldNow, bool kickHeldNow)
         {
             attackPressedThisTick =
                 attackHeldNow && previousAttackHeld == false;
-
             previousAttackHeld = attackHeldNow;
+
+            kickPressedThisTick =
+                kickHeldNow && previousKickHeld == false;
+            previousKickHeld = kickHeldNow;
         }
 
         /// <summary>
-        /// Jパンチを開始状態にします。
+        /// 互換: Attack ボタンのみサンプリング（Kick は離した扱い）。
         /// </summary>
-        public void StartJPunch()
+        public void SampleAttackInput(bool attackHeldNow)
         {
+            SampleAttackButtons(attackHeldNow, false);
+        }
+
+        /// <summary>
+        /// 指定攻撃を開始します。攻撃データは呼び出し側が渡す正本参照です。
+        /// </summary>
+        public void StartAttack(
+            DebugAttackId attackId,
+            DebugAttackData attackData,
+            int combatFrame)
+        {
+            if (attackId == DebugAttackId.None || attackData == null)
+            {
+                return;
+            }
+
+            currentAttackId = attackId;
+            currentAttackData = attackData;
+            attackStartedCombatFrame = combatFrame;
             actionFrame = 0;
             isActionPlaying = true;
-            isJPunchAttack = true;
-            hasCurrentJPunchHit = false;
+            hasCurrentAttackHit = false;
             lastAttackResult = "None";
         }
 
-        /// <summary>
-        /// 攻撃中のActionFrameを1進めます。
-        /// 攻撃中でない場合は何もしません。
-        /// </summary>
+        /// <summary>互換: Jパンチ開始。</summary>
+        public void StartJPunch()
+        {
+            StartAttack(DebugAttackId.JPunch, DebugAttackData.JPunch, 0);
+        }
+
+        public void StartJPunch(int combatFrame)
+        {
+            StartAttack(DebugAttackId.JPunch, DebugAttackData.JPunch, combatFrame);
+        }
+
+        public void StartGroundKick(int combatFrame)
+        {
+            StartAttack(DebugAttackId.GroundKick, DebugAttackData.Kick, combatFrame);
+        }
+
         public void AdvanceActionFrame()
         {
             if (isActionPlaying == false)
@@ -121,79 +182,81 @@ namespace FightingGameTrial.Fighter
             }
 
             actionFrame = actionFrame + 1;
-
             if (actionFrame < 0)
             {
                 actionFrame = 0;
             }
         }
 
-        /// <summary>
-        /// 現在の攻撃がHitしたことを記録します。
-        /// </summary>
         public void MarkHit()
         {
-            hasCurrentJPunchHit = true;
+            hasCurrentAttackHit = true;
             lastAttackResult = "Hit";
         }
 
         /// <summary>
-        /// 攻撃中に被 Hit したとき、攻撃を即時中断します（段階12A）。
-        ///
-        /// Miss 記録は付けない（被弾による中断であり、空振り終了ではない）。
-        /// previousAttackHeld は維持し、入力サンプリング経路を壊さない。
+        /// 被 Hit で攻撃を即中断します。Miss にはしません。
         /// </summary>
         public void InterruptByHit()
         {
-            actionFrame = 0;
-            isActionPlaying = false;
-            isJPunchAttack = false;
-            hasCurrentJPunchHit = false;
+            ClearPlayingAttackFields();
         }
 
         /// <summary>
-        /// 現在の攻撃を終了します。
-        ///
-        /// HitしていなければMissとして記録します。
-        /// 終了後もlastAttackResultはHUD確認用に残します。
+        /// 通常終了。未 Hit なら Miss。Clash 終了は EndAttackAsClash を使う。
         /// </summary>
-        public void EndJPunch()
+        public void EndAttack()
         {
-            if (hasCurrentJPunchHit == false)
+            if (hasCurrentAttackHit == false)
             {
                 lastAttackResult = "Miss";
             }
 
-            actionFrame = 0;
-            isActionPlaying = false;
-            isJPunchAttack = false;
-            hasCurrentJPunchHit = false;
+            ClearPlayingAttackFields();
+        }
+
+        /// <summary>互換: Jパンチ終了。</summary>
+        public void EndJPunch()
+        {
+            EndAttack();
         }
 
         /// <summary>
-        /// Scene開始時やデバッグ状態の再初期化時に使用します。
+        /// Clash で攻撃を即終了し、同じ攻撃が再判定されないよう Hit 済み扱いにします。
         /// </summary>
+        public void EndAttackAsClash()
+        {
+            hasCurrentAttackHit = true;
+            lastAttackResult = "Clash";
+            ClearPlayingAttackFields();
+        }
+
         public void Reset()
         {
             previousAttackHeld = false;
             attackPressedThisTick = false;
-
-            isActionPlaying = false;
-            isJPunchAttack = false;
-            hasCurrentJPunchHit = false;
-
-            actionFrame = 0;
+            previousKickHeld = false;
+            kickPressedThisTick = false;
+            ClearPlayingAttackFields();
             lastAttackResult = "None";
         }
 
-        /// <summary>
-        /// Training Reset 共通 release gate 解除時など、Attack エッジ用 previous を再同期します。
-        /// 攻撃進行状態（Action）は触りません。
-        /// </summary>
         public void ClearAttackEdgePrevious()
         {
             previousAttackHeld = false;
             attackPressedThisTick = false;
+            previousKickHeld = false;
+            kickPressedThisTick = false;
+        }
+
+        private void ClearPlayingAttackFields()
+        {
+            actionFrame = 0;
+            isActionPlaying = false;
+            currentAttackId = DebugAttackId.None;
+            currentAttackData = null;
+            attackStartedCombatFrame = 0;
+            hasCurrentAttackHit = false;
         }
     }
 }

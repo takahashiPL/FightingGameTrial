@@ -704,19 +704,24 @@ namespace FightingGameTrial.Fighter
         }
 
         /// <summary>
-        /// Jパンチ Hit Box の World 座標を返します（段階11A / 15）。
+        /// 現在再生中の攻撃の Hit Box（World）を返します。
         ///
-        /// local 定義の正本: DebugAttackData.JPunch（Facing Right 基準）。
-        /// 本メソッドの責務: 原点計算・Facing による LocalX 反転・World 組み立て。
-        ///
-        /// Active 連動:
-        /// AttackState 再生中かつ攻撃データの Active 区間のときだけ IsActive。
+        /// local 定義の正本: AttackState.CurrentAttackData（Facing Right 基準）。
+        /// 攻撃中でなければ JPunch 定義を枠の形だけ返す（IsActive=false）。
+        /// Active 連動は攻撃データの Active 区間＋AttackState。
         /// </summary>
         public DebugBox2D EvaluateWorldHitBox()
         {
             EnsureLocalBoxDefaults();
 
             DebugAttackData attackData = DebugAttackData.JPunch;
+            if (attackState != null
+                && attackState.IsActionPlaying
+                && attackState.CurrentAttackData != null)
+            {
+                attackData = attackState.CurrentAttackData;
+            }
+
             DebugBox2D world = new DebugBox2D();
             float originX;
             float originY;
@@ -728,7 +733,6 @@ namespace FightingGameTrial.Fighter
                 facingRight = motor.FacingRight;
             }
 
-            // Facing Right: +LocalX / Facing Left: -LocalX（Y は反転しない）
             float localCenterX = attackData.HitBoxLocalCenterX;
             if (facingRight == false)
             {
@@ -747,7 +751,7 @@ namespace FightingGameTrial.Fighter
                 halfHeight = 0f;
             }
 
-            bool isActive = IsJPunchHitBoxActiveNow();
+            bool isActive = IsCurrentAttackHitBoxActiveNow(attackData);
 
             world.Set(
                 originX + localCenterX,
@@ -797,17 +801,12 @@ namespace FightingGameTrial.Fighter
         }
 
         /// <summary>
-        /// いま Jパンチ Hit Box を有効にすべきか。
-        /// 進行は AttackState、Active 境界は攻撃データ（可視化独自の進行は持たない）。
+        /// いま攻撃 Hit Box を有効にすべきか。
+        /// 進行は AttackState、Active 境界は渡された攻撃データ。
         /// </summary>
-        public bool IsJPunchHitBoxActiveNow()
+        public bool IsCurrentAttackHitBoxActiveNow(DebugAttackData attackData)
         {
-            if (attackState == null)
-            {
-                return false;
-            }
-
-            if (attackState.IsJPunchAttack == false)
+            if (attackState == null || attackData == null)
             {
                 return false;
             }
@@ -817,7 +816,18 @@ namespace FightingGameTrial.Fighter
                 return false;
             }
 
-            return DebugAttackData.JPunch.IsActiveFrame(attackState.ActionFrame);
+            if (attackState.CurrentAttackData != attackData)
+            {
+                return false;
+            }
+
+            return attackData.IsActiveFrame(attackState.ActionFrame);
+        }
+
+        /// <summary>互換: J Punch Active か。</summary>
+        public bool IsJPunchHitBoxActiveNow()
+        {
+            return IsCurrentAttackHitBoxActiveNow(DebugAttackData.JPunch);
         }
 
         /// <summary>

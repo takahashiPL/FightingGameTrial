@@ -97,6 +97,7 @@ namespace FightingGameTrial.Simulation
         /// J Punch 設定の参照（正本は DebugAttackData.JPunch。毎 Frame new しない）。
         /// </summary>
         private static readonly DebugAttackData JPunchData = DebugAttackData.JPunch;
+        private static readonly DebugAttackData KickData = DebugAttackData.Kick;
 
         /// <summary>
         /// selfX と opponentX がほぼ同じときの Facing 維持用しきい値です。
@@ -137,12 +138,32 @@ namespace FightingGameTrial.Simulation
         [SerializeField]
         private bool enableJumpDebugLog = true;
 
+        [Header("Debug（Clash 再現用・本番機能ではない）")]
+        [Tooltip(
+            "true のとき、P1 が地上攻撃を開始した同じ CombatFrame で P2 も同じ技を開始します。"
+            + " P2 手動操作が無い環境で Ground Clash を確認するための最小 Debug です。"
+            + " 通常プレイでは false のままにしてください。"
+        )]
+        [SerializeField]
+        private bool debugForceP2AttackWithP1ForClashTest = false;
+
         /// <summary>
         /// P2 専用の Neutral 入力です。
         /// P1 の CurrentInput とは別インスタンスで、毎tick new しません。
         /// 静的共有値にもしません（誤って書き換えられるのを防ぐため）。
         /// </summary>
         private SimulationInputState p2NeutralInput;
+
+        /// <summary>
+        /// 両方向 Hit 候補の再利用バッファ（毎 Frame new しない）。
+        /// </summary>
+        private readonly DebugPendingHit pendingHitP1ToP2 = new DebugPendingHit();
+        private readonly DebugPendingHit pendingHitP2ToP1 = new DebugPendingHit();
+
+        /// <summary>
+        /// HUD 用: 直近の Hit 解決結果（None / NormalHit / Clash）。
+        /// </summary>
+        private DebugHitResolutionType lastHitResolutionType = DebugHitResolutionType.None;
 
         /// <summary>
         /// HUD 用: 直近 CombatFrame の Push 中心間距離（補正後）。
@@ -162,7 +183,7 @@ namespace FightingGameTrial.Simulation
         /// <summary>
         /// Training Reset 後の共通 release gate。
         /// true の間は物理 Held を観測しつつ、Simulation へ渡す有効入力を全ニュートラルにする。
-        /// Left/Right/Up/Down/Attack がすべて離れた tick で解除する（R は含めない）。
+        /// Left/Right/Up/Down/Attack/Kick がすべて離れた tick で解除する（R は含めない）。
         /// </summary>
         private bool waitForAllGameplayInputReleaseAfterReset;
 
@@ -385,10 +406,13 @@ namespace FightingGameTrial.Simulation
             BeginCombatFrameForParticipant(participantP1);
             BeginCombatFrameForParticipant(participantP2);
 
-            // 8. Jパンチ開始判定（Participant 単位。P2 は Neutral のため通常は開始しない）
-            //    同一 CombatFrame で Up と J が同時でも、攻撃開始を先に試みる（Attack 優先）。
+            // 8. 攻撃開始（Punch を Kick より先に判定 → 同時押しは Punch 優先）
+            //    同一 CombatFrame で Up と攻撃が同時でも、攻撃開始を Jump より先に試みる。
             TryStartJPunchForParticipant(participantP1);
             TryStartJPunchForParticipant(participantP2);
+            TryStartGroundKickForParticipant(participantP1);
+            TryStartGroundKickForParticipant(participantP2);
+            TryForceP2AttackWithP1ForClashDebug();
 
             // 8b. ジャンプ開始（地上・非 Attack・非 Landing。空中再ジャンプなし）
             TryStartJumpForParticipant(participantP1, inputP1, jumpPressedP1);
@@ -421,17 +445,18 @@ namespace FightingGameTrial.Simulation
             AdvanceActionForParticipant(participantP1);
             AdvanceActionForParticipant(participantP2);
 
-            // 14. Hit 判定（attacker / defender 共通。同一tickで両方向を評価してから HitStop）
-            TryResolveJPunchHit(participantP1, participantP2);
-            TryResolveJPunchHit(participantP2, participantP1);
+            // 14. Hit 候補収集 → 結果決定 → 適用
+            //     即適用しない理由: 同じ CombatFrame の両方向を揃えてから
+            //     NormalHit / Ground Clash を決めるため（処理順で片側だけ有利にしない）。
+            CollectAndResolveHitsForCombatFrame();
 
-            // 15. Visual 更新（Attack / Jump / Walk / Idle。HitStun・KO は専用 State）
+            // 15. Visual 更新（Attack / Kick / Jump / Walk / Idle。HitStun・KO は専用 State）
             //     同一 CombatFrame の本更新なので歩行 elapsed を進める。
             RefreshFighterVisual(true);
 
-            // 16. 攻撃終了判定（AttackState 側）
-            TryEndJPunchForParticipant(participantP1);
-            TryEndJPunchForParticipant(participantP2);
+            // 16. 攻撃終了判定（AttackState 側。Punch / Kick 共通）
+            TryEndAttackForParticipant(participantP1);
+            TryEndAttackForParticipant(participantP2);
             // 攻撃終了で State が変わった場合の再適用。同一 CombatFrame のため elapsed は進めない。
             RefreshFighterVisual(false);
 
@@ -452,8 +477,20 @@ namespace FightingGameTrial.Simulation
             get { return JPunchData; }
         }
 
+        public DebugAttackData KickAttackData
+        {
+            get { return KickData; }
+        }
+
+        /// <summary>HUD 用: 直近 CombatFrame の Hit 解決結果。</summary>
+        public DebugHitResolutionType LastHitResolutionType
+        {
+            get { return lastHitResolutionType; }
+        }
+
         /// <summary>
-        /// HUD互換用: Idle / Startup / Active / Recovery（P1 AttackState + 攻撃データ境界）。
+        /// HUD用: 現在再生中攻撃の区間ラベル（Idle / Startup / Active / Recovery）。
+        /// Punch / Kick 共通。未再生は Idle。
         /// </summary>
         public string GetPunchPhaseLabel()
         {
@@ -463,24 +500,23 @@ namespace FightingGameTrial.Simulation
             }
 
             DebugFighterAttackState attackState = participantP1.AttackState;
-            if (attackState.IsJPunchAttack == false || attackState.IsActionPlaying == false)
+            if (attackState.IsActionPlaying == false || attackState.CurrentAttackData == null)
             {
                 return "Idle";
             }
 
-            int frame = attackState.ActionFrame;
-            if (JPunchData.IsStartupFrame(frame))
+            DebugAttackPhase phase = attackState.CurrentPhase;
+            if (phase == DebugAttackPhase.Startup)
             {
                 return "Startup";
             }
 
-            if (JPunchData.IsActiveFrame(frame))
+            if (phase == DebugAttackPhase.Active)
             {
                 return "Active";
             }
 
-            // 既存どおり Active 終了後は Recovery（AF=0 のみ Idle）
-            if (frame > JPunchData.ActiveEndActionFrame)
+            if (phase == DebugAttackPhase.Recovery)
             {
                 return "Recovery";
             }
@@ -538,7 +574,7 @@ namespace FightingGameTrial.Simulation
                 return;
             }
 
-            attackState.StartJPunch();
+            attackState.StartJPunch(timeState != null ? timeState.CombatFrame : 0);
             RefreshOneFighterVisual(participantP1, false);
 
             if (timeState != null)
@@ -689,7 +725,7 @@ namespace FightingGameTrial.Simulation
         /// 1体分の Visual を AttackState / HitState / KO / Jump / 移動入力から反映します。
         ///
         /// Sprite 優先:
-        /// KO → HitStun → Attack → JumpStart → JumpRise → JumpApex → JumpFall → Landing
+        /// KO → HitStun → Attack(Punch) → Kick → JumpStart → JumpRise → JumpApex → JumpFall → Landing
         /// → WalkForward / WalkBackward → Idle
         ///
         /// 色は Participant.ApplyDisplayColor（HitStun 赤 &gt; KO 暗色 &gt; 通常）。
@@ -712,7 +748,7 @@ namespace FightingGameTrial.Simulation
         /// <summary>
         /// 1体の Visual State を決定します（見た目の正本決定。Sprite 差し替えは Visual）。
         ///
-        /// 優先: KO → HitStun → Attack → JumpStart → JumpRise → JumpApex → JumpFall → Landing → Walk → Idle
+        /// 優先: KO → HitStun → Attack → Kick → JumpStart → JumpRise → JumpApex → JumpFall → Landing → Walk → Idle
         /// </summary>
         private FighterVisualState ResolveFighterVisualState(DebugFighterParticipant participant)
         {
@@ -727,13 +763,25 @@ namespace FightingGameTrial.Simulation
             }
 
             DebugFighterAttackState attackState = participant.AttackState;
-            if (attackState != null
-                && participant.Visual.IsAttackPoseActive(
+            if (attackState != null && participant.Visual != null)
+            {
+                if (participant.Visual.IsAttackPoseActive(
                     attackState.IsActionPlaying,
                     attackState.ActionFrame,
                     attackState.IsJPunchAttack))
-            {
-                return FighterVisualState.Attack;
+                {
+                    return FighterVisualState.Attack;
+                }
+
+                int kickTotal = KickData.TotalFrames;
+                if (participant.Visual.IsKickPoseActive(
+                    attackState.IsActionPlaying,
+                    attackState.ActionFrame,
+                    attackState.IsGroundKickAttack,
+                    kickTotal))
+                {
+                    return FighterVisualState.Kick;
+                }
             }
 
             DebugFighterMotor motor = participant.Motor;
@@ -856,8 +904,9 @@ namespace FightingGameTrial.Simulation
         }
 
         /// <summary>
-        /// Participant 単位で攻撃ボタンの立ち上がりをサンプリングします。
+        /// Participant 単位で Attack / Kick ボタンの立ち上がりをサンプリングします。
         /// HitStop中でも呼ばれ、ActionFrame進行とは分離しています。
+        /// Held（押しっぱなし）ではエッジは立ちません。
         /// </summary>
         private void SampleAttackInputForParticipant(
             DebugFighterParticipant participant,
@@ -869,70 +918,148 @@ namespace FightingGameTrial.Simulation
             }
 
             bool attackHeldNow = false;
+            bool kickHeldNow = false;
 
             if (input != null)
             {
                 attackHeldNow = input.Attack;
+                kickHeldNow = input.Kick;
             }
 
-            participant.AttackState.SampleAttackInput(attackHeldNow);
+            participant.AttackState.SampleAttackButtons(attackHeldNow, kickHeldNow);
         }
 
         /// <summary>
-        /// Participant 単位で Jパンチ開始を試みます。
-        /// AttackPressedThisTick かつ未 Action かつ HitStun/KO/空中でないときだけ開始します。
+        /// 地上 J Punch 開始。Kick より先に呼ばれ、同時押しは Punch 優先。
         /// </summary>
         private void TryStartJPunchForParticipant(DebugFighterParticipant participant)
         {
-            if (participant == null || participant.AttackState == null)
-            {
-                return;
-            }
-
-            // KO 中は新規攻撃不可（段階14B）
-            if (participant.IsKnockedOut)
-            {
-                return;
-            }
-
-            // HitStun 中は新規攻撃不可（段階12A）
-            if (participant.IsInHitStun)
-            {
-                return;
-            }
-
-            // 空中攻撃は今回未実装
-            if (participant.Motor != null && participant.Motor.IsGrounded == false)
+            if (CanStartGroundAttack(participant) == false)
             {
                 return;
             }
 
             DebugFighterAttackState attackState = participant.AttackState;
-
             if (attackState.AttackPressedThisTick == false)
             {
                 return;
             }
 
-            if (attackState.IsActionPlaying)
+            attackState.StartJPunch(timeState.CombatFrame);
+            LogAttackStarted(participant, JPunchData);
+        }
+
+        /// <summary>
+        /// 地上 Ground Kick 開始。Punch 開始の後に呼ぶ（同時押しで Punch が先に取った場合は IsActionPlaying で弾く）。
+        /// </summary>
+        private void TryStartGroundKickForParticipant(DebugFighterParticipant participant)
+        {
+            if (CanStartGroundAttack(participant) == false)
             {
                 return;
             }
 
-            attackState.StartJPunch();
+            DebugFighterAttackState attackState = participant.AttackState;
+            if (attackState.KickPressedThisTick == false)
+            {
+                return;
+            }
 
-            // 攻撃データは設定正本。進行状態（AF 等）は AttackState。
+            attackState.StartGroundKick(timeState.CombatFrame);
+            LogAttackStarted(participant, KickData);
+        }
+
+        /// <summary>
+        /// 地上攻撃共通ゲート: KO / HitStun / 空中 / 他 Action 中は不可。
+        /// </summary>
+        private static bool CanStartGroundAttack(DebugFighterParticipant participant)
+        {
+            if (participant == null || participant.AttackState == null)
+            {
+                return false;
+            }
+
+            if (participant.IsKnockedOut)
+            {
+                return false;
+            }
+
+            if (participant.IsInHitStun)
+            {
+                return false;
+            }
+
+            if (participant.Motor != null && participant.Motor.IsGrounded == false)
+            {
+                return false;
+            }
+
+            if (participant.AttackState.IsActionPlaying)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private static void LogAttackStarted(
+            DebugFighterParticipant participant,
+            DebugAttackData attackData)
+        {
             Debug.Log(
                 "[FightDebug] Attack started slot=" + participant.SlotId
-                + " attack=" + JPunchData.AttackId
-                + " S/A/R=" + JPunchData.StartupFrames
-                + "/" + JPunchData.ActiveFrames
-                + "/" + JPunchData.RecoveryFrames
-                + " Damage=" + JPunchData.Damage
-                + " HitStop=" + JPunchData.HitStopFrames
-                + " HitStun=" + JPunchData.HitStunFrames
-                + " KB=" + JPunchData.KnockbackInitialVelocityX.ToString("0.000")
+                + " attack=" + attackData.AttackId
+                + " S/A/R=" + attackData.StartupFrames
+                + "/" + attackData.ActiveFrames
+                + "/" + attackData.RecoveryFrames
+                + " Damage=" + attackData.Damage
+                + " HitStop=" + attackData.HitStopFrames
+                + " HitStun=" + attackData.HitStunFrames
+                + " KB=" + attackData.KnockbackInitialVelocityX.ToString("0.000")
             );
+        }
+
+        /// <summary>
+        /// Clash 確認用 Debug: P1 が今フレーム攻撃を開始したら P2 も同じ技を開始する。
+        /// </summary>
+        private void TryForceP2AttackWithP1ForClashDebug()
+        {
+            if (debugForceP2AttackWithP1ForClashTest == false)
+            {
+                return;
+            }
+
+            if (participantP1 == null
+                || participantP2 == null
+                || participantP1.AttackState == null
+                || participantP2.AttackState == null)
+            {
+                return;
+            }
+
+            DebugFighterAttackState p1 = participantP1.AttackState;
+            if (p1.IsActionPlaying == false || p1.ActionFrame != 0)
+            {
+                return;
+            }
+
+            if (CanStartGroundAttack(participantP2) == false)
+            {
+                return;
+            }
+
+            if (p1.CurrentAttackId == DebugAttackId.JPunch)
+            {
+                participantP2.AttackState.StartJPunch(timeState.CombatFrame);
+                LogAttackStarted(participantP2, JPunchData);
+                Debug.Log("[FightDebug] ClashDebug: forced P2 JPunch with P1");
+            }
+            else if (p1.CurrentAttackId == DebugAttackId.GroundKick)
+            {
+                participantP2.AttackState.StartGroundKick(timeState.CombatFrame);
+                LogAttackStarted(participantP2, KickData);
+                Debug.Log("[FightDebug] ClashDebug: forced P2 GroundKick with P1");
+            }
         }
 
         /// <summary>
@@ -949,10 +1076,9 @@ namespace FightingGameTrial.Simulation
         }
 
         /// <summary>
-        /// Participant 単位で Jパンチ終了を試みます。
-        /// AttackState.EndJPunch のみを使い、専用の別進行は持ちません。
+        /// Punch / Kick 共通の攻撃終了。終了条件の正本は CurrentAttackData.TotalFrames。
         /// </summary>
-        private void TryEndJPunchForParticipant(DebugFighterParticipant participant)
+        private void TryEndAttackForParticipant(DebugFighterParticipant participant)
         {
             if (participant == null || participant.AttackState == null)
             {
@@ -960,21 +1086,28 @@ namespace FightingGameTrial.Simulation
             }
 
             DebugFighterAttackState attackState = participant.AttackState;
-            if (attackState.IsJPunchAttack == false || attackState.IsActionPlaying == false)
+            if (attackState.IsActionPlaying == false || attackState.CurrentAttackData == null)
             {
                 return;
             }
 
-            // 終了条件の正本は攻撃データ TotalFrames（既存 Visual.ActionEndFrame=12 と同値）。
-            if (JPunchData.IsFinished(attackState.ActionFrame))
+            DebugAttackData attackData = attackState.CurrentAttackData;
+            if (attackData.IsFinished(attackState.ActionFrame))
             {
-                attackState.EndJPunch();
+                string attackLabel = attackData.AttackId;
+                attackState.EndAttack();
 
                 Debug.Log(
                     "[FightDebug] Attack ended slot=" + participant.SlotId
-                    + " attack=" + JPunchData.AttackId
+                    + " attack=" + attackLabel
                 );
             }
+        }
+
+        /// <summary>互換: 旧名。</summary>
+        private void TryEndJPunchForParticipant(DebugFighterParticipant participant)
+        {
+            TryEndAttackForParticipant(participant);
         }
 
         /// <summary>
@@ -1545,6 +1678,254 @@ namespace FightingGameTrial.Simulation
         }
 
         /// <summary>
+        /// 同じ CombatFrame の両方向 Hit 候補を先に集め、
+        /// 片方向だけなら NormalHit、双方なら Ground Clash として解決します。
+        /// </summary>
+        private void CollectAndResolveHitsForCombatFrame()
+        {
+            pendingHitP1ToP2.Clear();
+            pendingHitP2ToP1.Clear();
+            lastHitResolutionType = DebugHitResolutionType.None;
+
+            CollectPendingHit(participantP1, participantP2, pendingHitP1ToP2);
+            CollectPendingHit(participantP2, participantP1, pendingHitP2ToP1);
+
+            if (pendingHitP1ToP2.IsValid && pendingHitP2ToP1.IsValid)
+            {
+                ApplyGroundClash(pendingHitP1ToP2, pendingHitP2ToP1);
+                lastHitResolutionType = DebugHitResolutionType.Clash;
+                return;
+            }
+
+            if (pendingHitP1ToP2.IsValid)
+            {
+                ApplyNormalHit(pendingHitP1ToP2);
+                lastHitResolutionType = DebugHitResolutionType.NormalHit;
+                return;
+            }
+
+            if (pendingHitP2ToP1.IsValid)
+            {
+                ApplyNormalHit(pendingHitP2ToP1);
+                lastHitResolutionType = DebugHitResolutionType.NormalHit;
+            }
+        }
+
+        /// <summary>
+        /// 片方向の Hit 候補だけを作ります。ここでは Damage 等をまだ適用しません。
+        /// </summary>
+        private void CollectPendingHit(
+            DebugFighterParticipant attacker,
+            DebugFighterParticipant defender,
+            DebugPendingHit destination)
+        {
+            destination.Clear();
+
+            if (attacker == null || defender == null || attacker == defender)
+            {
+                return;
+            }
+
+            DebugFighterAttackState attackState = attacker.AttackState;
+            if (attackState == null
+                || attackState.IsActionPlaying == false
+                || attackState.CurrentAttackData == null
+                || defender.IsKnockedOut)
+            {
+                return;
+            }
+
+            DebugBox2D hitBox = attacker.EvaluateWorldHitBox();
+            DebugBox2D hurtBox = defender.EvaluateWorldHurtBox();
+
+            string checkLabel;
+            bool boxesOverlap;
+            bool isCandidate = DebugPunchHitResolver.TryResolveHit(
+                attackState.IsActionPlaying,
+                attackState.HasCurrentAttackHit,
+                hitBox,
+                hurtBox,
+                out checkLabel,
+                out boxesOverlap
+            );
+
+            if (attacker == participantP1 && defender == participantP2)
+            {
+                lastHitCheckLabel = checkLabel;
+                lastBoxOverlap = boxesOverlap;
+            }
+
+            if (isCandidate == false)
+            {
+                return;
+            }
+
+            destination.IsValid = true;
+            destination.Attacker = attacker;
+            destination.Defender = defender;
+            destination.AttackId = attackState.CurrentAttackId;
+            destination.AttackData = attackState.CurrentAttackData;
+            destination.AttackStartedCombatFrame = attackState.AttackStartedCombatFrame;
+            destination.HitCombatFrame = timeState.CombatFrame;
+            destination.DistanceX = Mathf.Abs(
+                defender.Motor.LogicalX - attacker.Motor.LogicalX
+            );
+
+            DebugFighterAttackState defenderAttack = defender.AttackState;
+            destination.DefenderWasAttacking =
+                defenderAttack != null && defenderAttack.IsActionPlaying;
+            if (destination.DefenderWasAttacking)
+            {
+                destination.DefenderAttackId = defenderAttack.CurrentAttackId;
+                destination.DefenderAttackPhase = defenderAttack.CurrentPhase;
+            }
+
+            destination.HitBox = hitBox;
+            destination.HurtBox = hurtBox;
+        }
+
+        private void ApplyNormalHit(DebugPendingHit pendingHit)
+        {
+            if (pendingHit == null
+                || pendingHit.IsValid == false
+                || pendingHit.Attacker == null
+                || pendingHit.Defender == null
+                || pendingHit.AttackData == null)
+            {
+                return;
+            }
+
+            DebugFighterParticipant attacker = pendingHit.Attacker;
+            DebugFighterParticipant defender = pendingHit.Defender;
+            DebugAttackData attackData = pendingHit.AttackData;
+
+            float knockbackVelocityX = ResolveKnockbackVelocityX(
+                attacker,
+                defender,
+                attackData.KnockbackInitialVelocityX
+            );
+
+            defender.ReceiveHit(
+                timeState.CombatFrame,
+                attackData.HitStunFrames,
+                knockbackVelocityX
+            );
+
+            int actualDamage = defender.ApplyDamage(attackData.Damage);
+            if (defender.CurrentHitPoints <= 0)
+            {
+                defender.TryEnterKnockout();
+            }
+
+            if (attacker.AttackState != null)
+            {
+                attacker.AttackState.MarkHit();
+            }
+
+            RefreshOneFighterVisual(defender, false);
+            timeState.HitStopRemaining = attackData.HitStopFrames;
+            timeState.LastStatusMessage =
+                attacker.SlotId + " " + attackData.AttackId + " Hit";
+
+            Debug.Log(
+                "[FightDebug] Normal hit"
+                + " attack=" + attackData.AttackId
+                + " attacker=" + attacker.SlotId
+                + " defender=" + defender.SlotId
+                + " CombatFrame=" + timeState.CombatFrame
+                + " Damage=" + attackData.Damage
+                + " actual=" + actualDamage
+                + " distanceX=" + pendingHit.DistanceX.ToString("0.00")
+            );
+        }
+
+        private void ApplyGroundClash(
+            DebugPendingHit p1ToP2,
+            DebugPendingHit p2ToP1)
+        {
+            DebugFighterParticipant p1 = p1ToP2.Attacker;
+            DebugFighterParticipant p2 = p2ToP1.Attacker;
+            if (p1 == null || p2 == null)
+            {
+                return;
+            }
+
+            float p1Knockback = ResolveKnockbackVelocityX(
+                p2,
+                p1,
+                DebugClashTuning.HorizontalKnockback
+            );
+            float p2Knockback = ResolveKnockbackVelocityX(
+                p1,
+                p2,
+                DebugClashTuning.HorizontalKnockback
+            );
+
+            if (p1.AttackState != null)
+            {
+                p1.AttackState.EndAttackAsClash();
+            }
+
+            if (p2.AttackState != null)
+            {
+                p2.AttackState.EndAttackAsClash();
+            }
+
+            p1.ReceiveHit(
+                timeState.CombatFrame,
+                DebugClashTuning.ClashStunFrames,
+                p1Knockback
+            );
+            p2.ReceiveHit(
+                timeState.CombatFrame,
+                DebugClashTuning.ClashStunFrames,
+                p2Knockback
+            );
+
+            timeState.HitStopRemaining = DebugClashTuning.HitStopFrames;
+            timeState.LastStatusMessage = "Ground Clash";
+
+            Debug.Log(
+                "[FightDebug] Ground Clash"
+                + " CombatFrame=" + timeState.CombatFrame
+                + " P1Attack=" + p1ToP2.AttackId
+                + " P2Attack=" + p2ToP1.AttackId
+                + " Damage=0"
+            );
+        }
+
+        private static float ResolveKnockbackVelocityX(
+            DebugFighterParticipant attacker,
+            DebugFighterParticipant defender,
+            float speed)
+        {
+            speed = Mathf.Abs(speed);
+            if (speed == 0f
+                || attacker == null
+                || defender == null
+                || attacker.Motor == null
+                || defender.Motor == null)
+            {
+                return 0f;
+            }
+
+            float attackerX = attacker.Motor.LogicalX;
+            float defenderX = defender.Motor.LogicalX;
+
+            if (attackerX < defenderX)
+            {
+                return speed;
+            }
+
+            if (attackerX > defenderX)
+            {
+                return -speed;
+            }
+
+            return attacker.Motor.FacingRight ? speed : -speed;
+        }
+
+        /// <summary>
         /// attacker → defender の Jパンチ Hit を判定します（段階11B / 13A / 14A / 14B）。
         ///
         /// 何をするか:
@@ -1791,6 +2172,7 @@ namespace FightingGameTrial.Simulation
             bool up = false;
             bool down = false;
             bool attack = false;
+            bool kick = false;
 
             if (debugGameplayInput != null)
             {
@@ -1799,6 +2181,7 @@ namespace FightingGameTrial.Simulation
                 up = debugGameplayInput.IsUpPressed;
                 down = debugGameplayInput.IsDownPressed;
                 attack = debugGameplayInput.IsAttackPressed;
+                kick = debugGameplayInput.IsKickPressed;
             }
 
             if (waitForAllGameplayInputReleaseAfterReset)
@@ -1817,9 +2200,11 @@ namespace FightingGameTrial.Simulation
                     right,
                     up,
                     down,
-                    attack);
+                    attack,
+                    kick);
 
                 timeState.CurrentInput.CopyFromPhysicalAndCommit(
+                    false,
                     false,
                     false,
                     false,
@@ -1843,6 +2228,7 @@ namespace FightingGameTrial.Simulation
                 up,
                 down,
                 attack,
+                kick,
                 timeState.SimulationTick
             );
         }

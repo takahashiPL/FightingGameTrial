@@ -10,26 +10,18 @@ namespace FightingGameTrial.Combat
     /// - 本クラス … Startup/Active/Recovery・Damage・HitStop・HitStun・KB・Hit Box など、技の固定設定
     /// - DebugFighterAttackState … 今この機体が何フレーム目か、Hit 済みか、という進行状態
     ///
-    /// なぜ Session の const から分離するか:
-    /// 固定値が Session / Participant / Visual に散ると「どれが正本か」が追えない。
-    /// 参照元を1つにすると、将来の複数攻撃や ScriptableObject 化の接続点が明確になる。
-    ///
     /// local Hit Box と world Hit Box:
     /// - ここは Facing Right 基準のローカル定義（Center / Half）だけを持つ
     /// - World 変換・Facing 反転・原点計算は Participant.EvaluateWorldHitBox の責務
     ///
     /// Frame 区間の考え方（ActionFrame）:
-    /// StartJPunch 直後は AF=0。Combat ごとに +1。
+    /// Start 直後は AF=0。Combat ごとに +1。
     /// Startup = 1〜StartupFrames、Active = その直後の ActiveFrames 分、
     /// Recovery = Active 終了翌〜TotalFrames。AF &gt;= TotalFrames で攻撃終了。
     ///
-    /// 今回 ScriptableObject 化しない理由:
-    /// 学習用に「値の正本がコード上の1か所」であることを優先する。
-    /// Inspector / アセット依存を増やす前に、参照経路を整理する段階。
-    ///
     /// 将来の複数攻撃:
-    /// Session が「今使う DebugAttackData」を攻撃開始時に選ぶ接続点を残す。
-    /// 現段階は JPunch 静的1本のみ。
+    /// Session が開始時に DebugAttackData を選ぶ。現在は JPunch と GroundKick の静的2本。
+    /// 将来の空中 Kick は別 ID / 別インスタンスとして追加する（GroundKick と混ぜない）。
     /// </summary>
     public sealed class DebugAttackData
     {
@@ -38,7 +30,13 @@ namespace FightingGameTrial.Combat
         /// </summary>
         public static readonly DebugAttackData JPunch = CreateJPunch();
 
-        private readonly string attackId;
+        /// <summary>
+        /// 地上通常 Kick の設定正本（仮値。Editor 確認後にここだけ直す）。
+        /// </summary>
+        public static readonly DebugAttackData Kick = CreateGroundKick();
+
+        private readonly DebugAttackId attackId;
+        private readonly string attackIdLabel;
         private readonly int startupFrames;
         private readonly int activeFrames;
         private readonly int recoveryFrames;
@@ -53,7 +51,8 @@ namespace FightingGameTrial.Combat
         private readonly float hitBoxHalfHeight;
 
         private DebugAttackData(
-            string attackId,
+            DebugAttackId attackId,
+            string attackIdLabel,
             int startupFrames,
             int activeFrames,
             int recoveryFrames,
@@ -67,9 +66,14 @@ namespace FightingGameTrial.Combat
             float hitBoxHalfWidth,
             float hitBoxHalfHeight)
         {
-            if (string.IsNullOrEmpty(attackId))
+            if (attackId == DebugAttackId.None)
             {
-                throw new ArgumentException("AttackId が空です。", "attackId");
+                throw new ArgumentException("AttackId が None です。", "attackId");
+            }
+
+            if (string.IsNullOrEmpty(attackIdLabel))
+            {
+                throw new ArgumentException("AttackIdLabel が空です。", "attackIdLabel");
             }
 
             if (startupFrames < 0
@@ -81,10 +85,11 @@ namespace FightingGameTrial.Combat
                 || knockbackInitialVelocityX < 0f
                 || knockbackDecelerationPerCombatFrame < 0f)
             {
-                throw new ArgumentException("攻撃データの数値が不正です: " + attackId);
+                throw new ArgumentException("攻撃データの数値が不正です: " + attackIdLabel);
             }
 
             this.attackId = attackId;
+            this.attackIdLabel = attackIdLabel;
             this.startupFrames = startupFrames;
             this.activeFrames = activeFrames;
             this.recoveryFrames = recoveryFrames;
@@ -99,9 +104,16 @@ namespace FightingGameTrial.Combat
             this.hitBoxHalfHeight = hitBoxHalfHeight;
         }
 
-        public string AttackId
+        /// <summary>enum の攻撃 ID（Hit 解決・技相性用）。</summary>
+        public DebugAttackId Id
         {
             get { return attackId; }
+        }
+
+        /// <summary>ログ / HUD 用ラベル（"JPunch" / "GroundKick"）。</summary>
+        public string AttackId
+        {
+            get { return attackIdLabel; }
         }
 
         public int StartupFrames
@@ -119,14 +131,6 @@ namespace FightingGameTrial.Combat
             get { return recoveryFrames; }
         }
 
-        /// <summary>
-        /// Startup + Active + Recovery。ActionFrame がこの値以上で攻撃終了。
-        /// </summary>
-        public int TotalFrames
-        {
-            get { return startupFrames + activeFrames + recoveryFrames; }
-        }
-
         public int Damage
         {
             get { return damage; }
@@ -142,9 +146,6 @@ namespace FightingGameTrial.Combat
             get { return hitStunFrames; }
         }
 
-        /// <summary>
-        /// Knockback 初速の絶対値（符号は Session が LogicalX 比較で決める）。
-        /// </summary>
         public float KnockbackInitialVelocityX
         {
             get { return knockbackInitialVelocityX; }
@@ -155,9 +156,6 @@ namespace FightingGameTrial.Combat
             get { return knockbackDecelerationPerCombatFrame; }
         }
 
-        /// <summary>
-        /// Facing Right 基準の Hit Box ローカル Center X。
-        /// </summary>
         public float HitBoxLocalCenterX
         {
             get { return hitBoxLocalCenterX; }
@@ -178,17 +176,16 @@ namespace FightingGameTrial.Combat
             get { return hitBoxHalfHeight; }
         }
 
-        /// <summary>
-        /// Active 区間の最初の ActionFrame（1始まり区間の先頭）。
-        /// </summary>
+        public int TotalFrames
+        {
+            get { return startupFrames + activeFrames + recoveryFrames; }
+        }
+
         public int ActiveStartActionFrame
         {
             get { return startupFrames + 1; }
         }
 
-        /// <summary>
-        /// Active 区間の最後の ActionFrame（含む）。
-        /// </summary>
         public int ActiveEndActionFrame
         {
             get { return startupFrames + activeFrames; }
@@ -211,18 +208,34 @@ namespace FightingGameTrial.Combat
                 && actionFrame <= TotalFrames;
         }
 
-        /// <summary>
-        /// 既存 Session と同じ: ActionFrame &gt;= TotalFrames で終了。
-        /// </summary>
         public bool IsFinished(int actionFrame)
         {
             return actionFrame >= TotalFrames;
         }
 
         /// <summary>
-        /// Facing Right 基準のローカル Hit Box を新しい DebugBox2D として返す。
-        /// IsActive は呼び出し側が ActionFrame から決める。
+        /// ActionFrame から区間を返します。攻撃外・AF0 は None。
         /// </summary>
+        public DebugAttackPhase GetPhase(int actionFrame)
+        {
+            if (IsStartupFrame(actionFrame))
+            {
+                return DebugAttackPhase.Startup;
+            }
+
+            if (IsActiveFrame(actionFrame))
+            {
+                return DebugAttackPhase.Active;
+            }
+
+            if (IsRecoveryFrame(actionFrame))
+            {
+                return DebugAttackPhase.Recovery;
+            }
+
+            return DebugAttackPhase.None;
+        }
+
         public DebugBox2D CreateLocalHitBoxDefinition(bool isActive)
         {
             return new DebugBox2D(
@@ -234,16 +247,11 @@ namespace FightingGameTrial.Combat
             );
         }
 
-        /// <summary>
-        /// 現行実装の J Punch 固定値をそのまま写した工場です。
-        /// Docs 推測ではなく、Session / Participant にあった値を移行する。
-        /// </summary>
         private static DebugAttackData CreateJPunch()
         {
             // Startup AF 1〜3 / Active 4〜6 / Recovery 7〜12（Total=12）
-            // Damage=10, HitStop=6, HitStun=12, KB=0.18 / decel=0.015
-            // Hit Box local: (0.75, 1.25, 0.55, 0.35)
             return new DebugAttackData(
+                DebugAttackId.JPunch,
                 "JPunch",
                 3,
                 3,
@@ -257,6 +265,29 @@ namespace FightingGameTrial.Combat
                 1.25f,
                 0.55f,
                 0.35f
+            );
+        }
+
+        private static DebugAttackData CreateGroundKick()
+        {
+            // Startup 8 / Active 3 / Recovery 4（Total=15）
+            // Hit Box: Punch より遠く、蹴り脚に合わせて低く薄めにした仮値
+            // centerX 0.95 / centerY 0.55 / half 0.60×0.25
+            return new DebugAttackData(
+                DebugAttackId.GroundKick,
+                "GroundKick",
+                8,
+                3,
+                4,
+                14,
+                7,
+                14,
+                0.24f,
+                0.015f,
+                0.95f,
+                0.55f,
+                0.60f,
+                0.25f
             );
         }
     }
