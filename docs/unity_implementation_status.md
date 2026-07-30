@@ -1,14 +1,15 @@
 # Unity 実装状況・次工程（段階1〜15到達後）
 
-最終更新: 2026-07-28
+最終更新: 2026-07-30
 対象ブランチ: `unity`
-最新コミット済み HEAD: **本コミット**（Add sprite sheet fighter visual sequences）※ push 前はローカルのみ
+最新コミット済み HEAD: **`bc80ddb`**（Add ground kick and shared hit resolution groundwork）・push 済み
 段階14全体（14A+14B）・段階15（攻撃データ化）: **完了・push 済み**
 GC-1 / GC-2（補助改善・正式 Stage ではない）: **完了・push 済み**
 Training Reset 位置・向き復帰: **実装・Editor 確認済み**（正式 Stage 番号なし）
 Visual Sequence + Sprite Sheet 移行: **実装・Editor 確認済み**（正式 Stage 番号なし）
 ジャンプ基盤・Jump Visual・計測ログ: **実装・Editor 確認済み**（正式 Stage 番号なし）
 Training Reset 共通 release gate: **実装・Editor 確認済み**（正式 Stage 番号なし）
+Ground Kick + shared hit resolution groundwork: **実装・Editor確認済み・push済み**（正式 Stage 番号なし）
 正式な次工程番号: **未定義**（新 Stage 番号は作らない）
 
 このファイルは、Unity 側の**実装済み / 暫定 / 未実装 / 次回候補 / 正式方針**を混同せずに追うための正本です。
@@ -122,7 +123,7 @@ HitStun / KO は専用 State。専用 Sequence 未設定時は Idle Sequence へ
 | Walk | 8（`Fighter_Walk_00` … `_07`） | **接続済み・確認 OK**（WalkF / WalkB 共有） |
 | Jump | 8（`Fighter_Jump_00` … `_07`） | **接続済み・確認 OK** |
 | Punch | 2（`Fighter_Punch_00` / `_01`） | **接続済み・確認 OK**（Recovery 専用コマなし・暫定） |
-| Kick | 5（`Fighter_Kick_00` … `_04`） | **素材のみ・Gameplay 未接続** |
+| Kick | 5（`Fighter_Kick_00` … `_04`） | **Ground Kickへ接続済み・確認 OK** |
 
 | State | Sequence 割当 |
 |---|---|
@@ -147,12 +148,12 @@ Characters フォルダは正本 PNG + `.meta` の 1 組のみ。
 | 31 sub-sprite 切り出し | **完了** |
 | Idle / Walk / Jump / Punch Sequence | **Editor 確認済み** |
 | Kick 素材 | **切り出し済み** |
-| Kick Gameplay | **未接続** |
+| Ground Kick Gameplay | **接続済み・Editor確認済み** |
 | P1/P2・P2 Tint | **確認済み** |
 | Missing Sprite | **なし（Editor 確認済み）** |
 | Gameplay ロジック変更 | **なし** |
 
-**次回改善候補**: Kick Gameplay 接続、Punch 3 枚以上、必要なら攻撃素材再制作。Animator 導入は別候補。
+**次回改善候補**: Ground Clash 専用実測、Punch 3 枚以上、必要なら攻撃素材再制作。Animator 導入は別候補。
 
 詳細は教材 §17.8・§17.9、`docs/rules.md` §15.5・§15.6、`docs/sprite_art_status.md`。
 
@@ -231,7 +232,7 @@ Left+Right 同時: Neutral
 
 | 区分 | 内容 |
 |---|---|
-| **未実装** | Animator / Animation Clip、**Air Hit / Air Knockback（空中被弾）**、Kick Gameplay 接続（地上攻撃候補）、正式 Character Data SO、高度な着地硬直・入力予約 |
+| **未実装** | Animator / Animation Clip、**Air Hit / Air Knockback（空中被弾）**、正式 Character Data SO、高度な着地硬直・入力予約 |
 | **未確認** | Development Build Profiler、Pause 中 R の詳細 |
 | **将来候補（仕様未定含む）** | 将来の空中攻撃（種類未定・空中パンチは対象外）、空中キック（未定）、Animator、Guard、Jump 値調整、SO 化 |
 
@@ -269,7 +270,7 @@ Round 終了・勝敗判定は工程表上の段階14/15には含まれず、**�
 
 | 入れ物 | 担当 |
 |---|---|
-| **`DebugAttackData` / `DebugAttackData.JPunch`** | **J Punch 攻撃設定値の正本**（進行状態は持たない） |
+| **`DebugAttackData` / `DebugAttackData.JPunch` / `DebugAttackData.GroundKick`** | **J Punch / Ground Kick 攻撃設定値の正本**（進行状態は持たない） |
 | **`DebugFighterAttackState`** | 攻撃進行の正本（ActionFrame / HasCurrentJPunchHit 等） |
 | **`DebugFighterHitState`** | 被 Hit / HitStun / ノックバック速度（HP・KO・攻撃データは持たない） |
 | **`DebugFighterParticipant`** | **HP 正本** + **KO 正本**（`isKnockedOut`）。local→world Hit Box 変換・Facing 反転 |
@@ -447,7 +448,7 @@ ScriptableObject 化、Inspector 編集、Character 別攻撃データ、複数�
 - 攻撃データの ScriptableObject 化 / Inspector 編集 / JSON・CSV
 - 複数攻撃、弱/中/強、技コマンド、コンボ、Cancel、Counter Hit
 - 自然な歩行素材の再制作（現状 Walk 8 コマは動作確認済み）
-- **Kick Gameplay 接続**（Kick sub-sprite 5 枚は素材のみ）
+- **Ground Clash 専用実測**（P2同時攻撃デバッグ経路。通常保存値はOFF）
 - Punch 3 枚以上への素材改善
 - Character Data ScriptableObject（ジャンプ設定の正式データ化含む）
 - Jump 数値調整、Development Build Profiler
@@ -487,7 +488,7 @@ Push / Hurt / Hit 可視化（11A）と Hit×Hurt 重なり判定（11B）は完
 
 その後の候補（順不同・未着手。**新工程番号は作らない**。正式な次 Stage も未定義）:
 
-- Kick Gameplay 接続（地上攻撃候補）、Punch 3 枚以上への素材改善
+- Ground Clash専用実測、Punch 3 枚以上への素材改善
 - Animator + Animation Clip
 - Air Hit / Air Knockback（**空中被弾**。空中攻撃ではない）
 - Guard
@@ -561,6 +562,37 @@ Round / Guard / 複数攻撃などの**機能 Stage とは別枠**。番号「GC
 - 段階1〜**15**まで到達。工程表の段階14（HP/Damage/KO）と段階15（攻撃データ化）は完了
 - Visual Sequence + Sprite Sheet 移行・ジャンプ基盤・計測ログ・Training Reset release gate は実装・Editor 確認済み。正式 Stage 番号なし
 - `FightDebugScene` は**練習・検証モード**。戦闘コア共通、KO 後処理はモード側（§1.1）
-- Visual: Sequence 再生 + `Fighter_SpriteSheet` **31 sub-sprite**（PPU 39、Idle/Walk/Jump/Punch 接続済み、Kick 素材のみ）。Animator 未使用
-- 飛び越し後 Facing 反転・左向き Walk / Jump / J Punch は Editor 確認済み。J Punch は地上専用（ジャンプ中開始不可）。Air Hit / Air Knockback・Kick Gameplay・Dev Build Profiler は未実装／未確認
-- 正式な次 Stage 番号は未定義。候補は順不同（Kick Gameplay、Punch 素材改善、Animator、Air Hit/KB、Guard、Character Data SO、対戦モード分離など。将来の空中攻撃は仕様未定）
+- Visual: Sequence 再生 + `Fighter_SpriteSheet` **31 sub-sprite**（PPU 39、Idle/Walk/Jump/Punch/Ground Kick 接続済み）。Animator 未使用
+- 飛び越し後 Facing 反転・左向き Walk / Jump / J Punch は Editor 確認済み。J Punch は地上専用（ジャンプ中開始不可）。Air Hit / Air Knockback・Ground Clash専用実測・Dev Build Profiler は未実装／未確認
+- 正式な次 Stage 番号は未定義。候補は順不同（Ground Clash専用実測、Punch 素材改善、Animator、Air Hit/KB、Guard、Character Data SO、対戦モード分離など。将来の空中攻撃は仕様未定）
+
+## 6. Ground Kick + 共通 Hit 解決基盤（2026-07-30）
+
+正式 Stage 番号なし。コミット `bc80ddb`、`origin/unity` へ push 済み。
+
+### Ground Kick 設定と入力
+
+| 項目 | 現在値／挙動 |
+|---|---|
+| 入力 | P1 `K` |
+| 開始条件 | Grounded、行動可能、KO/HitStun/他攻撃中でない |
+| J+K | 同Tick相当では J Punch 優先 |
+| 空中入力 | Ground Kick開始なし。K保持で着地しても予約発生せず、離して押し直すと開始 |
+| キャンセル | Punch→Kick / Kick→Punch ともなし。入力予約なし |
+| S/A/R | 8 / 3 / 4（Total 15） |
+| Damage / HitStop / HitStun | 14 / 7 / 14 |
+| Horizontal KB | 0.24 |
+| local Hit Box | center `(0.95, 0.55)` / half `(0.60, 0.25)` |
+| Visual | Kick 5枚、3CF/枚、Loop OFF、Hold Last Frame ON |
+
+### Editor確認
+
+- 近距離で `actual=14`、`P2HitCount=1`、追加Hitなし
+- HitStop開始／終了、右向き・左向き双方のHit、相手を離れる方向のノックバック
+- 空中で開始しない、空中K保持から着地しても出ない
+- Punch中Kick、Kick中Punchで途中切替しない
+- 通常速度で近いJ/K入力はPunch優先を確認
+
+### 共通 Hit 解決基盤
+
+`DebugAttackId`、`DebugAttackPhase`、`DebugPendingHit`、`DebugHitResolutionType`、`DebugClashTuning` を追加。各方向のHit候補を同一 CombatFrame で収集後に解決する構造へ移行した。Ground Clash のコード土台と `debugForceP2AttackWithP1ForClashTest`（Scene保存値OFF）を含むが、P2同時攻撃による専用実測は未確認であり、完了扱いにしない。

@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## Ground Kick + shared hit resolution groundwork（`bc80ddb`）
+
+- 2026-07-30、`unity` / `origin/unity` へ push 済み
+- P1 `K` で地上専用 Ground Kick。空中開始なし、着地予約なし、J Punch / Ground Kick 相互キャンセルなし、近い同時押下は J Punch 優先
+- Ground Kick: Startup 8 / Active 3 / Recovery 4、Damage 14、HitStop 7、HitStun 14、Horizontal KB 0.24
+- local Hit Box を脚へ合わせ `centerX=0.95 / centerY=0.55 / halfWidth=0.60 / halfHeight=0.25` に調整
+- `Fighter_Kick_00`〜`_04` を P1/P2 の `kickSequence` へ接続（3CF/枚、Loop OFF、Hold Last Frame ON）
+- `DebugAttackId` / `DebugAttackPhase` / `DebugPendingHit` / `DebugHitResolutionType` / `DebugClashTuning` を追加
+- 同一 CombatFrame の両方向 Hit 候補を収集してから解決する共通経路を追加。Ground Clash の土台を含む
+- Editor確認: 通常 Hit、14 damage、1攻撃1Hit、HitStop、ノックバック、左右 Facing、空中開始禁止、押しっぱなし着地予約なし、Punch/Kick相互キャンセルなし
+- 未確認: P2同時攻撃を使った Ground Clash の専用実測、Development Build
+
 ## Docs: 空中パンチ前提の記述整理
 
 - 初期資料には空中パンチ案が含まれていたが、**現在は J Punch を地上専用とし、ジャンプ中のパンチを採用しない**方針へ統一した

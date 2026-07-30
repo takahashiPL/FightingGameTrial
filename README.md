@@ -36,21 +36,21 @@ GC-2（Editor）: `DebugHudView.Update` 約17.2 KB → 約3.2 KB / frame。Devel
 ## Unity 実装の到達点（要約）
 
 ブランチ `unity` 上で、**段階1〜15まで完了**しています。
-最新コミット済み HEAD: **本コミット**（Add sprite sheet fighter visual sequences）※ push 前はローカルのみ
+最新コミット済み HEAD: **`bc80ddb`**（Add ground kick and shared hit resolution groundwork）・`origin/unity` へ push 済み
 段階14全体（14A+14B）・段階15（J Punch 攻撃データ化）: **完了・push 済み**（SO 化は見送り）。
 GC-1 / GC-2（補助改善・正式 Stage ではない）: **完了・push 済み**。
 Training Reset 位置・向き復帰: **実装・Editor 確認済み**（正式 Stage 番号なし）。
 Visual Sequence + Sprite Sheet 移行: **実装・Editor 確認済み**（正式 Stage 番号なし）。
-PixelLab 正本シート統合（31 sub-sprite / PPU 39）: **実装・Editor 確認済み**（Kick Gameplay 未接続・Punch 2 枚暫定）。
+PixelLab 正本シート統合（31 sub-sprite / PPU 39）: **実装・Editor 確認済み**（Ground Kick 接続済み・Punch 2 枚暫定）。
 ジャンプ基盤（Neutral / Forward / Backward・LogicalY 軌道・Jump Visual・計測ログ）: **実装・Editor 確認済み**（正式 Stage 番号なし）。
 Training Reset 共通 release gate（全操作 release まで入力抑制）: **実装・Editor 確認済み**（正式 Stage 番号なし）。
 正式な次工程番号は**未定義**（新 Stage 番号は作らない）。
 
 | 区分 | 内容 |
 |---|---|
-| **実装済み** | 60Hz SimulationTick、Pause/Step、HUD（左上状態／左下操作・JPunch Data）、HitStop、入力、左右移動、Facing分離、2体共通 Participant / AttackState / HitState、Push Box、壁際 Push 再配分、Box 可視化、Hit×Hurt 重なり判定、Jパンチ、1攻撃1Hit、Hit時6F HitStop、HitStun 12CF・被Hit表示、横ノックバック、HP/Damage（max100・J Punch10）、**KO状態・遷移（Life表示）**、**`DebugAttackData.JPunch` による攻撃設定正本**、**Training Reset（R）: 戦闘状態＋論理位置 X/Y・ジャンプ状態・Facing を Scene 開始時へ復帰**、**共通 release gate（全ゲーム操作を一度離すまで有効入力 Neutral）**、**Visual Sequence（Idle 8 / Walk 8 / Jump 8 / Punch 2 / Attack / JumpStart / Rise / Apex / Fall / Landing / HitStun / KO）+ `Fighter_SpriteSheet` 31 sub-sprite（GUID `dcb7851d129f2305be49fac973bf47b4`、PPU 39）**、**ジャンプ基盤（Neutral / Forward / Backward、キャラ別 Min/Max 高さ・時間・距離、押下時間補間、CombatFrame LogicalY 軌道、飛び越し時 Push skip、Jump 計測ログ）** |
-| **暫定** | Push 等分＋壁際再配分。攻撃数値はコード内不変データ（SO 未使用）。KO 視覚は色変更のみ（優先: HitStun赤 > KO暗色 > 通常Tint）。Motor minX/maxX（±7）。相打ちは両方向判定の土台のみ（P2 は Neutral）。見た目は Sequence による Sprite 差し替え（Animator 未使用）。**Punch は素材 2 枚のみ（Recovery 専用コマなし）**。ジャンプ数値はコード内 `FighterJumpSettings`（正式 Character Data SO ではない）。実測高さは設定 Min/Max より少し上回る場合あり |
-| **未実装（方針確定含む）** | 対戦モード進行（Round/勝敗/WIN・LOSE/タイマー等）、HPバー、Guard、壁バウンド等、**Kick Gameplay 接続**（Kick sub-sprite 5 枚は素材のみ・地上攻撃候補）、Animator + Animation Clip、**Air Hit / Air Knockback（空中被弾専用・空中攻撃ではない）**、正式 Character Data ScriptableObject、複数 Hurt/Hit Box、攻撃データ SO 化（要否は後続判断）、複数攻撃・コンボ・Cancel、Punch 3 枚以上への素材改善。**将来の空中攻撃は仕様未定（空中パンチは採用しない）** |
+| **実装済み** | 60Hz SimulationTick、Pause/Step、HUD（左上状態／左下操作・JPunch Data）、HitStop、入力、左右移動、Facing分離、2体共通 Participant / AttackState / HitState、Push Box、壁際 Push 再配分、Box 可視化、Hit×Hurt 重なり判定、Jパンチ、1攻撃1Hit、Hit時6F HitStop、HitStun 12CF・被Hit表示、横ノックバック、HP/Damage（max100・J Punch10）、**KO状態・遷移（Life表示）**、**`DebugAttackData` による J Punch / Ground Kick 攻撃設定正本**、**Training Reset（R）: 戦闘状態＋論理位置 X/Y・ジャンプ状態・Facing を Scene 開始時へ復帰**、**共通 release gate（全ゲーム操作を一度離すまで有効入力 Neutral）**、**Visual Sequence（Idle 8 / Walk 8 / Jump 8 / Punch 2 / Kick 5 / Attack / Kick / JumpStart / Rise / Apex / Fall / Landing / HitStun / KO）+ `Fighter_SpriteSheet` 31 sub-sprite（GUID `dcb7851d129f2305be49fac973bf47b4`、PPU 39）**、**ジャンプ基盤（Neutral / Forward / Backward、キャラ別 Min/Max 高さ・時間・距離、押下時間補間、CombatFrame LogicalY 軌道、飛び越し時 Push skip、Jump 計測ログ）** |
+| **暫定** | Push 等分＋壁際再配分。攻撃数値はコード内不変データ（SO 未使用）。KO 視覚は色変更のみ（優先: HitStun赤 > KO暗色 > 通常Tint）。Motor minX/maxX（±7）。同一 CombatFrame の両方向 Hit 候補収集と Ground Clash 解決の土台を実装（通常は P2 Neutral、Scene の検証フラグは OFF）。見た目は Sequence による Sprite 差し替え（Animator 未使用）。**Punch は素材 2 枚のみ（Recovery 専用コマなし）**。ジャンプ数値はコード内 `FighterJumpSettings`（正式 Character Data SO ではない）。実測高さは設定 Min/Max より少し上回る場合あり |
+| **未実装（方針確定含む）** | 対戦モード進行（Round/勝敗/WIN・LOSE/タイマー等）、HPバー、Guard、壁バウンド等、Animator + Animation Clip、**Air Hit / Air Knockback（空中被弾専用・空中攻撃ではない）**、正式 Character Data ScriptableObject、複数 Hurt/Hit Box、攻撃データ SO 化（要否は後続判断）、複数攻撃・コンボ・Cancel、Punch 3 枚以上への素材改善。**将来の空中攻撃は仕様未定（空中パンチは採用しない）** |
 
 詳細・次工程は **`docs/unity_implementation_status.md`** を正とする。
 ジャンプ・Visual・Reset gate は同ファイル §1.1・§1.2 および教材 §17.7〜§17.9。
@@ -120,7 +120,7 @@ Git 管理外: `Game/Library`、`Temp`、`Logs`、`UserSettings`、`obj` など
 
 正式な優先順位・次工程番号は**未決定**（順不同・新 Stage 番号は作らない）。
 
-1. Kick Gameplay 接続（Kick sub-sprite 5 枚は素材のみ。**地上攻撃**として接続する候補）
+1. Ground Clash の専用検証（P2 同時攻撃用デバッグ経路を使った実測）
 2. Punch 3 枚以上への素材改善（Recovery 含む）
 3. Animator + Animation Clip
 4. Air Hit / Air Knockback（**空中被弾**専用。空中攻撃とは別）
@@ -154,7 +154,7 @@ Git 管理外: `Game/Library`、`Temp`、`Logs`、`UserSettings`、`obj` など
 - `art/spritesheet_grid_template.png` … 128×128、8×8台紙（セルサイズ。画面等倍表示の意味ではない）
 - `Game/Assets/Art/Characters/Fighter_SpriteSheet.png` … FightDebug 正本（1536×1024、31 sub-sprite、PPU 39、GUID `dcb7851d129f2305be49fac973bf47b4`。本番清書ではない）
 - `docs/production_spritesheet_spec.md` … 制作工程とセル仕様の正本
-- `docs/sprite_art_status.md` … 現在の素材状態（31 sub-sprite・Kick 未接続・本番清書未達）
+- `docs/sprite_art_status.md` … 現在の素材状態（31 sub-sprite・Ground Kick 接続済み・本番清書未達）
 
 ## ディレクトリ構成
 
@@ -193,3 +193,15 @@ Unity_FightingGameTrial
 - Facing は相手との位置関係を基本とし、移動入力と分離する。Push 補正後の位置で Facing を更新する（Unity デバッグでは段階10A/10B-3 → `docs/unity_implementation_status.md`）
 - `attack_category` はラベルのみ
 - 必殺技は未実装・非表示
+
+## Ground Kick 実装メモ（2026-07-30）
+
+正式 Stage 番号は付けない。コミット `bc80ddb` で、地上専用の Ground Kick と共通 Hit 解決基盤を追加した。
+
+- 入力: P1 の `K`。地上専用。空中押下・空中保持から着地しても自動発生せず、押し直しが必要
+- J Punch と Ground Kick は相互キャンセル／予約なし。近い同時押下では J Punch 優先
+- Ground Kick: Startup 8 / Active 3 / Recovery 4、Damage 14、HitStop 7、HitStun 14、Horizontal Knockback 0.24
+- local Hit Box: center `(0.95, 0.55)`、half `(0.60, 0.25)`。左右 Facing 反転を確認済み
+- Sprite: `Fighter_Kick_00`〜`_04`、3 CombatFrame/枚、Loop OFF、Hold Last Frame ON（P1/P2）
+- Editor確認: 通常 Hit、1攻撃1Hit、14 damage、HitStop、ノックバック、左右向き、空中開始禁止、Punch/Kick相互キャンセルなし
+- Ground Clash はコード基盤を含むが、P2同時攻撃の専用実測は未確認

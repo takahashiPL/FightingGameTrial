@@ -46,7 +46,7 @@
 | Walk | 8 コマ（WalkF / WalkB 共有） | **接続済み・確認 OK** |
 | Jump | Start=00 / Rise=01–02 / Apex=03 / Fall=04–05 / Landing=06–07 | **接続済み・確認 OK** |
 | Punch | 2 コマ（Attack） | **接続済み・確認 OK**（Recovery 専用コマなし・暫定） |
-| Kick | — | **素材のみ・Gameplay 未接続** |
+| Kick | `Fighter_Kick_00` … `_04` | **Ground Kickへ接続済み・Editor確認済み** |
 
 詳細な実装接続は `docs/unity_implementation_status.md` §1.1。
 
@@ -70,7 +70,7 @@
 - Alpha 全体重心だけでは手足・帯・髪に引っ張られる。体幹・腰帯を基準にする
 - `framesPerSprite` は FPS ではなく、**1 枚を何 CombatFrame 表示するか**
 - JumpRise / JumpFall は `loop=false` + `holdLastFrame=true` で空中姿勢の往復を防止
-- Punch は素材 2 枚のみ（Recovery 専用コマなし）。Kick は原画上 knee-kick 寄りの見え方を含むが、今回は原画修正ではなく切り出し整理のみ
+- Punch は素材 2 枚のみ（Recovery 専用コマなし）。Kick は原画上 knee-kick 寄りの見え方を含む。Ground Kickへ接続済みだが、素材自体は暫定で必要なら再制作する
 - 旧・新シート並存のままコミットせず、参照検索後に新 GUID を維持して正本名へ一本化した
 - 旧素材は新参照確認前に削除しない
 
@@ -82,7 +82,7 @@
 
 ## 今後の改善候補
 
-- Kick Gameplay 実装（Sequence 接続）
+- Ground Kick の見た目／Hit Box再調整（必要時）
 - Punch 3 枚以上（Recovery 含む）への素材改善
 - 必要なら攻撃・歩行素材の再制作
 
@@ -97,3 +97,10 @@
 - v2 簡易図形: `art/fighter_spritesheet_v1.png` 等（実装素材として使用しない）
 - デバッグ単体 PNG（2026-07 削除）: `fighter_idle_00_transparent` / `fighter_attack_punch_transparent` / `Fighter_Walk_*` / `Fighter_Jump*` / `Fighter_Landing`（PNG+meta セット。Scene 参照ゼロ確認後）
 - 旧 `Fighter_SpriteSheet.png`（GUID `2bb8ae7896cf21b43bcd9cf17bf228d2`、2026-07 一本化時。参照ゼロ確認後）
+
+## Ground Kick 接続（2026-07-30）
+
+- P1/P2 `DebugFighterVisual.kickSequence` に5枚を同順で接続
+- 3 CombatFrame/枚、Loop OFF、Hold Last Frame ON
+- Gameplay側の Active は AF 8〜10 付近となり、伸びた蹴りポーズと赤い Hit Box が概ね一致するよう調整
+- 本番清書ではなく、現素材を使った学習・判定確認用の暫定品質

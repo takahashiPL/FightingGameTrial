@@ -5,7 +5,7 @@
 対象コミット（資料作成時点）: **`2341e4c`**（Add component and scene learning guide）
 方針追記時点の HEAD: **`dfcb9e0`**（Reduce status HUD allocations）※コード変更なしの Docs 追記
 対象 Scene: `Game/Assets/Scenes/FightDebugScene.unity`
-実装到達点: **Stage 15（J Punch 攻撃データ化）完了後**
+実装到達点: **Stage 15完了後 + Ground Kick / 共通Hit解決基盤（`bc80ddb`）**
 Scene の役割: **正式な練習・検証モード**（対戦モードではない。§2・§17）
 
 ---
@@ -55,7 +55,7 @@ Unity の **Scene / GameObject / Component / MonoBehaviour / Inspector 参照** 
 |---|---|
 | ゲーム仕様（時間・判定の意味） | `docs/rules.md` |
 | Unity 実装の到達点 | `docs/unity_implementation_status.md` |
-| J Punch 攻撃の設定値 | `DebugAttackData.JPunch`（コード） |
+| J Punch / Ground Kick の設定値 | `DebugAttackData.JPunch` / `DebugAttackData.GroundKick`（コード） |
 | 攻撃の進行状態 | 各 `DebugFighterParticipant.AttackState` |
 | 被 Hit / HitStun / KB 速度 | 各 `DebugFighterParticipant.HitState` |
 | HP / KO | 各 `DebugFighterParticipant` |
@@ -436,7 +436,7 @@ Keyboard (J)
 |---|---|---|
 | 1 | J 入力（物理） | `DebugGameplayInput` |
 | 2 | 押した瞬間の検出 | `DebugFighterAttackState.SampleAttackInput`（Session 経由） |
-| 3 | 攻撃開始 | `SimulationSession.TryStartJPunchForParticipant` → `AttackState.StartJPunch` |
+| 3 | 攻撃開始 | `SimulationSession.TryStartJPunchForParticipant` または `TryStartGroundKickForParticipant` → `AttackState.StartAttack` |
 | 4 | Startup（AF 1〜3） | `AttackState.ActionFrame` + `DebugAttackData` 境界 |
 | 5 | Active（AF 4〜6） | 同上。Hit Box `IsActive` |
 | 6 | local Hit Box | **正本** `DebugAttackData.JPunch` |
@@ -449,7 +449,7 @@ Keyboard (J)
 | 13 | HitStun | `HitState`（値は攻撃データから ReceiveHit） |
 | 14 | Knockback | Session が移動・減速（減速値も攻撃データ） |
 | 15 | Recovery（AF 7〜12） | ActionFrame 進行 |
-| 16 | 攻撃終了 | `ActionFrame >= TotalFrames` → `EndJPunch` |
+| 16 | 攻撃終了 | `ActionFrame >= TotalFrames` → `EndAttack` |
 | 17 | HUD / Log | `DebugHudView` / `Debug.Log` |
 
 処理順の詳細は `SimulationSession.ProcessOneSimulationTick` のコメント番号が正本です。
@@ -614,7 +614,7 @@ HUD の数字は便利な鏡です。**戦闘データの正本は Session / Par
 - 複数攻撃・コンボ・Cancel・Counter Hit
 - 2P 実操作（現在 P2 は Neutral）
 - 壁バウンド・壁やられ など
-- Walk 見た目品質改善、Animator、Kick Gameplay（地上）、Air Hit / Air Knockback（空中被弾）
+- Walk 見た目品質改善、Animator、Ground Clash専用実測、Air Hit / Air Knockback（空中被弾）
 - 正式 Character Data ScriptableObject
 - 将来の空中攻撃（仕様未定・空中パンチは対象外）
 
@@ -1017,12 +1017,12 @@ GC の話は「仕様の正本」ではなく、**実行時コストの学習**�
 - R による **Training Reset**: 戦闘状態＋論理位置 X/Y・ジャンプ状態・Facing 復帰＋共通 release gate（§17.7）
 - **Visual Sequence**: `FighterSpriteSequence` + `FighterVisualState`（Idle / WalkF / WalkB / Attack / JumpStart / Rise / Apex / Fall / Landing / HitStun / KO）。Session が決定、Visual が再生（§17.8・§17.9）
 - **ジャンプ基盤**: Neutral / Forward / Backward、LogicalY 軌道、飛び越し Push skip、計測ログ（§17.9）
-- **`Fighter_SpriteSheet`**（1536×1024、Multiple、31 sub-sprite、PPU 39、GUID `dcb7851d129f2305be49fac973bf47b4`）。P1/P2 同一、P2 Tint。Idle/Walk/Jump/Punch 接続済み。**Kick は素材のみ・Gameplay 未接続**
+- **`Fighter_SpriteSheet`**（1536×1024、Multiple、31 sub-sprite、PPU 39、GUID `dcb7851d129f2305be49fac973bf47b4`）。P1/P2 同一、P2 Tint。Idle/Walk/Jump/Punch 接続済み。**Ground Kickへ接続済み**
 
 ### 17.3 将来構想（方針確定・未実装）
 
 - 対戦モード用 Scene / Controller / HUD
-- Kick Gameplay 接続、Punch 3 枚以上、Animator + Animation Clip
+- Ground Clash専用実測、Punch 3 枚以上、Animator + Animation Clip
 - Character Data ScriptableObject（ジャンプ設定の正式データ化含む）
 
 （Training Reset・Visual Sequence / Sprite Sheet・ジャンプ基盤は §17.7〜§17.9 で実装済み。ここには含めない。）
@@ -1032,7 +1032,7 @@ GC の話は「仕様の正本」ではなく、**実行時コストの学習**�
 戦闘処理が足の角度や Sprite コマを直接決めない。Session が Visual State を決め、Visual が Sequence で表現する（**実装済み**）。
 
 **enum 実装済み**: Idle、WalkForward、WalkBackward、Attack、JumpStart、JumpRise、JumpApex、JumpFall、Landing、HitStun、KO。
-**将来候補**: Kick Gameplay、Punch 素材改善、Animator など。
+**将来候補**: Ground Clash専用実測、Punch 素材改善、Animator など。
 
 前進／後退は左右キーだけで決めない。**移動方向 × Facing**（詳細・優先順位は §17.8）。
 
@@ -1067,7 +1067,7 @@ Sprite 群
 | Sequence で Sprite 差し替え | **実装済み**（31 sub-sprite、Idle/Walk/Jump/Punch 接続済み） | 学習用経路として維持可 |
 | Animator + Animation Clip | **未実装** | 導入方針あり。State 決定は Session のまま |
 
-Walk 8 コマ切替は実装済み・Editor 確認済み。Kick は素材切り出しのみ（Gameplay 未接続）。
+Walk 8 コマ切替は実装済み・Editor 確認済み。Kick はGround Kickへ接続済み。
 
 ### 17.7 Training Reset（位置・向き・Jump・release gate・学習用）
 
@@ -1227,13 +1227,13 @@ HitStop 中は Combat 処理をスキップするため、**直前の Visual を
 
 | 項目 | 区分 |
 |---|---|
-| Kick Gameplay 接続 | **未実装**（Kick sub-sprite 5 枚は素材のみ） |
+| Ground Kick Gameplay | **実装済み・Editor確認済み**（Kick sub-sprite 5 枚） |
 | P1 が HitStun / KO 中に Walk へ落ちないこと | **未確認**（優先順位コード上は上位） |
 | Development Build | **未確認** |
 
 #### 将来の接続点
 
-- 歩行素材の再制作、Kick Gameplay、または Animator 導入時も State 決定は Session に残す
+- 歩行素材の再制作、Ground Kick再調整、または Animator 導入時も State 決定は Session に残す
 
 ### 17.9 ジャンプ基盤（LogicalY・種類判定・Push skip・計測・学習用）
 
@@ -1297,7 +1297,7 @@ DebugGameplayInput（物理 Held）
 | HitStun / KO | Jump 開始不可。入力空中制御不可（コード上対応） |
 | LandingFrames | 2。Landing 中左右移動可・再ジャンプ不可 |
 | Air Hit / Air Knockback | **未実装**（空中被弾専用。空中攻撃ではない） |
-| Kick Gameplay | **未接続**（地上攻撃候補。空中キックは仕様未定） |
+| Ground Kick Gameplay | **接続済み**（地上専用。空中キックは別仕様・未定） |
 
 #### Editor 確認済み（要約）
 
@@ -1310,4 +1310,30 @@ DebugGameplayInput（物理 Held）
 - Character Data SO へ Jump 設定を移す
 - Animator / 専用 Sprite を Visual に接続（State 決定は Session のまま）
 - Air Hit / Air Knockback（空中被弾）
-- Kick Gameplay（地上）。将来の空中攻撃は仕様未定（空中パンチは対象外）
+- Ground Clash専用実測。将来の空中攻撃は仕様未定（空中パンチは対象外）
+
+## 18. Ground Kick と共通 Hit 解決の確認ガイド
+
+### 18.1 Scene設定
+
+P1/P2の `DebugFighterVisual > Kick Sequence`:
+
+- Sprites: `Fighter_Kick_00`〜`_04`
+- Frames Per Sprite: 3
+- Loop: OFF
+- Hold Last Frame: ON
+
+`SimulationSession.debugForceP2AttackWithP1ForClashTest` は通常 **OFF**。Ground Clash専用検証時だけ使う候補で、現時点では実測未確認。
+
+### 18.2 Ground Kickの確認値
+
+`DebugAttackData.GroundKick`: S/A/R 8/3/4、Damage 14、HitStop 7、HitStun 14、Horizontal KB 0.24、Hit Box center `(0.95,0.55)` / half `(0.60,0.25)`。
+
+### 18.3 Play Mode確認済み
+
+1. 地上でK → Kick開始
+2. AF 8〜10付近で赤Hit Box、伸びたKick画像と概ね一致
+3. 近距離Hit → actual 14、P2HitCount 1、HitStop、ノックバック
+4. 左右Facing双方で相手方向へHit Box、相手が離れる方向へKB
+5. 空中K／空中保持着地では開始せず、離して押し直すと開始
+6. Punch/Kick中の相互切替なし。近いJ+K入力はJ Punch優先

@@ -186,9 +186,9 @@ HP と KO の正本は各 `DebugFighterParticipant`（HitState には持たせ�
 
 ## 3. 通常技
 
-**現行（Unity デバッグ）**: 地上立ちパンチ（J Punch）のみ実装。Kick は素材のみで Gameplay 未接続。空中パンチは採用しない。
+**現行（Unity デバッグ）**: 地上立ちパンチ（J Punch）と地上キック（Ground Kick）を実装。どちらも地上専用で、空中パンチは採用しない。Ground Kick は空中入力を着地後へ予約しない。
 
-**長期設計上の候補（未実装・未確定）**: 立ちキック、しゃがみパンチ／キック、将来の空中攻撃（種類未定。空中パンチは対象外）。
+**長期設計上の候補（未実装・未確定）**: しゃがみパンチ／キック、将来の空中攻撃（種類未定。空中パンチは対象外）。
 
 ### しゃがみキック（再掲・長期設計）
 
@@ -520,7 +520,7 @@ Unity デバッグ実装の**実際の到達点**（段階1〜15）と次工程�
 **実装済み**: `FighterVisualState` = Idle / WalkForward / WalkBackward / Attack / JumpStart / JumpRise / JumpApex / JumpFall / Landing / HitStun / KO。
 Session が状態を決定し、`DebugFighterVisual` が `FighterSpriteSequence` で Sprite を再生する。WalkForward / WalkBackward は同一 Walk 8 コマ。素材は `Fighter_SpriteSheet`（GUID `dcb7851d129f2305be49fac973bf47b4`、31 sub-sprite）の sub-sprite。Animator は未導入。
 
-**将来候補（未実装含む）**: Kick Gameplay 接続、Punch 3 枚以上、HitStun・KO 専用画像、Animator など。
+**将来候補（未実装含む）**: Ground Clash専用実測、Punch 3 枚以上、HitStun・KO 専用画像、Animator など。
 
 **責務境界（維持する）**
 
@@ -588,13 +588,24 @@ Session が状態を決定し、`DebugFighterVisual` が `FighterSpriteSequence`
 - Reset 後は全ゲーム操作（Left/Right/Up/Down/Attack）を一度離すまで入力抑制する
 - release gate は物理入力を消さず、有効入力だけ Neutral 化する
 - R Reset は release 対象外
-- 将来 Kick / Guard 等を追加したら、共通 Held 判定（`HasAnyGameplayInputHeld`）へ追加する
+- Kick は共通 Held 判定（`HasAnyGameplayInputHeld`）へ追加済み。将来 Guard 等を追加するときも同経路へ追加する
 
 **未実装（混同禁止）**:
 
 | 項目 | 意味 |
 |---|---|
 | Air Hit / Air Knockback | **空中被弾**側の専用処理。空中攻撃ではない |
-| Kick Gameplay 接続 | 既存 Kick 素材を**地上攻撃**として接続する候補 |
+| Ground Kick | **実装済み**。K、地上専用、S/A/R=8/3/4、空中入力予約なし |
 | 将来の空中攻撃 | 仕様未定。空中パンチは対象外 |
 | Animator / Character Data SO 等 | 別候補 |
+
+## 16. Ground Kick の現行Unityデバッグ仕様
+
+- 入力は `K`、Grounded時のみ開始
+- J PunchとGround Kickは相互キャンセルしない。押下が重なる場合はJ Punchを優先する
+- 他攻撃中に押した攻撃を終了後へ予約しない
+- 空中でKを押す／保持したまま着地するだけでは開始しない。いったん離して再押下が必要
+- Ground Kickは Startup 8 / Active 3 / Recovery 4、Damage 14、HitStop 7、HitStun 14、横KB 0.24
+- local Hit Boxは Facing Right基準 center `(0.95, 0.55)`、half `(0.60, 0.25)`。Facing LeftではParticipantが反転する
+- 1攻撃1Hit。Active中の複数CombatFrameで重なっても追加Damageしない
+- 同一CombatFrameの両方向Hit候補を収集してから解決する。Ground Clashの土台は実装済みだが、専用実測は未確認
