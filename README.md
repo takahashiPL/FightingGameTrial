@@ -50,7 +50,7 @@ Training Reset 共通 release gate（全操作 release まで入力抑制）: **
 |---|---|
 | **実装済み** | 60Hz SimulationTick、Pause/Step、HUD（左上状態／左下操作・JPunch Data）、HitStop、入力、左右移動、Facing分離、2体共通 Participant / AttackState / HitState、Push Box、壁際 Push 再配分、Box 可視化、Hit×Hurt 重なり判定、Jパンチ、1攻撃1Hit、Hit時6F HitStop、HitStun 12CF・被Hit表示、横ノックバック、HP/Damage（max100・J Punch10）、**KO状態・遷移（Life表示）**、**`DebugAttackData.JPunch` による攻撃設定正本**、**Training Reset（R）: 戦闘状態＋論理位置 X/Y・ジャンプ状態・Facing を Scene 開始時へ復帰**、**共通 release gate（全ゲーム操作を一度離すまで有効入力 Neutral）**、**Visual Sequence（Idle 8 / Walk 8 / Jump 8 / Punch 2 / Attack / JumpStart / Rise / Apex / Fall / Landing / HitStun / KO）+ `Fighter_SpriteSheet` 31 sub-sprite（GUID `dcb7851d129f2305be49fac973bf47b4`、PPU 39）**、**ジャンプ基盤（Neutral / Forward / Backward、キャラ別 Min/Max 高さ・時間・距離、押下時間補間、CombatFrame LogicalY 軌道、飛び越し時 Push skip、Jump 計測ログ）** |
 | **暫定** | Push 等分＋壁際再配分。攻撃数値はコード内不変データ（SO 未使用）。KO 視覚は色変更のみ（優先: HitStun赤 > KO暗色 > 通常Tint）。Motor minX/maxX（±7）。相打ちは両方向判定の土台のみ（P2 は Neutral）。見た目は Sequence による Sprite 差し替え（Animator 未使用）。**Punch は素材 2 枚のみ（Recovery 専用コマなし）**。ジャンプ数値はコード内 `FighterJumpSettings`（正式 Character Data SO ではない）。実測高さは設定 Min/Max より少し上回る場合あり |
-| **未実装（方針確定含む）** | 対戦モード進行（Round/勝敗/WIN・LOSE/タイマー等）、HPバー、Guard、壁バウンド等、**Kick Gameplay 接続**（Kick sub-sprite 5 枚は素材のみ）、Animator + Animation Clip、空中 Attack、空中被弾専用仕様、正式 Character Data ScriptableObject、複数 Hurt/Hit Box、攻撃データ SO 化（要否は後続判断）、複数攻撃・コンボ・Cancel、Punch 3 枚以上への素材改善 |
+| **未実装（方針確定含む）** | 対戦モード進行（Round/勝敗/WIN・LOSE/タイマー等）、HPバー、Guard、壁バウンド等、**Kick Gameplay 接続**（Kick sub-sprite 5 枚は素材のみ・地上攻撃候補）、Animator + Animation Clip、**Air Hit / Air Knockback（空中被弾専用・空中攻撃ではない）**、正式 Character Data ScriptableObject、複数 Hurt/Hit Box、攻撃データ SO 化（要否は後続判断）、複数攻撃・コンボ・Cancel、Punch 3 枚以上への素材改善。**将来の空中攻撃は仕様未定（空中パンチは採用しない）** |
 
 詳細・次工程は **`docs/unity_implementation_status.md`** を正とする。
 ジャンプ・Visual・Reset gate は同ファイル §1.1・§1.2 および教材 §17.7〜§17.9。
@@ -120,10 +120,10 @@ Git 管理外: `Game/Library`、`Temp`、`Logs`、`UserSettings`、`obj` など
 
 正式な優先順位・次工程番号は**未決定**（順不同・新 Stage 番号は作らない）。
 
-1. Kick Gameplay 接続（Kick sub-sprite 5 枚は素材のみ）
+1. Kick Gameplay 接続（Kick sub-sprite 5 枚は素材のみ。**地上攻撃**として接続する候補）
 2. Punch 3 枚以上への素材改善（Recovery 含む）
 3. Animator + Animation Clip
-4. Air Hit / Air Knockback など空中被弾専用仕様（空中 Attack も未実装）
+4. Air Hit / Air Knockback（**空中被弾**専用。空中攻撃とは別）
 5. Guard
 6. Character Data ScriptableObject 化（ジャンプ設定の正式データ化含む）
 7. ジャンプ数値の調整（現状の実測値を踏まえたチューニング）
@@ -131,6 +131,8 @@ Git 管理外: `Game/Library`、`Temp`、`Logs`、`UserSettings`、`obj` など
 9. 対戦モード用 Scene / Controller / HUD（FightDebugScene とは分離）
 10. 既存残課題: KB壁停止、壁バウンド、壁やられ、Corner、HPバー、複数攻撃・バッファ・Cancel、攻撃データ SO 化（必要時）
 11. 2P入力/AI時の実操作確認（KO中移動・攻撃禁止、P1被Hit・左方向KB など）
+
+**混同禁止**: J Punch は地上専用（ジャンプ中開始不可）。将来の空中攻撃は仕様未定で、空中パンチは対象外。
 
 ジャンプ基盤・Visual Sequence / Sprite Sheet・計測ログ・Training Reset 共通 release gate・飛び越し Facing は**実装済み**（未実装候補からは外す）。詳細は `docs/unity_implementation_status.md`。
 
@@ -177,7 +179,7 @@ Unity_FightingGameTrial
 ## 仮値・未確定（要約）
 
 暫定値: JustGuardWindow=3、Damage、Stun、Pushback、Jump移動量、LandingRecoveryフレーム数、デバッグ用 attackRange=1.35 など。
-未確定: 空中パンチのガード可否、多段技、必殺技、キャラ差、高度な壁際補正。
+未確定: 多段技、必殺技、キャラ差、高度な壁際補正、将来の空中攻撃（種類未定・空中パンチは対象外）、Air Hit / Air Knockback。
 詳細は `docs/rules.md` §0。
 
 ## 主要仕様（要約）

@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## Docs: 空中パンチ前提の記述整理
+
+- 初期資料には空中パンチ案が含まれていたが、**現在は J Punch を地上専用とし、ジャンプ中のパンチを採用しない**方針へ統一した
+- Air Hit / Air Knockback は**空中攻撃ではなく、空中被弾側の処理**として整理した
+- Kick Gameplay 接続は、既存 Kick 素材を**地上攻撃**として接続する候補とした（空中キックは仕様未定）
+- 将来の空中攻撃は仕様未定とし、空中パンチを前提にしない
+- `docs/rules.md` から「空中パンチのガード可否」など、存在しない攻撃に関する未確定事項を削除
+- `production_spritesheet_spec.md` の制作計画一覧から空中パンチ／空中キック必須扱いを除外
+
 ## PixelLab fighter action sprites 統合
 
 - 正式 Stage 番号なし（段階15完了状態は維持）
@@ -38,7 +47,7 @@
 - Training Reset: Reset 受理フレームは `SimulationClockDriver` が通常 Tick へ進めない（同一 Update return）
 - Training Reset 後の共通 release gate: 全ゲーム操作（Left/Right/Up/Down/Attack）を一度すべて離すまで有効入力を Neutral 化。物理入力は消さない。R は解除条件に含めない
 - Editor Play Mode 確認済み: 基本ジャンプ、短押し／長押し差、Forward／Backward、飛び越し・Facing、計測ログ、Reset 後の再ジャンプ／再移動なし、全 release 後の再受付、HitStop 中 Reset
-- 未実装: 空中 Attack、空中被弾専用仕様、Jump 専用 Sprite、Animator、正式 Character Data SO、P2 操作
+- 未実装: Air Hit / Air Knockback（空中被弾）、Kick Gameplay、Animator、正式 Character Data SO、P2 操作。ジャンプ中の攻撃開始は現行でも不可（J Punch 地上専用）
 - 未確認: Development Build Profiler、Pause 中 R の詳細など
 - Scene / Prefab / Sprite / Animator / Font 変更なし
 - Docs: README / `unity_implementation_status.md` §1.1・§1.2 / `rules.md` §15.4・§15.5・§15.7 / `component_and_scene_guide.md` §17.7〜§17.9

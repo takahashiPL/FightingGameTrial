@@ -35,7 +35,7 @@ Unity / UE などのエンジンAPIではなく、**60Hz論理シミュレーシ
 - しゃがみキックの潰しは Clash のみ（優先度勝利ではない）
 - 通常 Hit/Guard の壁際 Pushback は未消化を攻撃側へ100%転送（初期）
 - Clash の壁際未消化反動は初期版では**転送せず破棄**
-- 着地で空中攻撃強制終了 → LandingRecovery（フレーム数は暫定・未決定）
+- **J Punch（A）は地上専用**。ジャンプ中は開始できない。空中パンチは採用しない
 - 必殺技は未実装・非表示
 - `state_transitions.csv` は草案（完全実行用SMではない）
 
@@ -46,21 +46,20 @@ Unity / UE などのエンジンAPIではなく、**60Hz論理シミュレーシ
 | JustGuardWindow | 3 SimulationTick（contact 含む直前3） |
 | Damage / HitStun / BlockStun / Pushback | `moves.csv` provisional |
 | 判定箱サイズ | `boxes.csv` |
-| Jump 移動量 | 未収録 |
-| LandingRecovery フレーム数 | 暫定・未決定 |
+| Jump 移動量 | 未収録（Unity デバッグは `FighterJumpSettings`。§15.7） |
+| LandingRecovery フレーム数 | 暫定・未決定（Unity デバッグは `LandingFrames=2`） |
 | ClashRecoil 量 | 未収録・暫定 |
 
 ### 0.3 未確定事項
 
-- 空中パンチのガード可否
 - 多段技、必殺技、キャラ差
 - Clash 壁際の未消化転送（将来候補。初期は破棄）
 - 高度な壁際補正、結果別 `transfer_ratio`
 - LandingRecovery の具体フレーム数
+- **将来の空中攻撃全般**（種類・回数・着地時の扱い。空中パンチは対象外。空中キックも仕様未定）
+- **Air Hit / Air Knockback**（空中にいるキャラが被弾したときの専用処理。空中攻撃とは別）
 
-### 0.4 空中パンチのガード（未確定）
-
-`moves.csv` の `AIR_PUNCH.can_*_guard` は暫定値であり仕様確定ではない。
+> 初期資料・`moves.csv` の `AIR_PUNCH` / `AIR_KICK` 行は過去の配置・数値案の残骸であり、**現行仕様の正本ではない**。履歴は `CHANGELOG.md` を参照。
 
 ---
 
@@ -68,8 +67,8 @@ Unity / UE などのエンジンAPIではなく、**60Hz論理シミュレーシ
 
 | 入力 | 動作 |
 |---|---|
-| A | 地上パンチ / 空中パンチ |
-| B | 地上キック / 空中キック |
+| A | **地上パンチ（J Punch）**。ジャンプ中は開始不可 |
+| B | 地上キック（**Gameplay 未実装**。Kick 素材接続は将来候補） |
 | X | 垂直ジャンプ |
 | X + 前 | 前ジャンプ |
 | X + 後ろ | 後ろジャンプ |
@@ -115,18 +114,20 @@ Unity / UE などのエンジンAPIではなく、**60Hz論理シミュレーシ
 - 着地まで軌道変更なし
 - 空中Pushbox無効（すれ違い可）
 - 空中ガード不可
-- 空中攻撃は1ジャンプ1回
+- **現行**: ジャンプ中の攻撃開始はない（J Punch 地上専用）。空中パンチは採用しない
+- **将来の空中攻撃**: 仕様未定。導入する場合も空中パンチは前提にしない。回数・着地時の扱いも未定
 
-> **Unity デバッグ実装メモ（2026-07-28）**: FightDebugScene では Up エッジ＋Facing×左右で Neutral/Forward/Backward を決め、CombatFrame 固定の LogicalY 軌道を使う（Rigidbody 非使用）。空中 Push は高さ差閾値で skip。空中攻撃は**未実装（開始不可）**。詳細ルールは **§15.7**、到達点は `docs/unity_implementation_status.md` §1.2。本節の「直前2 tick」バッファ設計とは一致しない点がある。
+> **Unity デバッグ実装メモ（2026-07-28）**: FightDebugScene では Up エッジ＋Facing×左右で Neutral/Forward/Backward を決め、CombatFrame 固定の LogicalY 軌道を使う（Rigidbody 非使用）。空中 Push は高さ差閾値で skip。ジャンプ中の J Punch 開始は**不可**。詳細ルールは **§15.7**、到達点は `docs/unity_implementation_status.md` §1.2。本節の「直前2 tick」バッファ設計とは一致しない点がある。
 
-### 2.1 着地と空中攻撃
+### 2.1 着地と LandingRecovery
 
-- 着地した CombatFrame で空中攻撃を強制終了
-- Active/Recovery は地上へ持ち越さない
-- `LandingRecovery` へ入る（フレーム数は暫定・未決定）
+- 着地後は `LandingRecovery`（または Unity デバッグの Landing）へ入る（フレーム数は暫定・未決定）
 - LandingRecovery 中は再ジャンプ不可
+- **現行**: 空中攻撃が存在しないため、「着地で空中攻撃を強制終了する」処理は不要
+- **将来**: 空中攻撃を導入する場合の着地時終了ルールは、そのとき仕様を決める（未定）
 
-> Unity デバッグ実装: `LandingFrames=2`。Landing 中は左右移動可・再ジャンプ不可。空中攻撃自体は未実装。
+> Unity デバッグ実装: `LandingFrames=2`。Landing 中は左右移動可・再ジャンプ不可。ジャンプ中の攻撃開始は不可。
+
 ### 2.2 着地時 Pushbox
 
 - 着地 CombatFrame で地上 Pushbox 復活
@@ -185,9 +186,11 @@ HP と KO の正本は各 `DebugFighterParticipant`（HitState には持たせ�
 
 ## 3. 通常技
 
-（立ちP／立ちK／しゃがみP／しゃがみK／空中P／空中Kの内容は従来どおり。初期実装対象は立ちパンチ。）
+**現行（Unity デバッグ）**: 地上立ちパンチ（J Punch）のみ実装。Kick は素材のみで Gameplay 未接続。空中パンチは採用しない。
 
-### しゃがみキック（再掲）
+**長期設計上の候補（未実装・未確定）**: 立ちキック、しゃがみパンチ／キック、将来の空中攻撃（種類未定。空中パンチは対象外）。
+
+### しゃがみキック（再掲・長期設計）
 
 - 「潰す」は優先度による自動勝利では**ない**
 - 相手 Hitbox と接触すれば Clash。接触せず Hurt に届けば通常 Hit
@@ -262,8 +265,8 @@ BlockStun の残りが 0 になったら:
 
 - 防御側: 無ダメージ、短い硬直、押し戻し軽減
 - 地上攻撃側: 中断 → Stagger 系
-- 空中攻撃側: Hitbox消去 → AirDeflected 系
 - AttackInstance 消費
+- **空中攻撃側の JustGuard 効果**（旧案の AirDeflected 等）: 空中攻撃自体が仕様未定のため、現行では定義しない
 
 ---
 
@@ -587,4 +590,11 @@ Session が状態を決定し、`DebugFighterVisual` が `FighterSpriteSequence`
 - R Reset は release 対象外
 - 将来 Kick / Guard 等を追加したら、共通 Held 判定（`HasAnyGameplayInputHeld`）へ追加する
 
-**未実装（混同禁止）**: 空中 Attack、空中被弾専用仕様、Animator、自然な歩行素材、正式 Character Data SO。
+**未実装（混同禁止）**:
+
+| 項目 | 意味 |
+|---|---|
+| Air Hit / Air Knockback | **空中被弾**側の専用処理。空中攻撃ではない |
+| Kick Gameplay 接続 | 既存 Kick 素材を**地上攻撃**として接続する候補 |
+| 将来の空中攻撃 | 仕様未定。空中パンチは対象外 |
+| Animator / Character Data SO 等 | 別候補 |

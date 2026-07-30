@@ -219,7 +219,7 @@ Left+Right 同時: Neutral
 | Backward 代表 | held=8/dir=10、maxHeight=2.40、frames=36、distance=2.35 |
 | 空中制御 | Neutral 中の水平移動あり（例 0.94 / 1.18 / 1.34）。現状値を採用・調整可能 |
 | 飛び越し・Facing | P1 が P2 を越え Facing 反転。反対側から再飛び越しで復帰。左向き Forward/Backward・Walk・J Punch 成立 |
-| 空中 Attack | **開始不可**（HUD Attack=1でも Jump 中は開始しない） |
+| ジャンプ中の J Punch | **開始不可**（J Punch は地上専用。HUD Attack=1 でも Jump 中は開始しない） |
 | Landing | LandingFrames=2、Landing Visual 確認。Landing 中左右移動可・再ジャンプ不可 |
 
 ### コード上対応（実測と分離）
@@ -231,9 +231,9 @@ Left+Right 同時: Neutral
 
 | 区分 | 内容 |
 |---|---|
-| **未実装** | Animator / Animation Clip、空中 Attack、空中被弾専用仕様、正式 Character Data SO、高度な着地硬直・入力予約、自然な歩行素材 |
+| **未実装** | Animator / Animation Clip、**Air Hit / Air Knockback（空中被弾）**、Kick Gameplay 接続（地上攻撃候補）、正式 Character Data SO、高度な着地硬直・入力予約 |
 | **未確認** | Development Build Profiler、Pause 中 R の詳細 |
-| **将来候補** | 歩行素材品質改善、Animator、Air Hit/KB、Kick、Guard、Jump 値調整、SO 化 |
+| **将来候補（仕様未定含む）** | 将来の空中攻撃（種類未定・空中パンチは対象外）、空中キック（未定）、Animator、Guard、Jump 値調整、SO 化 |
 
 ### GC（コード確認）
 
@@ -487,10 +487,11 @@ Push / Hurt / Hit 可視化（11A）と Hit×Hurt 重なり判定（11B）は完
 
 その後の候補（順不同・未着手。**新工程番号は作らない**。正式な次 Stage も未定義）:
 
-- Kick Gameplay 接続、Punch 3 枚以上への素材改善
+- Kick Gameplay 接続（地上攻撃候補）、Punch 3 枚以上への素材改善
 - Animator + Animation Clip
-- Air Hit / Air Knockback、空中 Attack
-- K Kick、Guard
+- Air Hit / Air Knockback（**空中被弾**。空中攻撃ではない）
+- Guard
+- 将来の空中攻撃（仕様未定・空中パンチは対象外）
 - Character Data ScriptableObject 化（ジャンプ設定含む）
 - Jump 数値調整、Development Build Profiler
 - 対戦モード用 Scene / Controller / HUD（Round / 勝敗 / タイマー / リザルト等。FightDebugScene とは分離）
@@ -561,5 +562,5 @@ Round / Guard / 複数攻撃などの**機能 Stage とは別枠**。番号「GC
 - Visual Sequence + Sprite Sheet 移行・ジャンプ基盤・計測ログ・Training Reset release gate は実装・Editor 確認済み。正式 Stage 番号なし
 - `FightDebugScene` は**練習・検証モード**。戦闘コア共通、KO 後処理はモード側（§1.1）
 - Visual: Sequence 再生 + `Fighter_SpriteSheet` **31 sub-sprite**（PPU 39、Idle/Walk/Jump/Punch 接続済み、Kick 素材のみ）。Animator 未使用
-- 飛び越し後 Facing 反転・左向き Walk / Jump / J Punch は Editor 確認済み。空中 Attack・空中被弾専用・Dev Build Profiler・自然な歩行素材は未実装／未完了
-- 正式な次 Stage 番号は未定義。候補は順不同（Kick Gameplay、Punch 素材改善、Animator、Air Hit、Guard、Character Data SO、対戦モード分離など）
+- 飛び越し後 Facing 反転・左向き Walk / Jump / J Punch は Editor 確認済み。J Punch は地上専用（ジャンプ中開始不可）。Air Hit / Air Knockback・Kick Gameplay・Dev Build Profiler は未実装／未確認
+- 正式な次 Stage 番号は未定義。候補は順不同（Kick Gameplay、Punch 素材改善、Animator、Air Hit/KB、Guard、Character Data SO、対戦モード分離など。将来の空中攻撃は仕様未定）

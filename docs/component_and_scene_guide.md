@@ -614,10 +614,11 @@ HUD の数字は便利な鏡です。**戦闘データの正本は Session / Par
 - 複数攻撃・コンボ・Cancel・Counter Hit
 - 2P 実操作（現在 P2 は Neutral）
 - 壁バウンド・壁やられ など
-- Walk 見た目品質改善、Animator、K Kick、空中 Attack、空中被弾専用仕様
+- Walk 見た目品質改善、Animator、Kick Gameplay（地上）、Air Hit / Air Knockback（空中被弾）
 - 正式 Character Data ScriptableObject
+- 将来の空中攻撃（仕様未定・空中パンチは対象外）
 
-Training Reset の位置・向き・Jump 復帰と共通 release gate は **実装済み**（§17.7）。Visual Sequence / Sprite Sheet は **実装済み**（§17.8・§17.9）。ジャンプ基盤は **実装済み**（§17.9）。歩行見た目は暫定。
+Training Reset の位置・向き・Jump 復帰と共通 release gate は **実装済み**（§17.7）。Visual Sequence / Sprite Sheet は **実装済み**（§17.8・§17.9）。ジャンプ基盤は **実装済み**（§17.9）。
 
 詳細は `docs/unity_implementation_status.md`（モード責務は §1.1、ジャンプは §1.2）。概念図は本資料 §17。
 
@@ -1287,15 +1288,16 @@ DebugGameplayInput（物理 Held）
 
 `enableJumpDebugLog=false` でも event は Consume して残留防止。false 時は文字列生成しない。毎 Frame ログではない。
 
-#### 空中 Attack / HitStop / Landing（現状）
+#### ジャンプ中攻撃 / HitStop / Landing / 被弾（現状）
 
 | 項目 | 現状 |
 |---|---|
-| 空中 J Punch | **開始不可** |
+| J Punch | **地上専用**。ジャンプ中は**開始不可** |
 | HitStop | Jump 軌道・LogicalY 停止。Jump Visual 保持 |
 | HitStun / KO | Jump 開始不可。入力空中制御不可（コード上対応） |
 | LandingFrames | 2。Landing 中左右移動可・再ジャンプ不可 |
-| 空中被弾専用仕様 | **未実装** |
+| Air Hit / Air Knockback | **未実装**（空中被弾専用。空中攻撃ではない） |
+| Kick Gameplay | **未接続**（地上攻撃候補。空中キックは仕様未定） |
 
 #### Editor 確認済み（要約）
 
@@ -1307,4 +1309,5 @@ DebugGameplayInput（物理 Held）
 
 - Character Data SO へ Jump 設定を移す
 - Animator / 専用 Sprite を Visual に接続（State 決定は Session のまま）
-- Air Hit / Air Knockback / 空中 Attack
+- Air Hit / Air Knockback（空中被弾）
+- Kick Gameplay（地上）。将来の空中攻撃は仕様未定（空中パンチは対象外）

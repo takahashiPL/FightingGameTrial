@@ -264,10 +264,10 @@ ChatGPT によるドット絵化で体格や衣装の連続性が安定しない
 - 待機、前進・後退
 - 立ちパンチ / 立ちキック（Startup / Active / Recovery）
 - しゃがみ、しゃがみパンチ、しゃがみキック
-- 垂直・前・後ろジャンプ、空中パンチ、空中キック
+- 垂直・前・後ろジャンプ（空中攻撃素材は現行計画に含めない。将来の空中攻撃は仕様未定）
 - 立ち／しゃがみガード、ジャストガード
 - HitStun、Knockdown、Down、WakeUp
-- Stagger、AirDeflected、LandingStagger、ClashRecoil
+- Stagger、ClashRecoil（旧案の AirDeflected / LandingStagger は空中攻撃前提のため現行必須から外す）
 
 ---
 
