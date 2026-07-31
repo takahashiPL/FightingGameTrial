@@ -355,7 +355,7 @@ HitStun / ClashRecoil / KO 表示色はコード側 SerializeField。`ClashRecoi
 | Inspector 項目 | 型 | Scene 値 | 何に使うか |
 |---|---|---|---|
 | Sprite Renderer | SpriteRenderer | 自分 | 表示先 |
-| Idle / Walk / Jump* / Landing / Attack / Kick / ClashRecoil Sequence | `FighterSpriteSequence` | `Fighter_SpriteSheet` sub-sprite（31 枚、GUID `dcb7851d129f2305be49fac973bf47b4`） | State ごとのコマ列。ClashRecoil専用Spriteは未設定でIdle fallback |
+| Idle / Walk / Jump* / Landing / Attack / Kick / AirKick / ClashRecoil Sequence | `FighterSpriteSequence` | `Fighter_SpriteSheet` sub-sprite（41枚、GUID `42345be00e0994144ba94bc5f1362757`） | Stateごとのコマ列。AirKickは専用6枚、ClashRecoil専用Spriteは未設定でIdle fallback |
 | Walk Sequence | 8 枚 | `Fighter_Walk_00` … `_07` | WalkForward / WalkBackward 共有 |
 | JumpStart / JumpApex Visual Frames | int | `2` / `2` | 見た目窓（軌道非依存） |
 | Attack Pose End Frame | int | `6` | 攻撃ポーズ終了 AF |
@@ -1017,7 +1017,7 @@ GC の話は「仕様の正本」ではなく、**実行時コストの学習**�
 - R による **Training Reset**: 戦闘状態＋論理位置 X/Y・ジャンプ状態・Facing 復帰＋共通 release gate（§17.7）
 - **Visual Sequence**: `FighterSpriteSequence` + `FighterVisualState`（Idle / WalkF / WalkB / Attack / JumpStart / Rise / Apex / Fall / Landing / HitStun / KO）。Session が決定、Visual が再生（§17.8・§17.9）
 - **ジャンプ基盤**: Neutral / Forward / Backward、LogicalY 軌道、飛び越し Push skip、計測ログ（§17.9）
-- **`Fighter_SpriteSheet`**（1536×1024、Multiple、31 sub-sprite、PPU 39、GUID `dcb7851d129f2305be49fac973bf47b4`）。P1/P2 同一、P2 Tint。Idle/Walk/Jump/Punch 接続済み。**Ground Kickへ接続済み**
+- **`Fighter_SpriteSheet`**（Multiple、41 sub-sprite、PPU 39、実画素Trim Rect＋Center Pivot、GUID `42345be00e0994144ba94bc5f1362757`）。P1/P2同一、P2 Tint。Idle/Walk/Jump/Punch/Ground Kick/Air Kick接続済み
 
 ### 17.3 将来構想（方針確定・未実装）
 
@@ -1064,7 +1064,7 @@ Sprite 群
 
 | 方式 | いま | 将来 |
 |---|---|---|
-| Sequence で Sprite 差し替え | **実装済み**（31 sub-sprite、Idle/Walk/Jump/Punch 接続済み） | 学習用経路として維持可 |
+| Sequence で Sprite 差し替え | **実装済み**（41 sub-sprite、Idle/Walk/Jump/Punch/Ground Kick/Air Kick接続済み） | 学習用経路として維持可 |
 | Animator + Animation Clip | **未実装** | 導入方針あり。State 決定は Session のまま |
 
 Walk 8 コマ切替は実装済み・Editor 確認済み。Kick はGround Kickへ接続済み。
@@ -1218,7 +1218,7 @@ HitStop 中は Combat 処理をスキップするため、**直前の Visual を
 #### Editor 確認済み
 
 - 無入力 → Idle、Walk 8 コマ切替、Punch、Jump 各状態 → Idle
-- P1/P2 同一シート（GUID `dcb7851d129f2305be49fac973bf47b4`）、P2 Tint 維持
+- P1/P2 同一シート（GUID `42345be00e0994144ba94bc5f1362757`）、P2 Tint 維持
 - Missing Sprite なし（Editor 確認済み）
 - Training Reset 後 → Idle
 - Push / Damage / HitStop / HitStun / Knockback / KO 継続
@@ -1318,7 +1318,7 @@ DebugGameplayInput（物理 Held）
 
 P1/P2の `DebugFighterVisual > Kick Sequence`:
 
-- Sprites: `Fighter_Kick_00`〜`_04`
+- Sprites: `FighterRebuilt_Kick_00`〜`_04`
 - Frames Per Sprite: 3
 - Loop: OFF
 - Hold Last Frame: ON
@@ -1355,7 +1355,7 @@ P1をP2へPush Box最小距離まで近づけ、`debugForceP2AttackWithP1ForClas
 
 ### 19.1 Scene / Prefab
 
-今回の接続はC#だけで完結し、Scene / Prefab変更はない。`DebugFighterVisual`へ専用SerializeFieldを追加せず、`FighterVisualState.AirKick`も既存`kickSequence`を返す。
+`DebugFighterVisual`には専用SerializeField `airKickSequence`を追加済み。P1/P2とも`FighterRebuilt_AirKick_00`〜`05`を登録し、Ground Kickの`kickSequence`とは分離した。Air Kick Startup／Activeは専用Sequence、RecoveryはSimulation側の選択によりJumpFallを表示する。
 
 ### 19.2 K入力と攻撃状態
 
@@ -1376,7 +1376,7 @@ Visual選択と内部攻撃状態は別である。Recovery前半にAttack / Kic
 
 ### 19.4 現在の制約
 
-- Ground Kick画像はAir Kickへ暫定流用
+- Air Kick専用Flying Kick 6枚は接続・表示確認済み（1CF/枚、Loop OFF、Hold Last Frame ON）
 - Air Hit / Air Knockback / 縦KB / Air Clash / 正式Tradeは未実装
 - Ground Kickは脚の伸び・シルエット不足の可能性があり、Sprite再制作後にフレームとHit Boxを再調整する
 - Air Kick専用モーション完成後もS/A/R、Hit Box、表示Sprite範囲を再調整する

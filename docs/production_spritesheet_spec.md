@@ -9,7 +9,7 @@
 - セル配置: `data/sprite_frame_requirements.csv`
 - ゲーム仕様: `docs/rules.md`
 
-**注（FightDebug 現行）**: `Game/Assets/Art/Characters/Fighter_SpriteSheet.png`（1536×1024、GUID `dcb7851d129f2305be49fac973bf47b4`、31 sub-sprite、PPU 39）は PixelLab 統合済みの動作確認用シートで、**均等固定セルではなく個別 Rect** + 共通 Bottom Center Pivot で切り出している。本仕様の固定セル清書パイプラインとは別物として扱う。状態の正本は `sprite_art_status.md`。
+**注（FightDebug 現行・2026-07-31正式採用）**: `Game/Assets/Art/Characters/Fighter_SpriteSheet.png`（GUID `42345be00e0994144ba94bc5f1362757`、41 sub-sprite、PPU 39）はPixelLab再構築版である。192×192固定セル＋Center Pivotは透明余白中心がTransform基準となり表示が大きく上へずれたため不採用とし、各セル内の**実画素Trim Rect＋Center Pivot**を採用した。本仕様の将来向け固定セル清書パイプラインとは区別し、現行Asset状態の正本は`docs/sprite_art_status.md`とする。
 
 ---
 

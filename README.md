@@ -41,7 +41,7 @@ GC-2（Editor）: `DebugHudView.Update` 約17.2 KB → 約3.2 KB / frame。Devel
 GC-1 / GC-2（補助改善・正式 Stage ではない）: **完了・push 済み**。
 Training Reset 位置・向き復帰: **実装・Editor 確認済み**（正式 Stage 番号なし）。
 Visual Sequence + Sprite Sheet 移行: **実装・Editor 確認済み**（正式 Stage 番号なし）。
-PixelLab 正本シート統合（31 sub-sprite / PPU 39）: **実装・Editor 確認済み**（Ground Kick 接続済み・Punch 2 枚暫定）。
+PixelLab 再構築版Sprite Sheet正式採用（41 sub-sprite / PPU 39）: **実装・Editor確認済み**。Idle／Walk／Jump／J Punch／Ground Kick／Air Kick専用Flying KickをP1/P2へ接続済み。
 ジャンプ基盤（Neutral / Forward / Backward・LogicalY 軌道・Jump Visual・計測ログ）: **実装・Editor 確認済み**（正式 Stage 番号なし）。
 Training Reset 共通 release gate（全操作 release まで入力抑制）: **実装・Editor 確認済み**（正式 Stage 番号なし）。
 正式な次工程番号は**未定義**（新 Stage 番号は作らない）。
@@ -49,7 +49,7 @@ Training Reset 共通 release gate（全操作 release まで入力抑制）: **
 | 区分 | 内容 |
 |---|---|
 | **実装済み** | 60Hz SimulationTick、Pause/Step、HUD、HitStop、入力、左右移動、Facing、Participant / AttackState / HitState、Push Box、Box可視化、Hit×Hurt判定、J Punch、Ground Kick、**Air Kick最小検証版**、1攻撃1Hit、横ノックバック、HP/Damage、KO、Training Reset、Visual Sequence、ジャンプ基盤 |
-| **暫定** | J Punch `4/3/8`、Ground Kick `9/4/13`、Air Kick `5/5/10`。Active中だけHit Boxを出す。J PunchはAF8〜10、Ground KickはAF14〜19まで振り切りVisualを残し、後半はIdleへ戻すが内部Recoveryは継続。Air Kickは空中K・1ジャンプ1回・着地即終了、既存Kick画像を流用し、RecoveryはJumpFall表示。Ground KickはPlay確認後も見た目改善が限定的で、脚の伸び・シルエットを改善したSprite再制作後に再調整する |
+| **暫定** | J Punch `4/3/8`、Ground Kick `9/4/13`、Air Kick `5/5/10`。Active中だけHit Boxを出す。J PunchはAF8〜10、Ground KickはAF14〜19まで振り切りVisualを残し、後半はIdleへ戻すが内部Recoveryは継続。Air Kickは空中K・1ジャンプ1回・着地即終了。Startup／Activeは専用Flying Kick、RecoveryはJumpFall表示。Hurt／Push BoxはCenterX `0`、HalfWidth `0.75`の左右対称暫定値 |
 | **未実装（方針確定含む）** | 対戦モード進行、HPバー、Guard、Animator、正式Character Data SO、複数Hit/Hurt Box、コンボ・Cancel、**Air Hit / Air Knockback・縦Knockback・Air Clash・正式Trade**。Air Kickは空中攻撃の最小検証であり、Air Hit基盤完成ではない |
 
 詳細・次工程は **`docs/unity_implementation_status.md`** を正とする。
@@ -114,7 +114,7 @@ Git 管理外: `Game/Library`、`Temp`、`Logs`、`UserSettings`、`obj` など
 | `state_transitions.csv` | **草案**（完全実行用SMではない） |
 | `hit_resolution.csv` | 方向ごとの一次分類参照（Tradeは複合集約・表外） |
 | 本番スプライトシート（固定セル清書） | **未完成** |
-| FightDebug 用 `Fighter_SpriteSheet` | **運用中**（31 sub-sprite・PPU 39・個別 Rect・GUID `dcb7851d129f2305be49fac973bf47b4`） |
+| FightDebug 用 `Fighter_SpriteSheet` | **正式採用済み**（41 sub-sprite・PPU 39・実画素Trim Rect・Center Pivot・GUID `42345be00e0994144ba94bc5f1362757`） |
 
 ## 次の実装候補（要約）
 
@@ -124,6 +124,7 @@ Git 管理外: `Game/Library`、`Temp`、`Logs`、`UserSettings`、`obj` など
 2. ClashRecoil専用Sprite／演出の追加（現在は専用色＋Idle fallback）
 3. Animator + Animation Clip
 4. Air Hit / Air Knockback（**空中被弾**専用。実装済みAir Kickとは別）
+5. Hurt／Push BoxのFacing対応と前後非対称化（現状はCenterX `0`、HalfWidth `0.75`の左右対称暫定値）
 5. Guard
 6. Character Data ScriptableObject 化（ジャンプ設定の正式データ化含む）
 7. ジャンプ数値の調整（現状の実測値を踏まえたチューニング）
@@ -152,9 +153,9 @@ Git 管理外: `Game/Library`、`Temp`、`Logs`、`UserSettings`、`obj` など
 
 - `art/fighter_motion_reference_sheet.png` … デザイン参考。**完成スプライトではない**
 - `art/spritesheet_grid_template.png` … 128×128、8×8台紙（セルサイズ。画面等倍表示の意味ではない）
-- `Game/Assets/Art/Characters/Fighter_SpriteSheet.png` … FightDebug 正本（1536×1024、31 sub-sprite、PPU 39、GUID `dcb7851d129f2305be49fac973bf47b4`。本番清書ではない）
+- `Game/Assets/Art/Characters/Fighter_SpriteSheet.png` … FightDebug正式正本（41 sub-sprite、PPU 39、Point、Compression None、Mip Map Off、実画素Trim Rect＋Center Pivot、GUID `42345be00e0994144ba94bc5f1362757`）
 - `docs/production_spritesheet_spec.md` … 制作工程とセル仕様の正本
-- `docs/sprite_art_status.md` … 現在の素材状態（31 sub-sprite・Ground Kick 接続済み・本番清書未達）
+- `docs/sprite_art_status.md` … 現在の素材状態（41 sub-sprite・Ground Kick／Air Kick接続済み）
 
 ## ディレクトリ構成
 
@@ -214,6 +215,14 @@ Unity_FightingGameTrial
 - 地上`Up+K`はGround Kick、`J+K`はJ Punch優先、空中Jは攻撃なし
 - Air Kickは1ジャンプ1回。着地時にStartup / Active / Recovery途中でも即終了
 - 地上／空中相手とも既存Hit Box対Hurt Boxの幾何学判定で命中可能。被弾は既存HitStun＋横KBを暫定流用
-- Scene / Prefab変更なし。`FighterVisualState.AirKick`は既存`kickSequence`をコード上で流用
+- `DebugFighterVisual.airKickSequence`へFlying Kick 6枚を接続済み。Startup／Activeは専用Sequence、Recoveryは従来どおりJumpFall。Ground Kickの`kickSequence`とは分離
 - Play確認評価: J Punchは軽い技として見やすくなった。Air Kickは`5/5/10`で立ち相手へ当てやすくなった。Ground Kickは見た目改善が限定的で、コード不具合と断定せずSpriteの脚の伸び・シルエット不足を再制作候補とする
 - Air Hit / Air Knockback / 縦KB / Air Clash / 正式Tradeは未実装
+
+## Fighter Sprite Sheet正式採用（2026-07-31・未コミット）
+
+- PixelLab由来の再構築版を正式な`Game/Assets/Art/Characters/Fighter_SpriteSheet.png`として採用。GUID `42345be00e0994144ba94bc5f1362757`、41 Sprite、既存internalIDを維持した
+- 192×192固定セル＋Center Pivotでは透明余白の中心が基準となり、旧素材よりキャラクターが大きく上へずれたため不採用。各セル内の実画素範囲へTrimしたRect＋Center Pivotを採用した
+- 旧GUID `dcb7851d129f2305be49fac973bf47b4`はGame/Assets内参照0件を確認してから削除。旧正本は`D:\project\withAI\UNITY\Unity_FightingGameTrial_Backups\20260731_Fighter_SpriteSheet_Legacy_Before_Rebuilt_Adoption`へ退避済み
+- Sub-Asset名`FighterRebuilt_...`は参照破損を避けるため意図的に維持。未整理ではない
+- P1/P2の初期表示と全Sequenceを正式GUIDへ接続。正式GUID参照76件、不明internalID 0件。Air Kick専用Flying Kick表示はユーザー操作で確認済み

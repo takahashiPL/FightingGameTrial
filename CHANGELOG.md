@@ -1,10 +1,20 @@
 # CHANGELOG
 
+## 未コミット: Fighter Sprite Sheet再構築版の正式採用（2026-07-31）
+
+- PixelLab由来の再構築版を正式な`Game/Assets/Art/Characters/Fighter_SpriteSheet.png`へ整理。GUID `42345be00e0994144ba94bc5f1362757`と41 SpriteのinternalIDを維持
+- 192×192固定セル＋Center Pivotは透明余白中心が基準となり表示が上へずれたため不採用。各セル内の実画素Trim Rect＋Center Pivotを正式方式とした
+- 旧GUID `dcb7851d129f2305be49fac973bf47b4`のGame/Assets参照を0件にして削除し、旧PNG/metaはAssets外へバックアップ
+- P1/P2のSpriteRenderer初期表示とIdle／Walk／Jump／Punch／Ground Kickを正式GUIDへ統一。Scene内正式GUID参照76件、不明internalID 0件
+- `DebugFighterVisual.airKickSequence`を追加し、`FighterRebuilt_AirKick_00`〜`05`を1CF/枚、Loop OFF、Hold Last Frame ONで接続。RecoveryはJumpFallを維持
+- Unity Import、コンパイル、Missing Sprite／参照例外なしを確認。IdleとAir Kick専用Flying Kick表示を確認済み。総合操作回帰は未確認として残す
+- Hurt／Push BoxはCenterX 0、HalfWidth 0.75の左右対称暫定値。Facing対応と前後非対称化はPush Resolverを含む後工程へ保留
+
 ## 未コミット: Air Kick最小検証版・通常技暫定調整
 
 - `AirKick`をGround Kickとは別の`DebugAttackId` / `DebugAttackData` / `FighterVisualState`として追加
 - K入力を接地状態で一括分岐。接地中はGround Kick、すでに空中ならAir Kick。地上Up+KはGround Kick、J+KはJ Punch優先、空中Jは攻撃なし
-- Air Kickは1ジャンプ1回、着地即終了。既存Ground Kickの`kickSequence`をコード上で流用し、Scene / Prefab変更なし
+- Air Kickは1ジャンプ1回、着地即終了。後続の正式Sprite採用で専用`airKickSequence`へ接続済み
 - 暫定値: J Punch `S/A/R=4/3/8`、Ground Kick `9/4/13`、Air Kick `5/5/10`
 - Active中だけHit Boxを有効化。Recovery中は内部行動不能を維持し、J Punch AF8〜10 / Ground Kick AF14〜19は振り切りVisual、後半はIdle。Air Kick RecoveryはJumpFall
 - Play確認: J Punchは軽い技として見やすく、Air Kickは立ち相手へ以前より当てやすい。Ground Kickの見た目改善は限定的で、脚の伸び・シルエットを改善したSprite再制作後に再調整する

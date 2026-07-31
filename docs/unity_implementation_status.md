@@ -117,7 +117,7 @@ Air Kick最小検証版・攻撃フレーム調整: **実装済み・Play確認�
 
 HitStun / ClashRecoil / KO は専用 State。専用 Sequence 未設定時は Idle Sequence へ fallback。色は`ApplyDisplayColor`で分離し、ClashRecoilは黄色系、HitStunは赤、KOは暗色、通常時はTint。
 
-**素材（FightDebug 正本）**: `Assets/Art/Characters/Fighter_SpriteSheet.png`（1536×1024、Multiple、GUID `dcb7851d129f2305be49fac973bf47b4`）。PixelLab Export を統合した **31 個別 Rect**。PPU **39** / Full Rect / Point / Compression None / Physics Shape Off。全 sub-sprite **Bottom Center**。P1/P2 同一シート参照、P2 は Tint 区別。旧 GUID `2bb8ae7896cf21b43bcd9cf17bf228d2` は削除済み。
+**素材（FightDebug 正本）**: `Assets/Art/Characters/Fighter_SpriteSheet.png`（Multiple、GUID `42345be00e0994144ba94bc5f1362757`）。PixelLab再構築版の**41実画素Trim Rect**。PPU **39** / Full Rect / Point / Compression None / Physics Shape Off / Mip Map Off。全sub-sprite **Center**。P1/P2同一シート参照、P2はTint区別。
 
 | グループ | 枚数 | Scene 接続 |
 |---|---|---|
@@ -147,7 +147,7 @@ Characters フォルダは正本 PNG + `.meta` の 1 組のみ。
 | 項目 | 状態 |
 |---|---|
 | PixelLab 正本シート統合 | **完了** |
-| 31 sub-sprite 切り出し | **完了** |
+| 41 sub-sprite切り出し・正式採用 | **完了** |
 | Idle / Walk / Jump / Punch Sequence | **Editor 確認済み** |
 | Kick 素材 | **切り出し済み** |
 | Ground Kick Gameplay | **接続済み・Editor確認済み** |
@@ -480,6 +480,8 @@ Push / Hurt / Hit 可視化（11A）と Hit×Hurt 重なり判定（11B）は完
 
 ## 5. 推奨工程順（見直し後）
 
+2026-07-31時点でSprite Sheet正式採用は完了。次の独立した保留タスクとして、**Hurt／Push BoxのFacing対応と前後非対称化**を追加する。現状はP1/P2ともCenterX `0`、HalfWidth `0.75`（全幅1.50）の左右対称暫定値である。Hurt/PushのCenterX反転だけを先行させず、`DebugFighterPushResolver`がWorld Push Box中心を使うよう揃え、表示と押し合い判定を一致させてから前方／背面幅を調整する。
+
 | 段階 | 内容 | 区分 |
 |---|---|---|
 | **10A〜13B-1** | Facing〜壁際 Push 再配分 | **完了** |
@@ -564,7 +566,7 @@ Round / Guard / 複数攻撃などの**機能 Stage とは別枠**。番号「GC
 - 段階1〜**15**まで到達。工程表の段階14（HP/Damage/KO）と段階15（攻撃データ化）は完了
 - Visual Sequence + Sprite Sheet 移行・ジャンプ基盤・計測ログ・Training Reset release gate は実装・Editor 確認済み。正式 Stage 番号なし
 - `FightDebugScene` は**練習・検証モード**。戦闘コア共通、KO 後処理はモード側（§1.1）
-- Visual: Sequence 再生 + `Fighter_SpriteSheet` **31 sub-sprite**（PPU 39、Idle/Walk/Jump/Punch/Ground Kick 接続済み）。Animator 未使用
+- Visual: Sequence再生＋`Fighter_SpriteSheet` **41 sub-sprite**（PPU 39、Idle/Walk/Jump/Punch/Ground Kick/Air Kick接続済み）。Animator未使用
 - 飛び越し後 Facing 反転・左向き Walk / Jump / J Punch は Editor 確認済み。J Punch は地上専用（ジャンプ中開始不可）。Air Hit / Air Knockback・ClashRecoil専用Sprite／演出・Dev Build Profiler は未実装／未確認
 - 正式な次 Stage 番号は未定義。候補は順不同（ClashRecoil専用Sprite／演出、Punch / Ground Kick / Air Kick素材改善、Animator、Air Hit/KB、Guard、Character Data SO、対戦モード分離など。Air Kick最小検証版は実装済みだが正式仕様は未確定）
 
@@ -611,6 +613,17 @@ Round / Guard / 複数攻撃などの**機能 Stage とは別枠**。番号「GC
 - `debugForceP2AttackWithP1ForClashTest`は通常OFF。検証時のみPlay中にON
 
 ## 7. Air Kick最小検証版・通常技暫定調整（2026-07-31・未コミット）
+
+### 2026-07-31 Sprite Sheet正式採用後の状態
+
+- 正式Assetは`Game/Assets/Art/Characters/Fighter_SpriteSheet.png`。GUID `42345be00e0994144ba94bc5f1362757`、41 Sprite、PPU 39、Point、Compression None、Mip Map Off
+- 192×192固定セル＋Center Pivotは透明余白中心が基準となって表示が上へずれたため不採用。各セル内の実画素Trim Rect＋Center Pivotを正式採用
+- 再構築版GUIDとinternalIDを維持してAsset名のみ正式化。Sub-Asset名`FighterRebuilt_...`も参照破損回避のため維持
+- 旧GUID `dcb7851d129f2305be49fac973bf47b4`のGame/Assets参照0件を確認後に削除。旧PNG/metaはAssets外へバックアップ済み
+- P1/P2の初期Sprite、Idle／Walk／Jump／Punch／Ground Kick／Air Kickを接続済み。正式GUID参照76件、不明internalID 0件
+- `DebugFighterVisual.airKickSequence`へ`FighterRebuilt_AirKick_00`〜`05`を接続（1CF/枚、Loop OFF、Hold Last Frame ON）。Startup／Activeで使用し、RecoveryはJumpFall
+- 確認済み: Import、C#コンパイル、Missing Sprite/参照例外なし、P1/P2 Idle、Air Kick専用Flying Kick表示
+- 未確認: 移動、Jump、J Punch、Ground Kick、通常Hit、Ground Clash、HitStun、Training Resetを通した最終総合回帰
 
 ### 区分
 

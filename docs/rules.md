@@ -517,7 +517,7 @@ Unity デバッグ実装の**実際の到達点**（段階1〜15）と次工程�
 前進・後退・Idle・歩行表現・ジャンプ・キック・Punch・HitStun・ClashRecoil・Knockback・KO・アニメーション状態は、**練習専用ではなく練習／対戦共通のキャラクター機能**とする。
 
 **実装済み**: `FighterVisualState` = Idle / WalkForward / WalkBackward / Attack / JumpStart / JumpRise / JumpApex / JumpFall / Landing / HitStun / KO / Kick / ClashRecoil。
-Session が状態を決定し、`DebugFighterVisual` が `FighterSpriteSequence` で Sprite を再生する。WalkForward / WalkBackward は同一 Walk 8 コマ。素材は `Fighter_SpriteSheet`（GUID `dcb7851d129f2305be49fac973bf47b4`、31 sub-sprite）の sub-sprite。Animator は未導入。
+Session が状態を決定し、`DebugFighterVisual` が `FighterSpriteSequence` で Sprite を再生する。WalkForward / WalkBackward は同一 Walk 8コマ。素材は`Fighter_SpriteSheet`（GUID `42345be00e0994144ba94bc5f1362757`、41 sub-sprite）のsub-sprite。Animatorは未導入。
 
 **将来候補（未実装含む）**: ClashRecoil専用Sprite／演出、Punch 3 枚以上、HitStun・KO 専用画像、Animator など。
 
@@ -549,7 +549,7 @@ Session が状態を決定し、`DebugFighterVisual` が `FighterSpriteSequence`
 
 ### 15.6 Sprite と Animation（学習方針）
 
-**現在（実装済み）**: `Fighter_SpriteSheet.png`（1536×1024、Multiple、GUID `dcb7851d129f2305be49fac973bf47b4`、31 sub-sprite、PPU 39）。P1/P2 同一シート、P2 は Tint。`FighterSpriteSequence` で CombatFrame 基準のコマ切替。各アクションは個別 Rect + 共通 Bottom Center Pivot。
+**現在（実装済み）**: `Fighter_SpriteSheet.png`（Multiple、GUID `42345be00e0994144ba94bc5f1362757`、41 sub-sprite、PPU 39）。P1/P2同一シート、P2はTint。`FighterSpriteSequence`でCombatFrame基準のコマ切替。各コマは実画素Trim Rect＋Center Pivot。
 
 **複数コマの用意**
 
@@ -612,6 +612,10 @@ Session が状態を決定し、`DebugFighterVisual` が `FighterSpriteSequence`
 
 ## 17. Air Kick最小検証版と攻撃Visualの暫定仕様
 
+2026-07-31更新: Air Kickの攻撃ルールとS/A/R `5/5/10`は変更せず、表示だけをGround Kick流用から専用`airKickSequence`へ分離した。Startup／Activeは`FighterRebuilt_AirKick_00`〜`05`、RecoveryはJumpFallを使う。専用画像接続済みである一方、Air Hit／Air Knockback／縦Knockback／Air Clash／正式Tradeは未実装のままである。
+
+BoxはP1/P2ともHurt／Push CenterX `0`、HalfWidth `0.75`の左右対称暫定値。Facing対応のCenterX反転と前後非対称化は未実装であり、Push Resolverの判定中心も同時にWorld Push Box中心へ揃えるまで値だけを前寄せしない。
+
 - `K`押下エッジを一か所で処理し、CombatFrame開始時点で接地中ならGround Kick、すでに空中ならAir Kick
 - 地上Up+KはGround Kick、J+KはJ Punch優先。空中Jは攻撃を開始しない
 - Air Kickは1ジャンプ1回。次のジャンプ開始時に使用済み状態を解除し、着地時は途中Phaseでも即終了
@@ -619,7 +623,7 @@ Session が状態を決定し、`DebugFighterVisual` が `FighterSpriteSequence`
 - Visualと内部状態を分離する。J PunchはAF1〜10がAttack、AF11〜15がIdle。Ground KickはAF1〜19がKick、AF20〜26がIdle。Air KickはStartup / ActiveがAirKick、RecoveryがJumpFall
 - 攻撃Visualを残すRecovery前半は振り切り表現であり、追加判定ではない。VisualがIdle / JumpFallでも内部Recoveryと行動制限はTotalまで継続
 - 地上／空中相手とも現行Hit Box対Hurt Boxの幾何学判定で命中可能。被弾は既存HitStun＋横KBを暫定流用
-- Ground Kick画像をAir Kickへ暫定流用し、Scene / Prefab / SerializeFieldは追加しない
+- Air Kickは専用`airKickSequence`へFlying Kick 6枚を接続済み。Startup／Activeで使用し、RecoveryはJumpFall
 - Air Hit / Air Knockback / 縦KB / Air Clash / 正式Tradeは未実装。Air KickをAir Hit基盤完成とは扱わない
 - 全フレーム値・Visual境界・Hit Boxは専用モーション完成後に再調整する暫定仕様
 - Clashは通常Hitとは別の`ClashRecoil`状態で表示する。Damage 0、通常HitCount非加算、黄色系専用色、専用Sprite未設定時Idle fallbackをEditor確認済み

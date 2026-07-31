@@ -68,9 +68,9 @@
 ## 4.1 スプライト素材の学習メモ（FightDebug）
 
 - 画像のピクセル寸法だけでは見かけサイズは揃わない（**PPU**・Rect・描画内容が効く）。正本は PPU **39**（旧・新 Alpha bbox から算出）。Transform Scale の場当たり調整はしない
-- PixelLab Export（116×116 連番）を 1536×1024 正本シートへ統合。想定フレーム数と実物が異なった（Idle/Walk/Jump 各 8、Punch 2、Kick 5）
-- 192×192 共通 Rect + 共通 Pivot だけでは、フレーム内キャラ位置ずれで SpriteRenderer だけが左右・上下へ動いて見える
-- **Rect 側で体幹中心（腰帯）を水平中央、接地点または最下端を Rect 下端へ揃える**。フレームごとの個別 Pivot で帳尻を合わせない
+- PixelLab由来の再構築版はIdle 8、Walk 8、Jump 9、Punch 3、Kick 7、Air Kick 6の計41 Spriteとして正式採用した
+- 192×192固定Rect＋Center Pivotでは、キャラクターではなく透明余白を含むセル中心がTransform基準となり、旧素材より大きく上へずれた
+- 現行FightDebug正本は各セル内の実画素外接範囲へTrimし、各Trim RectのCenter Pivotを使う。固定セル方式の失敗と、個別PivotやTransform Scaleで場当たり的に補正しない判断を記録する
 - Alpha 全体重心だけでは手足・帯・髪に引っ張られる
 - `framesPerSprite` は FPS ではなく、**1 枚を何 CombatFrame 表示するか**
 - JumpRise / JumpFall は `loop=false` + `holdLastFrame=true` で空中姿勢の往復を防止

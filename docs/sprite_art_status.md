@@ -2,11 +2,15 @@
 
 ## 結論（現状）
 
+2026-07-31、PixelLab由来の再構築版をFightDebugの正式`Fighter_SpriteSheet.png`として採用した。現行正本は41 Sprite、GUID `42345be00e0994144ba94bc5f1362757`、PPU 39、Point、Compression None、Mip Map Off、実画素Trim Rect＋Center Pivotである。
+
+192×192固定セル＋Center Pivotの比較版は、透明余白を含むセル中心がTransform基準となり、キャラクターが旧素材より大きく上へずれたため不採用とした。PNG内のセル構成は192×192だが、Unity Sprite Rectは各セル内の実画素範囲へTrimする。
+
 **本番清書スプライトシート（固定セル仕様を満たした最終素材）は未完成である。**
 一方、FightDebugScene 向けの**動作確認用シート**は PixelLab 生成素材を統合した正本として運用中である。
 
 - 正本ファイル: `Game/Assets/Art/Characters/Fighter_SpriteSheet.png`（1536×1024）
-- 正本 GUID: `dcb7851d129f2305be49fac973bf47b4`
+- 正本 GUID: `42345be00e0994144ba94bc5f1362757`
 - 旧シート GUID `2bb8ae7896cf21b43bcd9cf17bf228d2` は参照ゼロ確認後に削除済み（2026-07 一本化）
 - Characters フォルダは正本 PNG + `.meta` の **1 組のみ**（`_New` 中間名・旧シート・単体 PNG なし）
 - sub-sprite **31 枚**（Idle 8 / Walk 8 / Jump 8 / Punch 2 / Kick 5）
@@ -14,12 +18,19 @@
 
 `art/fighter_motion_reference_sheet.png` および `docs/reference_infographic.png` は、白い道着・赤い鉢巻の格闘家を基準にした**デザイン／モーション方向性の参考画像**である（Unity 取込完成シートではない）。
 
-## FightDebug 用シート（2026-07 正本）
+## FightDebug 用シート（2026-07-31 正式正本）
+
+- Asset: `Game/Assets/Art/Characters/Fighter_SpriteSheet.png`
+- GUID: `42345be00e0994144ba94bc5f1362757`
+- 41 Sprite: Idle 8 / Walk 8 / Jump 9 / Punch 3 / Kick 7 / Air Kick 6
+- Sub-Asset名は参照安全性のため`FighterRebuilt_...`を意図的に維持
+- P1/P2の初期SpriteとIdle／Walk／Jump／Punch／Ground Kick／Air Kickを接続済み
+- 旧GUID `dcb7851d129f2305be49fac973bf47b4`は参照0件確認後に削除。旧PNG/metaはAssets外バックアップに保存
 
 | 項目 | 内容 |
 |---|---|
 | ファイル | `Fighter_SpriteSheet.png` + `.meta` |
-| GUID | `dcb7851d129f2305be49fac973bf47b4` |
+| GUID | `42345be00e0994144ba94bc5f1362757` |
 | 元素材 | PixelLab Export（116×116 連番 PNG）→ 1536×1024 シートへ配置 |
 | Sprite Mode | Multiple |
 | PPU / Mesh / Filter / Compression | **39** / Full Rect / Point / None |
@@ -57,7 +68,7 @@
 | 骨格 | 未整備（制作工程の正本は `production_spritesheet_spec.md`） |
 | シルエット | 未整備 |
 | 仮ドット絵 | FightDebug 正本シート（PixelLab 統合済み。本番清書ではない） |
-| 動作確認用素材 | **31 sub-sprite 運用中** |
+| FightDebug正式素材 | **41 sub-sprite 運用中** |
 | 本番清書素材 | **未作成**（固定セル仕様適合・清書は未達） |
 | 参考PNG | 参考のみ。完成扱いしない |
 
@@ -72,7 +83,7 @@
 - JumpRise / JumpFall は `loop=false` + `holdLastFrame=true` で空中姿勢の往復を防止
 - Punch は素材2枚のみでRecovery専用コマなし。現行はRecovery前半まで振り切り表示し、後半をIdleへ戻す
 - Kick は原画上knee-kick寄りで、脚の伸び・シルエット不足がGround Kickの見た目改善を制限している可能性がある。コード不具合と断定せず再制作候補とする
-- Air Kick専用Spriteは未作成。現在はGround Kickの5枚をコード上で流用する
+- Air Kick専用Sprite 6枚は作成・接続・表示確認済み。Ground Kick流用は終了した
 - 旧・新シート並存のままコミットせず、参照検索後に新 GUID を維持して正本名へ一本化した
 - 旧素材は新参照確認前に削除しない
 
@@ -108,9 +119,14 @@
 - 現行暫定値ではGround Kick ActiveはAF10〜13。AF14〜19は振り切り表示だけを残し、Hit Boxは無効。AF20〜26はIdle表示
 - 本番清書ではなく、現素材を使った学習・判定確認用の暫定品質
 
-## Air Kick素材流用（2026-07-31・未コミット）
+## Air Kick専用素材接続（2026-07-31・未コミット）
 
-- Air Kick専用Sprite / Sequenceは未作成
+- `FighterRebuilt_AirKick_00`〜`05`を`DebugFighterVisual.airKickSequence`へ接続済み
+- 6枚、1 CombatFrame/枚、Loop OFF、Hold Last Frame ON。Startup＋Active 10Fのうち6F表示後は最終コマを保持し、RecoveryでJumpFallへ戻る
+- Ground Kickの`kickSequence`とは分離済み。Air Kick専用Flying Kickが実際に表示されることはユーザー操作で確認済み
+- 専用絵の接続は完了したが、S/A/R `5/5/10`、Hit Box、Air Hit／Air Knockbackは引き続き暫定または未実装である
+
+- Air Kick専用Sprite / Sequenceは接続済み。専用モーションに合わせたフレーム値・Hit Box再調整は将来候補
 - `FighterVisualState.AirKick`はコード上で既存`kickSequence`を返し、Scene / Prefab / SerializeField変更なし
 - Startup / ActiveはKick素材、RecoveryはJumpFallを表示。VisualがJumpFallでも内部Air Kick Recoveryは継続
 - `5/5/10`への調整後、以前より立ち相手へ当てやすいことをPlay確認
