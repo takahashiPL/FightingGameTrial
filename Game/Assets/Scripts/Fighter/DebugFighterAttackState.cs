@@ -31,6 +31,12 @@ namespace FightingGameTrial.Fighter
         private int actionFrame;
         private string lastAttackResult = "None";
 
+        /// <summary>
+        /// 現在のジャンプで Air Kick を使ったか。
+        /// 着地では解除せず、次のジャンプ開始成功時に解除することで1ジャンプ1回を明確にします。
+        /// </summary>
+        private bool airKickUsedThisJump;
+
         public bool PreviousAttackHeld
         {
             get { return previousAttackHeld; }
@@ -76,6 +82,16 @@ namespace FightingGameTrial.Fighter
         public bool IsGroundKickAttack
         {
             get { return isActionPlaying && currentAttackId == DebugAttackId.GroundKick; }
+        }
+
+        public bool IsAirKickAttack
+        {
+            get { return isActionPlaying && currentAttackId == DebugAttackId.AirKick; }
+        }
+
+        public bool AirKickUsedThisJump
+        {
+            get { return airKickUsedThisJump; }
         }
 
         /// <summary>互換: J Punch 再生中かつその攻撃で Hit 済みか。</summary>
@@ -174,6 +190,22 @@ namespace FightingGameTrial.Fighter
             StartAttack(DebugAttackId.GroundKick, DebugAttackData.Kick, combatFrame);
         }
 
+        public void StartAirKick(int combatFrame)
+        {
+            // 空中攻撃の進行は共通 AttackState を使いますが、ID/Data は Ground Kick と分けます。
+            StartAttack(DebugAttackId.AirKick, DebugAttackData.AirKick, combatFrame);
+            airKickUsedThisJump = true;
+        }
+
+        /// <summary>
+        /// Motor が新しいジャンプを開始できたときだけ呼びます。
+        /// 地上待機や着地直後に解除しないため、同じジャンプ中の再発動を防げます。
+        /// </summary>
+        public void BeginNewJumpForAirKickUsage()
+        {
+            airKickUsedThisJump = false;
+        }
+
         public void AdvanceActionFrame()
         {
             if (isActionPlaying == false)
@@ -237,6 +269,7 @@ namespace FightingGameTrial.Fighter
             attackPressedThisTick = false;
             previousKickHeld = false;
             kickPressedThisTick = false;
+            airKickUsedThisJump = false;
             ClearPlayingAttackFields();
             lastAttackResult = "None";
         }

@@ -35,6 +35,13 @@ namespace FightingGameTrial.Combat
         /// </summary>
         public static readonly DebugAttackData Kick = CreateGroundKick();
 
+        /// <summary>
+        /// 最小検証版 Air Kick の設定正本。
+        /// Ground Kick とは別インスタンスなので、地上攻撃を変えず空中用フレームだけ調整できます。
+        /// Hit Box の大きさ・位置と Damage 等は現時点では Ground Kick と同値です。
+        /// </summary>
+        public static readonly DebugAttackData AirKick = CreateAirKick();
+
         private readonly DebugAttackId attackId;
         private readonly string attackIdLabel;
         private readonly int startupFrames;
@@ -249,13 +256,14 @@ namespace FightingGameTrial.Combat
 
         private static DebugAttackData CreateJPunch()
         {
-            // Startup AF 1〜3 / Active 4〜6 / Recovery 7〜12（Total=12）
+            // 軽く速い地上技。Startupで発生前、ActiveだけHit Box、Recoveryが次の行動までの隙です。
+            // Ground Kickより早く動ける暫定値で、専用モーション完成後に再調整します。
             return new DebugAttackData(
                 DebugAttackId.JPunch,
                 "JPunch",
+                4,
                 3,
-                3,
-                6,
+                8,
                 10,
                 6,
                 12,
@@ -270,15 +278,39 @@ namespace FightingGameTrial.Combat
 
         private static DebugAttackData CreateGroundKick()
         {
-            // Startup 8 / Active 3 / Recovery 4（Total=15）
+            // Punchより発生が遅く、空振り時のRecoveryも長い重い地上技です。
+            // ActiveだけHit Boxを出し、Recovery 13CFは見た目がIdleでも内部では行動不能の隙になります。
+            // フレーム値は既存Kick Sequenceを使う暫定値で、専用モーション完成後に再調整します。
             // Hit Box: Punch より遠く、蹴り脚に合わせて低く薄めにした仮値
             // centerX 0.95 / centerY 0.55 / half 0.60×0.25
             return new DebugAttackData(
                 DebugAttackId.GroundKick,
                 "GroundKick",
-                8,
-                3,
+                9,
                 4,
+                13,
+                14,
+                7,
+                14,
+                0.24f,
+                0.015f,
+                0.95f,
+                0.55f,
+                0.60f,
+                0.25f
+            );
+        }
+
+        private static DebugAttackData CreateAirKick()
+        {
+            // 脚を伸ばした画像と Active のずれを減らすため、Startupを短縮しActiveを延長します。
+            // Recovery中は攻撃状態だけを継続し、IsActiveFrame=falseになるためHit Boxは出ません。
+            return new DebugAttackData(
+                DebugAttackId.AirKick,
+                "AirKick",
+                5,
+                5,
+                10,
                 14,
                 7,
                 14,

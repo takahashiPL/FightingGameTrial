@@ -33,6 +33,9 @@ namespace FightingGameTrial.Fighter
         Kick = 11,
 
         /// <summary>Ground Clash 成立後の専用反動表示。</summary>
-        ClashRecoil = 12
+        ClashRecoil = 12,
+
+        /// <summary>空中 Kick。最小検証版では既存 Kick Sequence を流用する。</summary>
+        AirKick = 13
     }
 }

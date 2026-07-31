@@ -10,6 +10,9 @@ namespace FightingGameTrial.Combat
     {
         None = 0,
         JPunch = 1,
-        GroundKick = 2
+        GroundKick = 2,
+
+        // 既存値は Scene / Prefab の互換性を守るため変えず、空中 Kick は末尾へ追加します。
+        AirKick = 3
     }
 }

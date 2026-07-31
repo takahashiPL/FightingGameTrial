@@ -304,6 +304,10 @@ namespace FightingGameTrial.Fighter
                 case FighterVisualState.Kick:
                     return kickSequence;
 
+                // 専用 SerializeField は増やさず、最小検証中は Ground Kick の画像を流用します。
+                case FighterVisualState.AirKick:
+                    return kickSequence;
+
                 case FighterVisualState.ClashRecoil:
                     return clashRecoilSequence;
 

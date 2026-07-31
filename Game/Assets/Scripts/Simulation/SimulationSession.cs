@@ -98,6 +98,14 @@ namespace FightingGameTrial.Simulation
         /// </summary>
         private static readonly DebugAttackData JPunchData = DebugAttackData.JPunch;
         private static readonly DebugAttackData KickData = DebugAttackData.Kick;
+        private static readonly DebugAttackData AirKickData = DebugAttackData.AirKick;
+
+        /// <summary>
+        /// 専用の戻しモーションがない間だけ使う、Recovery前半の攻撃Visual終了AFです。
+        /// 判定のActive区間ではなく見た目だけの境界で、Hit Boxの有効性には影響しません。
+        /// </summary>
+        private const int JPunchRecoveryVisualEndActionFrame = 10;
+        private const int GroundKickRecoveryVisualEndActionFrame = 19;
 
         /// <summary>
         /// selfX と opponentX がほぼ同じときの Facing 維持用しきい値です。
@@ -410,8 +418,10 @@ namespace FightingGameTrial.Simulation
             //    同一 CombatFrame で Up と攻撃が同時でも、攻撃開始を Jump より先に試みる。
             TryStartJPunchForParticipant(participantP1);
             TryStartJPunchForParticipant(participantP2);
-            TryStartGroundKickForParticipant(participantP1);
-            TryStartGroundKickForParticipant(participantP2);
+            // K はここ1か所で、CombatFrame 開始時点の接地状態から Ground / Air へ振り分ける。
+            // 地上 Up+K は Jump より先に Ground Kick が始まり、空中への入力予約にはならない。
+            TryStartKickForParticipant(participantP1);
+            TryStartKickForParticipant(participantP2);
             TryForceP2AttackWithP1ForClashDebug();
 
             // 8b. ジャンプ開始（地上・非 Attack・非 Landing。空中再ジャンプなし）
@@ -423,6 +433,10 @@ namespace FightingGameTrial.Simulation
             // 9. 両体移動（地上: 入力移動 / 空中: ジャンプ軌道。HitStun・KO 中は入力移動スキップ）
             ProcessOneFighterMovement(participantP1, inputP1);
             ProcessOneFighterMovement(participantP2, inputP2);
+            // Motor がこのフレームで着地したなら、Hit収集より前に Air Kick を即終了する。
+            // 今回は地上 Recovery / 着地硬直を追加しない最小検証仕様です。
+            TryEndAirKickOnLanding(participantP1);
+            TryEndAirKickOnLanding(participantP2);
             // 頂点・着地イベントは空中軌道更新後に発生するため、ここで消費してログする
             FlushJumpDebugLogsForParticipant(participantP1);
             FlushJumpDebugLogsForParticipant(participantP2);
@@ -770,22 +784,72 @@ namespace FightingGameTrial.Simulation
             DebugFighterAttackState attackState = participant.AttackState;
             if (attackState != null && participant.Visual != null)
             {
-                if (participant.Visual.IsAttackPoseActive(
-                    attackState.IsActionPlaying,
-                    attackState.ActionFrame,
-                    attackState.IsJPunchAttack))
+                if (attackState.IsJPunchAttack)
                 {
-                    return FighterVisualState.Attack;
+                    // 内部Phaseと見た目を分離します。Startup / ActiveはPunch Sequenceを表示します。
+                    if (attackState.CurrentPhase == DebugAttackPhase.Startup
+                        || attackState.CurrentPhase == DebugAttackPhase.Active)
+                    {
+                        return FighterVisualState.Attack;
+                    }
+
+                    if (attackState.CurrentPhase == DebugAttackPhase.Recovery)
+                    {
+                        // AF8〜10は「振り切り」の見た目としてAttackを残しますが、追加判定ではありません。
+                        // Hit BoxはAttackData.IsActiveFrameだけが決めるため、Recovery中は常に無効です。
+                        if (attackState.ActionFrame <= JPunchRecoveryVisualEndActionFrame)
+                        {
+                            return FighterVisualState.Attack;
+                        }
+
+                        // AF11〜15は拳を伸ばした姿勢を長く保持しすぎないようIdleへ戻します。
+                        // 見た目がIdleでも内部はJPunch Recoveryのままで、次の攻撃・ジャンプは開始不可です。
+                        // 専用の戻しモーションが完成したら、この暫定境界を再調整します。
+                        return FighterVisualState.Idle;
+                    }
                 }
 
-                int kickTotal = KickData.TotalFrames;
-                if (participant.Visual.IsKickPoseActive(
-                    attackState.IsActionPlaying,
-                    attackState.ActionFrame,
-                    attackState.IsGroundKickAttack,
-                    kickTotal))
+                if (attackState.IsGroundKickAttack)
                 {
-                    return FighterVisualState.Kick;
+                    // Startup / ActiveはKick Sequenceを表示します。
+                    if (attackState.CurrentPhase == DebugAttackPhase.Startup
+                        || attackState.CurrentPhase == DebugAttackPhase.Active)
+                    {
+                        return FighterVisualState.Kick;
+                    }
+
+                    if (attackState.CurrentPhase == DebugAttackPhase.Recovery)
+                    {
+                        // AF14〜19は「振り切り」の見た目としてKickを残しますが、Hit Boxは復活しません。
+                        if (attackState.ActionFrame <= GroundKickRecoveryVisualEndActionFrame)
+                        {
+                            return FighterVisualState.Kick;
+                        }
+
+                        // AF20〜26は脚を伸ばした最終コマを長く保持しないようIdleへ戻します。
+                        // Visualと内部状態は別なので、GroundKick Recoveryと行動不能はAF26終了まで継続します。
+                        // 専用の戻しモーションが完成したら、この暫定境界を再調整します。
+                        return FighterVisualState.Idle;
+                    }
+                }
+
+                if (attackState.IsAirKickAttack)
+                {
+                    // 攻撃の内部状態と表示は分けます。
+                    // Startup / Active は脚を伸ばす AirKick 表示、Recovery は Hit Box のない行動不能時間です。
+                    if (attackState.CurrentPhase == DebugAttackPhase.Startup
+                        || attackState.CurrentPhase == DebugAttackPhase.Active)
+                    {
+                        return FighterVisualState.AirKick;
+                    }
+
+                    if (attackState.CurrentPhase == DebugAttackPhase.Recovery)
+                    {
+                        // Recoveryまで蹴り画像を出すと「脚が当たっているのにHitしない」ように見えます。
+                        // そこで見た目だけJumpFallへ戻しますが、AttackStateはAirKick Recoveryのままです。
+                        // IsActionPlayingも維持されるため、新しい攻撃やジャンプは開始できません。
+                        return FighterVisualState.JumpFall;
+                    }
                 }
             }
 
@@ -957,9 +1021,11 @@ namespace FightingGameTrial.Simulation
         /// <summary>
         /// 地上 Ground Kick 開始。Punch 開始の後に呼ぶ（同時押しで Punch が先に取った場合は IsActionPlaying で弾く）。
         /// </summary>
-        private void TryStartGroundKickForParticipant(DebugFighterParticipant participant)
+        private void TryStartKickForParticipant(DebugFighterParticipant participant)
         {
-            if (CanStartGroundAttack(participant) == false)
+            if (participant == null
+                || participant.AttackState == null
+                || participant.Motor == null)
             {
                 return;
             }
@@ -970,8 +1036,52 @@ namespace FightingGameTrial.Simulation
                 return;
             }
 
-            attackState.StartGroundKick(timeState.CombatFrame);
-            LogAttackStarted(participant, KickData);
+            // K の押下エッジを一度だけ読み、CombatFrame 開始時点の接地状態で攻撃を選びます。
+            // Held は新しいエッジにならないため、地上Kを空中へ予約することもありません。
+            if (participant.Motor.IsGrounded)
+            {
+                if (CanStartGroundAttack(participant) == false)
+                {
+                    return;
+                }
+
+                attackState.StartGroundKick(timeState.CombatFrame);
+                LogAttackStarted(participant, KickData);
+                return;
+            }
+
+            if (CanStartAirKick(participant) == false)
+            {
+                return;
+            }
+
+            attackState.StartAirKick(timeState.CombatFrame);
+            LogAttackStarted(participant, AirKickData);
+        }
+
+        /// <summary>
+        /// Air Kick 専用ゲート。上昇／頂点／下降は区別せず、すでに空中なら開始できます。
+        /// AirKickUsedThisJump により同じジャンプ中の再発動を禁止します。
+        /// </summary>
+        private static bool CanStartAirKick(DebugFighterParticipant participant)
+        {
+            if (participant == null
+                || participant.AttackState == null
+                || participant.Motor == null
+                || participant.Motor.IsGrounded)
+            {
+                return false;
+            }
+
+            if (participant.IsKnockedOut
+                || participant.IsInCombatReaction
+                || participant.AttackState.IsActionPlaying
+                || participant.AttackState.AirKickUsedThisJump)
+            {
+                return false;
+            }
+
+            return true;
         }
 
         /// <summary>
@@ -1109,6 +1219,29 @@ namespace FightingGameTrial.Simulation
             }
         }
 
+        /// <summary>
+        /// Air Kick中にMotorが着地したら、その場で攻撃を終了します。
+        /// 地上Recoveryへ持ち越さず、将来のAir Hit／Air Knockbackとも混ぜない検証用ルールです。
+        /// </summary>
+        private static void TryEndAirKickOnLanding(DebugFighterParticipant participant)
+        {
+            if (participant == null
+                || participant.Motor == null
+                || participant.AttackState == null
+                || participant.Motor.IsGrounded == false
+                || participant.AttackState.IsAirKickAttack == false)
+            {
+                return;
+            }
+
+            participant.AttackState.EndAttack();
+            Debug.Log(
+                "[FightDebug] Attack ended on landing"
+                + " slot=" + participant.SlotId
+                + " attack=AirKick"
+            );
+        }
+
         /// <summary>互換: 旧名。</summary>
         private void TryEndJPunchForParticipant(DebugFighterParticipant participant)
         {
@@ -1244,9 +1377,19 @@ namespace FightingGameTrial.Simulation
             }
 
             bool started = motor.TryStartJump(jumpType);
-            if (started && timeState != null)
+            if (started)
             {
-                timeState.LastStatusMessage = "Jump " + jumpType;
+                // 1ジャンプ1回制限は「新しいジャンプが実際に始まった時点」で解除します。
+                // 着地時に解除しないため、状態の境界がMotorのジャンプ開始と一致します。
+                if (participant.AttackState != null)
+                {
+                    participant.AttackState.BeginNewJumpForAirKickUsage();
+                }
+
+                if (timeState != null)
+                {
+                    timeState.LastStatusMessage = "Jump " + jumpType;
+                }
             }
         }
 
@@ -2148,6 +2291,15 @@ namespace FightingGameTrial.Simulation
                 if (p1Attack.IsJPunchAttack)
                 {
                     timeState.LastStatusMessage = "J Punch " + GetPunchPhaseLabel();
+                }
+                else if (p1Attack.IsGroundKickAttack)
+                {
+                    timeState.LastStatusMessage = "GroundKick " + GetPunchPhaseLabel();
+                }
+                else if (p1Attack.IsAirKickAttack)
+                {
+                    // 同じ kickSequence を使っていても、HUD上の攻撃名は Ground Kick と区別します。
+                    timeState.LastStatusMessage = "AirKick " + GetPunchPhaseLabel();
                 }
                 else
                 {
