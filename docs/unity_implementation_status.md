@@ -2,7 +2,7 @@
 
 最終更新: 2026-07-30
 対象ブランチ: `unity`
-最新コミット済み HEAD: **`78c4e94`**（Separate ground clash recoil from normal hit state）・push 済み
+最新コミット済み HEAD: **`69c9385`**（Document clash recoil state separation）・push 済み
 段階14全体（14A+14B）・段階15（攻撃データ化）: **完了・push 済み**
 GC-1 / GC-2（補助改善・正式 Stage ではない）: **完了・push 済み**
 Training Reset 位置・向き復帰: **実装・Editor 確認済み**（正式 Stage 番号なし）

@@ -36,7 +36,7 @@ GC-2（Editor）: `DebugHudView.Update` 約17.2 KB → 約3.2 KB / frame。Devel
 ## Unity 実装の到達点（要約）
 
 ブランチ `unity` 上で、**段階1〜15まで完了**しています。
-最新コミット済み HEAD: **`78c4e94`**（Separate ground clash recoil from normal hit state）・`origin/unity` へ push 済み
+最新コミット済み HEAD: **`69c9385`**（Document clash recoil state separation）・`origin/unity` へ push 済み
 段階14全体（14A+14B）・段階15（J Punch 攻撃データ化）: **完了・push 済み**（SO 化は見送り）。
 GC-1 / GC-2（補助改善・正式 Stage ではない）: **完了・push 済み**。
 Training Reset 位置・向き復帰: **実装・Editor 確認済み**（正式 Stage 番号なし）。
