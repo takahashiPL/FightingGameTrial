@@ -1310,7 +1310,7 @@ DebugGameplayInput（物理 Held）
 - Character Data SO へ Jump 設定を移す
 - Animator / 専用 Sprite を Visual に接続（State 決定は Session のまま）
 - Air Hit / Air Knockback（空中被弾）
-- ClashRecoil専用Sprite／演出の追加。将来の空中攻撃は仕様未定（空中パンチは対象外）
+- ClashRecoil専用Sprite／演出の追加。Air Kick最小検証版は実装済みで、専用Sprite・正式仕様は未確定（空中Jは対象外）
 
 ## 18. Ground Kick と共通 Hit 解決の確認ガイド
 
@@ -1327,15 +1327,15 @@ P1/P2の `DebugFighterVisual > Kick Sequence`:
 
 ### 18.2 Ground Kickの確認値
 
-`DebugAttackData.GroundKick`: S/A/R 8/3/4、Damage 14、HitStop 7、HitStun 14、Horizontal KB 0.24、Hit Box center `(0.95,0.55)` / half `(0.60,0.25)`。
+現在の未コミット暫定値は`DebugAttackData.GroundKick`: S/A/R 9/4/13、Damage 14、HitStop 7、HitStun 14、Horizontal KB 0.24、Hit Box center `(0.95,0.55)` / half `(0.60,0.25)`。コミット`bc80ddb`時点の履歴値は8/3/4。
 
 ### 18.3 Play Mode確認済み
 
 1. 地上でK → Kick開始
-2. AF 8〜10付近で赤Hit Box、伸びたKick画像と概ね一致
+2. AF 10〜13で赤Hit Box。AF14〜19は振り切りVisualだけを残し、Hit Boxは無効
 3. 近距離Hit → actual 14、P2HitCount 1、HitStop、ノックバック
 4. 左右Facing双方で相手方向へHit Box、相手が離れる方向へKB
-5. 空中K／空中保持着地では開始せず、離して押し直すと開始
+5. 空中で新しくKを押すとAir Kick。地上K保持を空中へ予約しない
 6. Punch/Kick中の相互切替なし。近いJ+K入力はJ Punch優先
 
 ### 18.3 Ground ClashのEditor実測結果
@@ -1350,3 +1350,33 @@ P1をP2へPush Box最小距離まで近づけ、`debugForceP2AttackWithP1ForClas
 - 専用Sprite Sequenceは未設定で、Idle Sequenceへfallbackする。Scene差分は持たずコード初期値で動作確認済み
 
 通常作業では検証フラグをOFFのまま使う。
+
+## 19. Air Kick最小検証版とRecovery Visual
+
+### 19.1 Scene / Prefab
+
+今回の接続はC#だけで完結し、Scene / Prefab変更はない。`DebugFighterVisual`へ専用SerializeFieldを追加せず、`FighterVisualState.AirKick`も既存`kickSequence`を返す。
+
+### 19.2 K入力と攻撃状態
+
+- `SimulationSession`がK押下を一か所で処理する
+- CombatFrame開始時点で接地中ならGround Kick、すでに空中ならAir Kick
+- Air Kickは`DebugAttackId` / `DebugAttackData` / `FighterVisualState`をGround Kickと分離
+- 1ジャンプ1回。次のジャンプ開始時に使用済み状態を解除し、着地時は即終了
+
+### 19.3 PhaseとVisual
+
+| 攻撃 | Startup / Active | Recovery前半 | Recovery後半 |
+|---|---|---|---|
+| J Punch | AF1〜7 Attack | AF8〜10 Attack（振り切り） | AF11〜15 Idle |
+| Ground Kick | AF1〜13 Kick | AF14〜19 Kick（振り切り） | AF20〜26 Idle |
+| Air Kick | AirKick | JumpFall | JumpFall |
+
+Visual選択と内部攻撃状態は別である。Recovery前半にAttack / Kickが見えても、Hit Boxは`DebugAttackData.IsActiveFrame()`がtrueの間だけ。Recovery後半にIdle / JumpFallへ戻っても、`IsActionPlaying`はTotalまたはAir Kick着地終了まで維持される。
+
+### 19.4 現在の制約
+
+- Ground Kick画像はAir Kickへ暫定流用
+- Air Hit / Air Knockback / 縦KB / Air Clash / 正式Tradeは未実装
+- Ground Kickは脚の伸び・シルエット不足の可能性があり、Sprite再制作後にフレームとHit Boxを再調整する
+- Air Kick専用モーション完成後もS/A/R、Hit Box、表示Sprite範囲を再調整する

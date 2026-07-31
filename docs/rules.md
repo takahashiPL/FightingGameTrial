@@ -56,7 +56,7 @@ Unity / UE などのエンジンAPIではなく、**60Hz論理シミュレーシ
 - Clash 壁際の未消化転送（将来候補。初期は破棄）
 - 高度な壁際補正、結果別 `transfer_ratio`
 - LandingRecovery の具体フレーム数
-- **将来の空中攻撃全般**（種類・回数・着地時の扱い。空中パンチは対象外。空中キックも仕様未定）
+- Air Kickの正式値・専用Sprite・正式な空中命中／被弾挙動（最小検証版は実装済み）
 - **Air Hit / Air Knockback**（空中にいるキャラが被弾したときの専用処理。空中攻撃とは別）
 
 > 初期資料・`moves.csv` の `AIR_PUNCH` / `AIR_KICK` 行は過去の配置・数値案の残骸であり、**現行仕様の正本ではない**。履歴は `CHANGELOG.md` を参照。
@@ -68,7 +68,7 @@ Unity / UE などのエンジンAPIではなく、**60Hz論理シミュレーシ
 | 入力 | 動作 |
 |---|---|
 | A | **地上パンチ（J Punch）**。ジャンプ中は開始不可 |
-| B | 地上キック（**Gameplay 未実装**。Kick 素材接続は将来候補） |
+| B（Unity: K） | 接地中はGround Kick、すでに空中ならAir Kick。地上Up+KはGround Kick |
 | X | 垂直ジャンプ |
 | X + 前 | 前ジャンプ |
 | X + 後ろ | 後ろジャンプ |
@@ -114,8 +114,8 @@ Unity / UE などのエンジンAPIではなく、**60Hz論理シミュレーシ
 - 着地まで軌道変更なし
 - 空中Pushbox無効（すれ違い可）
 - 空中ガード不可
-- **現行**: ジャンプ中の攻撃開始はない（J Punch 地上専用）。空中パンチは採用しない
-- **将来の空中攻撃**: 仕様未定。導入する場合も空中パンチは前提にしない。回数・着地時の扱いも未定
+- **現行**: J Punch / Ground Kickは地上専用。すでに空中で新しくKを押すとAir Kickを開始する。空中Jは攻撃なし
+- Air Kickは1ジャンプ1回、上昇・頂点・下降で開始可能。入力予約はせず、着地時に即終了する暫定仕様
 
 > **Unity デバッグ実装メモ（2026-07-28）**: FightDebugScene では Up エッジ＋Facing×左右で Neutral/Forward/Backward を決め、CombatFrame 固定の LogicalY 軌道を使う（Rigidbody 非使用）。空中 Push は高さ差閾値で skip。ジャンプ中の J Punch 開始は**不可**。詳細ルールは **§15.7**、到達点は `docs/unity_implementation_status.md` §1.2。本節の「直前2 tick」バッファ設計とは一致しない点がある。
 
@@ -123,10 +123,9 @@ Unity / UE などのエンジンAPIではなく、**60Hz論理シミュレーシ
 
 - 着地後は `LandingRecovery`（または Unity デバッグの Landing）へ入る（フレーム数は暫定・未決定）
 - LandingRecovery 中は再ジャンプ不可
-- **現行**: 空中攻撃が存在しないため、「着地で空中攻撃を強制終了する」処理は不要
-- **将来**: 空中攻撃を導入する場合の着地時終了ルールは、そのとき仕様を決める（未定）
+- **現行**: Air KickはStartup / Active / Recoveryの途中でも着地時に即終了する。地上Recoveryや追加着地硬直は設けない
 
-> Unity デバッグ実装: `LandingFrames=2`。Landing 中は左右移動可・再ジャンプ不可。ジャンプ中の攻撃開始は不可。
+> Unity デバッグ実装: `LandingFrames=2`。Landing 中は左右移動可・再ジャンプ不可。空中Jは不可、空中KはAir Kick最小検証版として1ジャンプ1回だけ開始可能。
 
 ### 2.2 着地時 Pushbox
 
@@ -186,9 +185,9 @@ HP と KO の正本は各 `DebugFighterParticipant`（HitState には持たせ�
 
 ## 3. 通常技
 
-**現行（Unity デバッグ）**: 地上立ちパンチ（J Punch）と地上キック（Ground Kick）を実装。どちらも地上専用で、空中パンチは採用しない。Ground Kick は空中入力を着地後へ予約しない。
+**現行（Unity デバッグ）**: 地上J Punch、地上Ground Kick、空中Air Kick最小検証版を実装。空中Jは採用しない。KはCombatFrame開始時点の接地状態でGround / Airへ分岐し、入力予約しない。
 
-**長期設計上の候補（未実装・未確定）**: しゃがみパンチ／キック、将来の空中攻撃（種類未定。空中パンチは対象外）。
+**長期設計上の候補（未実装・未確定）**: しゃがみパンチ／キック、Air Kick正式化、Air Hit / Air Knockback。
 
 ### しゃがみキック（再掲・長期設計）
 
@@ -595,8 +594,8 @@ Session が状態を決定し、`DebugFighterVisual` が `FighterSpriteSequence`
 | 項目 | 意味 |
 |---|---|
 | Air Hit / Air Knockback | **空中被弾**側の専用処理。空中攻撃ではない |
-| Ground Kick | **実装済み**。K、地上専用、S/A/R=8/3/4、空中入力予約なし |
-| 将来の空中攻撃 | 仕様未定。空中パンチは対象外 |
+| Ground Kick | **実装済み・値は暫定**。接地中K、S/A/R=9/4/13、空中入力予約なし |
+| Air Kick | **最小検証版・暫定**。空中K、1ジャンプ1回、S/A/R=5/5/10、着地即終了 |
 | Animator / Character Data SO 等 | 別候補 |
 
 ## 16. Ground Kick の現行Unityデバッグ仕様
@@ -605,8 +604,22 @@ Session が状態を決定し、`DebugFighterVisual` が `FighterSpriteSequence`
 - J PunchとGround Kickは相互キャンセルしない。押下が重なる場合はJ Punchを優先する
 - 他攻撃中に押した攻撃を終了後へ予約しない
 - 空中でKを押す／保持したまま着地するだけでは開始しない。いったん離して再押下が必要
-- Ground Kickは Startup 8 / Active 3 / Recovery 4、Damage 14、HitStop 7、HitStun 14、横KB 0.24
+- J Punchは Startup 4 / Active 3 / Recovery 8、Damage 10、HitStop 6、HitStun 12、横KB 0.18
+- Ground Kickは Startup 9 / Active 4 / Recovery 13、Damage 14、HitStop 7、HitStun 14、横KB 0.24
 - local Hit Boxは Facing Right基準 center `(0.95, 0.55)`、half `(0.60, 0.25)`。Facing LeftではParticipantが反転する
 - 1攻撃1Hit。Active中の複数CombatFrameで重なっても追加Damageしない
 - 同一CombatFrameの両方向Hit候補を収集してから解決する。Ground ClashはJPunch同士／Ground Kick同士でEditor実測済み（Damage 0、HitStop、双方反動、攻撃終了）
+
+## 17. Air Kick最小検証版と攻撃Visualの暫定仕様
+
+- `K`押下エッジを一か所で処理し、CombatFrame開始時点で接地中ならGround Kick、すでに空中ならAir Kick
+- 地上Up+KはGround Kick、J+KはJ Punch優先。空中Jは攻撃を開始しない
+- Air Kickは1ジャンプ1回。次のジャンプ開始時に使用済み状態を解除し、着地時は途中Phaseでも即終了
+- J Punch / Ground Kick / Air KickともHit Boxは`DebugAttackData.IsActiveFrame()`がtrueの間だけ有効。Recovery中はVisualに関係なくHit Boxなし
+- Visualと内部状態を分離する。J PunchはAF1〜10がAttack、AF11〜15がIdle。Ground KickはAF1〜19がKick、AF20〜26がIdle。Air KickはStartup / ActiveがAirKick、RecoveryがJumpFall
+- 攻撃Visualを残すRecovery前半は振り切り表現であり、追加判定ではない。VisualがIdle / JumpFallでも内部Recoveryと行動制限はTotalまで継続
+- 地上／空中相手とも現行Hit Box対Hurt Boxの幾何学判定で命中可能。被弾は既存HitStun＋横KBを暫定流用
+- Ground Kick画像をAir Kickへ暫定流用し、Scene / Prefab / SerializeFieldは追加しない
+- Air Hit / Air Knockback / 縦KB / Air Clash / 正式Tradeは未実装。Air KickをAir Hit基盤完成とは扱わない
+- 全フレーム値・Visual境界・Hit Boxは専用モーション完成後に再調整する暫定仕様
 - Clashは通常Hitとは別の`ClashRecoil`状態で表示する。Damage 0、通常HitCount非加算、黄色系専用色、専用Sprite未設定時Idle fallbackをEditor確認済み

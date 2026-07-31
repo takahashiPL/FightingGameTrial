@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## 未コミット: Air Kick最小検証版・通常技暫定調整
+
+- `AirKick`をGround Kickとは別の`DebugAttackId` / `DebugAttackData` / `FighterVisualState`として追加
+- K入力を接地状態で一括分岐。接地中はGround Kick、すでに空中ならAir Kick。地上Up+KはGround Kick、J+KはJ Punch優先、空中Jは攻撃なし
+- Air Kickは1ジャンプ1回、着地即終了。既存Ground Kickの`kickSequence`をコード上で流用し、Scene / Prefab変更なし
+- 暫定値: J Punch `S/A/R=4/3/8`、Ground Kick `9/4/13`、Air Kick `5/5/10`
+- Active中だけHit Boxを有効化。Recovery中は内部行動不能を維持し、J Punch AF8〜10 / Ground Kick AF14〜19は振り切りVisual、後半はIdle。Air Kick RecoveryはJumpFall
+- Play確認: J Punchは軽い技として見やすく、Air Kickは立ち相手へ以前より当てやすい。Ground Kickの見た目改善は限定的で、脚の伸び・シルエットを改善したSprite再制作後に再調整する
+- Air Hit / Air Knockback / 縦Knockback / Air Clash / 正式Tradeは未実装。Air KickをAir Hit基盤完成とは扱わない
+
 ## Ground Clash recoil separation（`78c4e94`）
 
 - 2026-07-30、`unity` / `origin/unity` へ push 済み

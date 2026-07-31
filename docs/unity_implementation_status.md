@@ -1,8 +1,8 @@
 # Unity 実装状況・次工程（段階1〜15到達後）
 
-最終更新: 2026-07-30
+最終更新: 2026-07-31
 対象ブランチ: `unity`
-最新コミット済み HEAD: **`69c9385`**（Document clash recoil state separation）・push 済み
+内容反映済み基準コミット: **`69c9385`**（Document clash recoil state separation）。作業開始時の参照HEADは`cd17c83`で、以下には未コミットC# / Docs変更を含む
 段階14全体（14A+14B）・段階15（攻撃データ化）: **完了・push 済み**
 GC-1 / GC-2（補助改善・正式 Stage ではない）: **完了・push 済み**
 Training Reset 位置・向き復帰: **実装・Editor 確認済み**（正式 Stage 番号なし）
@@ -11,6 +11,7 @@ Visual Sequence + Sprite Sheet 移行: **実装・Editor 確認済み**（正式
 Training Reset 共通 release gate: **実装・Editor 確認済み**（正式 Stage 番号なし）
 Ground Kick + shared hit resolution groundwork: **実装・Editor確認済み・push済み**（正式 Stage 番号なし）
 Ground Clash recoil separation: **実装・Editor確認済み・push済み**（`ClashRecoil`専用状態・黄色系表示・通常HitCount非加算。正式 Stage 番号なし）
+Air Kick最小検証版・攻撃フレーム調整: **実装済み・Play確認済み・未コミット・暫定**（Scene / Prefab変更なし）
 正式な次工程番号: **未定義**（新 Stage 番号は作らない）
 
 このファイルは、Unity 側の**実装済み / 暫定 / 未実装 / 次回候補 / 正式方針**を混同せずに追うための正本です。
@@ -565,7 +566,7 @@ Round / Guard / 複数攻撃などの**機能 Stage とは別枠**。番号「GC
 - `FightDebugScene` は**練習・検証モード**。戦闘コア共通、KO 後処理はモード側（§1.1）
 - Visual: Sequence 再生 + `Fighter_SpriteSheet` **31 sub-sprite**（PPU 39、Idle/Walk/Jump/Punch/Ground Kick 接続済み）。Animator 未使用
 - 飛び越し後 Facing 反転・左向き Walk / Jump / J Punch は Editor 確認済み。J Punch は地上専用（ジャンプ中開始不可）。Air Hit / Air Knockback・ClashRecoil専用Sprite／演出・Dev Build Profiler は未実装／未確認
-- 正式な次 Stage 番号は未定義。候補は順不同（ClashRecoil専用Sprite／演出、Punch 素材改善、Animator、Air Hit/KB、Guard、Character Data SO、対戦モード分離など。将来の空中攻撃は仕様未定）
+- 正式な次 Stage 番号は未定義。候補は順不同（ClashRecoil専用Sprite／演出、Punch / Ground Kick / Air Kick素材改善、Animator、Air Hit/KB、Guard、Character Data SO、対戦モード分離など。Air Kick最小検証版は実装済みだが正式仕様は未確定）
 
 ## 6. Ground Kick + 共通 Hit 解決基盤（2026-07-30）
 
@@ -608,3 +609,57 @@ Round / Guard / 複数攻撃などの**機能 Stage とは別枠**。番号「GC
 - Clashでは通常HitCountを増やさず、JPunch同士／Ground Kick同士とも`P2HitCount=0`を確認
 - 専用Sprite Sequence未設定時はIdleへfallback。Scene差分なし、コード側初期値で同動作を再確認
 - `debugForceP2AttackWithP1ForClashTest`は通常OFF。検証時のみPlay中にON
+
+## 7. Air Kick最小検証版・通常技暫定調整（2026-07-31・未コミット）
+
+### 区分
+
+- **実装済み・Play確認済み**: Air Kick開始、1ジャンプ1回、着地即終了、既存Hit判定への接続、Visual分岐
+- **暫定**: 全フレーム値、Recovery Visual境界、Ground Kick画像流用、空中被弾時の既存HitStun＋横KB流用
+- **未実装**: Air Hit、Air Knockback、縦KB、Air Clash、正式Trade、Air Kick専用Sprite
+
+### 変更C#ファイル
+
+- `Combat/DebugAttackId.cs`: `AirKick`を既存値を変えず末尾追加
+- `Combat/DebugAttackData.cs`: Air Kick専用データ、J Punch / Ground Kick暫定フレーム値
+- `Fighter/DebugFighterAttackState.cs`: Air Kick状態と1ジャンプ1回制限
+- `Fighter/FighterVisualState.cs`: `AirKick`を末尾追加
+- `Fighter/DebugFighterVisual.cs`: AirKickから既存`kickSequence`を流用
+- `Simulation/SimulationSession.cs`: K入力分岐、着地終了、Phase別Visual、HUD / Console識別
+
+### 現行暫定値
+
+| 攻撃 | Startup | Active | Recovery | Total | Damage | HitStop | HitStun | 横KB |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| J Punch | 4 | 3 | 8 | 15 | 10 | 6 | 12 | 0.18 |
+| Ground Kick | 9 | 4 | 13 | 26 | 14 | 7 | 14 | 0.24 |
+| Air Kick | 5 | 5 | 10 | 20 | 14 | 7 | 14 | 0.24 |
+
+KB減速度とlocal Hit Box値は従来値を維持。Hit Boxは全技ともActive中だけ有効。
+
+### 入力・状態
+
+- CombatFrame開始時点で接地中のKはGround Kick、すでに空中ならAir Kick
+- 地上Up+KはGround Kick。J+KはJ Punch優先。空中Jは攻撃なし
+- Air Kickは1ジャンプ1回。上昇・頂点・下降で開始可能、入力予約なし、着地で途中終了
+- 地上／空中相手とも幾何学的なHit Box対Hurt Box重なりで命中可能
+- Recovery中は`IsActionPlaying`を維持し、新しい攻撃・ジャンプを禁止
+
+### Visualと内部Recovery
+
+| 攻撃 | 攻撃Visual | Recovery後半Visual | 内部状態 |
+|---|---|---|---|
+| J Punch | AF1〜10 Attack（AF8〜10は振り切り） | AF11〜15 Idle | AF15終了までRecovery |
+| Ground Kick | AF1〜19 Kick（AF14〜19は振り切り） | AF20〜26 Idle | AF26終了までRecovery |
+| Air Kick | Startup / ActiveはAirKick | RecoveryはJumpFall | 着地またはTotalまでRecovery |
+
+Visualが攻撃姿勢でもRecovery中のHit Boxは無効。VisualがIdle / JumpFallへ戻っても内部Recoveryと行動制限は継続する。
+
+### Play確認と評価
+
+- J Punch: 以前より見やすく、軽い技として暫定採用候補
+- Ground Kick: フレーム調整後も見た目改善は限定的。コード不具合と断定せず、Kick Spriteの脚の伸び・シルエット不足の可能性を記録
+- Air Kick: `5/5/10`へ調整後、以前より立ち相手へ当てやすい
+- Ground Kickはさらに数値だけ遅くせず、脚を伸ばした専用Spriteへ再制作後に再調整する
+- Air Kick専用モーション完成後、S/A/R、Hit Box、表示Sprite範囲を再調整する
+- Scene / Prefab変更なし。現在値は正式確定値ではない

@@ -36,7 +36,7 @@ GC-2（Editor）: `DebugHudView.Update` 約17.2 KB → 約3.2 KB / frame。Devel
 ## Unity 実装の到達点（要約）
 
 ブランチ `unity` 上で、**段階1〜15まで完了**しています。
-最新コミット済み HEAD: **`69c9385`**（Document clash recoil state separation）・`origin/unity` へ push 済み
+内容反映済み基準コミット: **`69c9385`**（Document clash recoil state separation）。以後の到達点には未コミット変更を含むため、現在HEADは `git log -1` で確認する。
 段階14全体（14A+14B）・段階15（J Punch 攻撃データ化）: **完了・push 済み**（SO 化は見送り）。
 GC-1 / GC-2（補助改善・正式 Stage ではない）: **完了・push 済み**。
 Training Reset 位置・向き復帰: **実装・Editor 確認済み**（正式 Stage 番号なし）。
@@ -48,9 +48,9 @@ Training Reset 共通 release gate（全操作 release まで入力抑制）: **
 
 | 区分 | 内容 |
 |---|---|
-| **実装済み** | 60Hz SimulationTick、Pause/Step、HUD（左上状態／左下操作・JPunch Data）、HitStop、入力、左右移動、Facing分離、2体共通 Participant / AttackState / HitState、Push Box、壁際 Push 再配分、Box 可視化、Hit×Hurt 重なり判定、Jパンチ、1攻撃1Hit、Hit時6F HitStop、HitStun 12CF・被Hit表示、横ノックバック、HP/Damage（max100・J Punch10）、**KO状態・遷移（Life表示）**、**`DebugAttackData` による J Punch / Ground Kick 攻撃設定正本**、**Training Reset（R）: 戦闘状態＋論理位置 X/Y・ジャンプ状態・Facing を Scene 開始時へ復帰**、**共通 release gate（全ゲーム操作を一度離すまで有効入力 Neutral）**、**Visual Sequence（Idle 8 / Walk 8 / Jump 8 / Punch 2 / Kick 5 / Attack / Kick / ClashRecoil / JumpStart / Rise / Apex / Fall / Landing / HitStun / KO）+ `Fighter_SpriteSheet` 31 sub-sprite（GUID `dcb7851d129f2305be49fac973bf47b4`、PPU 39）**、**ジャンプ基盤（Neutral / Forward / Backward、キャラ別 Min/Max 高さ・時間・距離、押下時間補間、CombatFrame LogicalY 軌道、飛び越し時 Push skip、Jump 計測ログ）** |
-| **暫定** | Push 等分＋壁際再配分。攻撃数値はコード内不変データ（SO 未使用）。KO 視覚は色変更のみ（優先: HitStun赤 > KO暗色 > 通常Tint）。Motor minX/maxX（±7）。同一 CombatFrame の両方向 Hit 候補収集と Ground Clash 解決を実装し、JPunch同士／Ground Kick同士でEditor実測済み（Damage 0、HitStop、双方反動、攻撃終了）。通常は P2 Neutral、Scene の検証フラグは OFF。Clashは通常Hitから分離した`ClashRecoil`状態を使い、黄色系の専用色・Damage 0・通常HitCount非加算をEditor確認済み。専用Spriteは未設定でIdleへfallback。見た目は Sequence による Sprite 差し替え（Animator 未使用）。**Punch は素材 2 枚のみ（Recovery 専用コマなし）**。ジャンプ数値はコード内 `FighterJumpSettings`（正式 Character Data SO ではない）。実測高さは設定 Min/Max より少し上回る場合あり |
-| **未実装（方針確定含む）** | 対戦モード進行（Round/勝敗/WIN・LOSE/タイマー等）、HPバー、Guard、壁バウンド等、Animator + Animation Clip、**Air Hit / Air Knockback（空中被弾専用・空中攻撃ではない）**、正式 Character Data ScriptableObject、複数 Hurt/Hit Box、攻撃データ SO 化（要否は後続判断）、複数攻撃・コンボ・Cancel、Punch 3 枚以上への素材改善。**将来の空中攻撃は仕様未定（空中パンチは採用しない）** |
+| **実装済み** | 60Hz SimulationTick、Pause/Step、HUD、HitStop、入力、左右移動、Facing、Participant / AttackState / HitState、Push Box、Box可視化、Hit×Hurt判定、J Punch、Ground Kick、**Air Kick最小検証版**、1攻撃1Hit、横ノックバック、HP/Damage、KO、Training Reset、Visual Sequence、ジャンプ基盤 |
+| **暫定** | J Punch `4/3/8`、Ground Kick `9/4/13`、Air Kick `5/5/10`。Active中だけHit Boxを出す。J PunchはAF8〜10、Ground KickはAF14〜19まで振り切りVisualを残し、後半はIdleへ戻すが内部Recoveryは継続。Air Kickは空中K・1ジャンプ1回・着地即終了、既存Kick画像を流用し、RecoveryはJumpFall表示。Ground KickはPlay確認後も見た目改善が限定的で、脚の伸び・シルエットを改善したSprite再制作後に再調整する |
+| **未実装（方針確定含む）** | 対戦モード進行、HPバー、Guard、Animator、正式Character Data SO、複数Hit/Hurt Box、コンボ・Cancel、**Air Hit / Air Knockback・縦Knockback・Air Clash・正式Trade**。Air Kickは空中攻撃の最小検証であり、Air Hit基盤完成ではない |
 
 詳細・次工程は **`docs/unity_implementation_status.md`** を正とする。
 ジャンプ・Visual・Reset gate は同ファイル §1.1・§1.2 および教材 §17.7〜§17.9。
@@ -123,7 +123,7 @@ Git 管理外: `Game/Library`、`Temp`、`Logs`、`UserSettings`、`obj` など
 1. Punch 3 枚以上への素材改善（Recovery 含む）
 2. ClashRecoil専用Sprite／演出の追加（現在は専用色＋Idle fallback）
 3. Animator + Animation Clip
-4. Air Hit / Air Knockback（**空中被弾**専用。空中攻撃とは別）
+4. Air Hit / Air Knockback（**空中被弾**専用。実装済みAir Kickとは別）
 5. Guard
 6. Character Data ScriptableObject 化（ジャンプ設定の正式データ化含む）
 7. ジャンプ数値の調整（現状の実測値を踏まえたチューニング）
@@ -132,7 +132,7 @@ Git 管理外: `Game/Library`、`Temp`、`Logs`、`UserSettings`、`obj` など
 10. 既存残課題: KB壁停止、壁バウンド、壁やられ、Corner、HPバー、複数攻撃・バッファ・Cancel、攻撃データ SO 化（必要時）
 11. 2P入力/AI時の実操作確認（KO中移動・攻撃禁止、P1被Hit・左方向KB など）
 
-**混同禁止**: J Punch は地上専用（ジャンプ中開始不可）。将来の空中攻撃は仕様未定で、空中パンチは対象外。
+**混同禁止**: J Punch / Ground Kickは地上専用、Air Kickは空中K専用。空中Jは採用しない。Air KickとAir Hit / Air Knockbackは別機能。
 
 ジャンプ基盤・Visual Sequence / Sprite Sheet・計測ログ・Training Reset 共通 release gate・飛び越し Facing は**実装済み**（未実装候補からは外す）。詳細は `docs/unity_implementation_status.md`。
 
@@ -179,7 +179,7 @@ Unity_FightingGameTrial
 ## 仮値・未確定（要約）
 
 暫定値: JustGuardWindow=3、Damage、Stun、Pushback、Jump移動量、LandingRecoveryフレーム数、デバッグ用 attackRange=1.35 など。
-未確定: 多段技、必殺技、キャラ差、高度な壁際補正、将来の空中攻撃（種類未定・空中パンチは対象外）、Air Hit / Air Knockback。
+未確定: 多段技、必殺技、キャラ差、高度な壁際補正、Air Kick正式仕様・専用Sprite、Air Hit / Air Knockback。
 詳細は `docs/rules.md` §0。
 
 ## 主要仕様（要約）
@@ -205,3 +205,15 @@ Unity_FightingGameTrial
 - Sprite: `Fighter_Kick_00`〜`_04`、3 CombatFrame/枚、Loop OFF、Hold Last Frame ON（P1/P2）
 - Editor確認: 通常 Hit、1攻撃1Hit、14 damage、HitStop、ノックバック、左右向き、空中開始禁止、Punch/Kick相互キャンセルなし
 - Ground ClashはP2同時攻撃デバッグ経路でEditor実測済み。JPunch同士／Ground Kick同士とも Damage 0、HitStop、双方反動、攻撃終了、Idle復帰を確認。コミット`78c4e94`で通常Hitから`ClashRecoil`へ分離し、黄色系専用色、`P2HitCount=0`維持、専用Sprite未設定時のIdle fallbackを確認済み
+
+上記`8/3/4`はコミット`bc80ddb`時点の履歴値。現在の未コミット暫定値は、J Punch `4/3/8`、Ground Kick `9/4/13`、Air Kick `5/5/10`。
+
+## Air Kick最小検証版・攻撃フレーム調整（未コミット）
+
+- 空中で新しく`K`を押すとAir Kick。CombatFrame開始時点で接地中ならGround Kick、すでに空中ならAir Kick
+- 地上`Up+K`はGround Kick、`J+K`はJ Punch優先、空中Jは攻撃なし
+- Air Kickは1ジャンプ1回。着地時にStartup / Active / Recovery途中でも即終了
+- 地上／空中相手とも既存Hit Box対Hurt Boxの幾何学判定で命中可能。被弾は既存HitStun＋横KBを暫定流用
+- Scene / Prefab変更なし。`FighterVisualState.AirKick`は既存`kickSequence`をコード上で流用
+- Play確認評価: J Punchは軽い技として見やすくなった。Air Kickは`5/5/10`で立ち相手へ当てやすくなった。Ground Kickは見た目改善が限定的で、コード不具合と断定せずSpriteの脚の伸び・シルエット不足を再制作候補とする
+- Air Hit / Air Knockback / 縦KB / Air Clash / 正式Tradeは未実装

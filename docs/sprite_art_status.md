@@ -46,7 +46,7 @@
 | Walk | 8 コマ（WalkF / WalkB 共有） | **接続済み・確認 OK** |
 | Jump | Start=00 / Rise=01–02 / Apex=03 / Fall=04–05 / Landing=06–07 | **接続済み・確認 OK** |
 | Punch | 2 コマ（Attack） | **接続済み・確認 OK**（Recovery 専用コマなし・暫定） |
-| Kick | `Fighter_Kick_00` … `_04` | **Ground Kickへ接続済み・Editor確認済み** |
+| Kick | `Fighter_Kick_00` … `_04` | **Ground Kickへ接続済み。Air Kick最小検証版でも暫定流用** |
 
 詳細な実装接続は `docs/unity_implementation_status.md` §1.1。
 
@@ -70,7 +70,9 @@
 - Alpha 全体重心だけでは手足・帯・髪に引っ張られる。体幹・腰帯を基準にする
 - `framesPerSprite` は FPS ではなく、**1 枚を何 CombatFrame 表示するか**
 - JumpRise / JumpFall は `loop=false` + `holdLastFrame=true` で空中姿勢の往復を防止
-- Punch は素材 2 枚のみ（Recovery 専用コマなし）。Kick は原画上 knee-kick 寄りの見え方を含む。Ground Kickへ接続済みだが、素材自体は暫定で必要なら再制作する
+- Punch は素材2枚のみでRecovery専用コマなし。現行はRecovery前半まで振り切り表示し、後半をIdleへ戻す
+- Kick は原画上knee-kick寄りで、脚の伸び・シルエット不足がGround Kickの見た目改善を制限している可能性がある。コード不具合と断定せず再制作候補とする
+- Air Kick専用Spriteは未作成。現在はGround Kickの5枚をコード上で流用する
 - 旧・新シート並存のままコミットせず、参照検索後に新 GUID を維持して正本名へ一本化した
 - 旧素材は新参照確認前に削除しない
 
@@ -82,7 +84,8 @@
 
 ## 今後の改善候補
 
-- Ground Kick の見た目／Hit Box再調整（必要時）
+- Ground Kickをもっと脚が伸びるシルエットへ再制作し、その後にフレーム／Hit Boxを再調整
+- Air Kick専用モーションを作成し、Startup / Active / Recovery、Hit Box、表示Sprite範囲を再調整
 - Punch 3 枚以上（Recovery 含む）への素材改善
 - 必要なら攻撃・歩行素材の再制作
 
@@ -102,8 +105,16 @@
 
 - P1/P2 `DebugFighterVisual.kickSequence` に5枚を同順で接続
 - 3 CombatFrame/枚、Loop OFF、Hold Last Frame ON
-- Gameplay側の Active は AF 8〜10 付近となり、伸びた蹴りポーズと赤い Hit Box が概ね一致するよう調整
+- 現行暫定値ではGround Kick ActiveはAF10〜13。AF14〜19は振り切り表示だけを残し、Hit Boxは無効。AF20〜26はIdle表示
 - 本番清書ではなく、現素材を使った学習・判定確認用の暫定品質
+
+## Air Kick素材流用（2026-07-31・未コミット）
+
+- Air Kick専用Sprite / Sequenceは未作成
+- `FighterVisualState.AirKick`はコード上で既存`kickSequence`を返し、Scene / Prefab / SerializeField変更なし
+- Startup / ActiveはKick素材、RecoveryはJumpFallを表示。VisualがJumpFallでも内部Air Kick Recoveryは継続
+- `5/5/10`への調整後、以前より立ち相手へ当てやすいことをPlay確認
+- 専用モーション完成後にフレーム値、Hit Box、使用Sprite範囲を再調整する
 
 
 ## Ground Clash表示（2026-07-30）
