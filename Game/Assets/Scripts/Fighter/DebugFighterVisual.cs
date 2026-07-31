@@ -58,6 +58,15 @@ namespace FightingGameTrial.Fighter
         [SerializeField]
         private FighterSpriteSequence kickSequence = new FighterSpriteSequence();
 
+        [Tooltip(
+            "Ground Kick 素材の暫定流用を終了し、Air Kick 専用の見た目を設定します。"
+            + " Air Kick の内部攻撃処理とは独立した表示用 Sequence です。"
+            + " Recovery は Simulation 側が JumpFall を選ぶため、Startup / Active の表示にだけ使います。"
+            + " Ground Kick の kickSequence と分離し、地上技の見た目を変更せずに空中技を差し替えます。"
+        )]
+        [SerializeField]
+        private FighterSpriteSequence airKickSequence = new FighterSpriteSequence();
+
         [Tooltip("Ground Clash 専用。未設定なら Idle Sequence へ fallback。")]
         [SerializeField]
         private FighterSpriteSequence clashRecoilSequence = new FighterSpriteSequence();
@@ -173,6 +182,11 @@ namespace FightingGameTrial.Fighter
             if (kickSequence == null || kickSequence.IsValid == false)
             {
                 Debug.LogError("DebugFighterVisual: kickSequence に有効な Sprite がありません。");
+            }
+
+            if (airKickSequence == null || airKickSequence.IsValid == false)
+            {
+                Debug.LogError("DebugFighterVisual: airKickSequence に有効な Sprite がありません。");
             }
 
             ResetToIdle();
@@ -304,9 +318,10 @@ namespace FightingGameTrial.Fighter
                 case FighterVisualState.Kick:
                     return kickSequence;
 
-                // 専用 SerializeField は増やさず、最小検証中は Ground Kick の画像を流用します。
+                // 内部の攻撃状態とは独立した Air Kick 専用の見た目を返します。
+                // Recovery は Simulation 側が JumpFall を選ぶため、これは Startup / Active 用です。
                 case FighterVisualState.AirKick:
-                    return kickSequence;
+                    return airKickSequence;
 
                 case FighterVisualState.ClashRecoil:
                     return clashRecoilSequence;

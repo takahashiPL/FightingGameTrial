@@ -1,100 +1,130 @@
 fileFormatVersion: 2
-guid: dcb7851d129f2305be49fac973bf47b4
+guid: 42345be00e0994144ba94bc5f1362757
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 6416580556862122530
-    second: Fighter_Idle_00
+      213: -8716160954999538037
+    second: FighterRebuilt_Idle_00
   - first:
-      213: 966658086203555024
-    second: Fighter_Idle_01
+      213: 4340239364595024794
+    second: FighterRebuilt_Idle_01
   - first:
-      213: -8293059592220196922
-    second: Fighter_Idle_02
+      213: -8845357007348005554
+    second: FighterRebuilt_Idle_02
   - first:
-      213: 7521787606047754259
-    second: Fighter_Idle_03
+      213: -5349023826991926892
+    second: FighterRebuilt_Idle_03
   - first:
-      213: 7246347419078054826
-    second: Fighter_Idle_04
+      213: -4008406040541973411
+    second: FighterRebuilt_Idle_04
   - first:
-      213: 8927006553526140056
-    second: Fighter_Idle_05
+      213: 4546107596192635574
+    second: FighterRebuilt_Idle_05
   - first:
-      213: 5312931639414449679
-    second: Fighter_Idle_06
+      213: 4775813658300646767
+    second: FighterRebuilt_Idle_06
   - first:
-      213: -5601683446387270787
-    second: Fighter_Idle_07
+      213: 6359124740510967979
+    second: FighterRebuilt_Idle_07
   - first:
-      213: 635353161213487548
-    second: Fighter_Walk_00
+      213: 8163459365179013195
+    second: FighterRebuilt_Walk_00
   - first:
-      213: -7396025626249946679
-    second: Fighter_Walk_01
+      213: 6034646487258793113
+    second: FighterRebuilt_Walk_01
   - first:
-      213: 5964273057507650123
-    second: Fighter_Walk_02
+      213: -1587887800253794857
+    second: FighterRebuilt_Walk_02
   - first:
-      213: -8769634361602214830
-    second: Fighter_Walk_03
+      213: 8868165244981380061
+    second: FighterRebuilt_Walk_03
   - first:
-      213: 9091132549315087878
-    second: Fighter_Walk_04
+      213: 6108620111685548145
+    second: FighterRebuilt_Walk_04
   - first:
-      213: 6854783029718337897
-    second: Fighter_Walk_05
+      213: 2066805042998853020
+    second: FighterRebuilt_Walk_05
   - first:
-      213: -4539027391029690831
-    second: Fighter_Walk_06
+      213: -2603544127704713332
+    second: FighterRebuilt_Walk_06
   - first:
-      213: 4536678039530678905
-    second: Fighter_Walk_07
+      213: 478782826248641029
+    second: FighterRebuilt_Walk_07
   - first:
-      213: 4414090336959396330
-    second: Fighter_Jump_00
+      213: -5704818883953862001
+    second: FighterRebuilt_Jump_00
   - first:
-      213: -8256688541223394905
-    second: Fighter_Jump_01
+      213: -3322466622745022332
+    second: FighterRebuilt_Jump_01
   - first:
-      213: -601119878782111544
-    second: Fighter_Jump_02
+      213: -40419988635412272
+    second: FighterRebuilt_Jump_02
   - first:
-      213: -7307160571792452778
-    second: Fighter_Jump_03
+      213: 3701698054283927720
+    second: FighterRebuilt_Jump_03
   - first:
-      213: -2399908528487463498
-    second: Fighter_Jump_04
+      213: -4983724940400017906
+    second: FighterRebuilt_Jump_04
   - first:
-      213: -220068121490847457
-    second: Fighter_Jump_05
+      213: -5025320162579251629
+    second: FighterRebuilt_Jump_05
   - first:
-      213: 8369401445206851527
-    second: Fighter_Jump_06
+      213: -2038485830698600311
+    second: FighterRebuilt_Jump_06
   - first:
-      213: 6947291798931185141
-    second: Fighter_Jump_07
+      213: -1867135693953888119
+    second: FighterRebuilt_Jump_07
   - first:
-      213: -7363211071436412856
-    second: Fighter_Punch_00
+      213: -9118522239936123828
+    second: FighterRebuilt_Jump_08
   - first:
-      213: 5499136287484261559
-    second: Fighter_Punch_01
+      213: -1572953337059035730
+    second: FighterRebuilt_Punch_00
   - first:
-      213: -6345471646519721461
-    second: Fighter_Kick_00
+      213: 7624963235074082714
+    second: FighterRebuilt_Punch_01
   - first:
-      213: -1609875405021310070
-    second: Fighter_Kick_01
+      213: 8425206343616099878
+    second: FighterRebuilt_Punch_02
   - first:
-      213: 6725173032045786517
-    second: Fighter_Kick_02
+      213: 1431876740914197163
+    second: FighterRebuilt_Kick_00
   - first:
-      213: -8498120603923588613
-    second: Fighter_Kick_03
+      213: -5621247661789151090
+    second: FighterRebuilt_Kick_01
   - first:
-      213: -696088642884363206
-    second: Fighter_Kick_04
+      213: -5428465727997987816
+    second: FighterRebuilt_Kick_02
+  - first:
+      213: -2500040723882086822
+    second: FighterRebuilt_Kick_03
+  - first:
+      213: -7566739854357381069
+    second: FighterRebuilt_Kick_04
+  - first:
+      213: -8741739043812853727
+    second: FighterRebuilt_Kick_05
+  - first:
+      213: -8641941616189844789
+    second: FighterRebuilt_Kick_06
+  - first:
+      213: -927496459846761926
+    second: FighterRebuilt_AirKick_00
+  - first:
+      213: 1312731449266635858
+    second: FighterRebuilt_AirKick_01
+  - first:
+      213: -6742982349113729853
+    second: FighterRebuilt_AirKick_02
+  - first:
+      213: 1468330955030642227
+    second: FighterRebuilt_AirKick_03
+  - first:
+      213: 1616393209198864007
+    second: FighterRebuilt_AirKick_04
+  - first:
+      213: 3065556829245702654
+    second: FighterRebuilt_AirKick_05
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -140,7 +170,7 @@ TextureImporter:
   spriteExtrude: 1
   spriteMeshType: 0
   alignment: 0
-  spritePivot: {x: 0.5, y: 0.212}
+  spritePivot: {x: 0.5, y: 0.5}
   spritePixelsToUnits: 39
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 0
@@ -203,683 +233,903 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Fighter_Idle_00
+      name: FighterRebuilt_Idle_00
       rect:
         serializedVersion: 2
-        x: 74
-        y: 872
-        width: 102
-        height: 116
+        x: 42
+        y: 1000
+        width: 88
+        height: 118
       alignment: 0
-      pivot: {x: 0.5, y: 0}
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData:
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b8e7f18aac9f90780800000000000000
+      internalID: -8716160954999538037
+      vertices: []
+      indices:
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_Idle_01
+      rect:
+        serializedVersion: 2
+        x: 234
+        y: 1000
+        width: 88
+        height: 118
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData:
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a938aded4b0ab3c30800000000000000
+      internalID: 4340239364595024794
+      vertices: []
+      indices:
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_Idle_02
+      rect:
+        serializedVersion: 2
+        x: 428
+        y: 1000
+        width: 86
+        height: 118
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData:
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e458281aaaafe3580800000000000000
+      internalID: -8845357007348005554
+      vertices: []
+      indices:
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_Idle_03
+      rect:
+        serializedVersion: 2
+        x: 620
+        y: 1000
+        width: 86
+        height: 118
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData:
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 491bb017b2374c5b0800000000000000
+      internalID: -5349023826991926892
+      vertices: []
+      indices:
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_Idle_04
+      rect:
+        serializedVersion: 2
+        x: 812
+        y: 1000
+        width: 86
+        height: 118
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData:
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d5437fd81f74f58c0800000000000000
+      internalID: -4008406040541973411
+      vertices: []
+      indices:
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_Idle_05
+      rect:
+        serializedVersion: 2
+        x: 1004
+        y: 1000
+        width: 88
+        height: 118
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData:
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 6ba54cdb5c4071f30800000000000000
+      internalID: 4546107596192635574
+      vertices: []
+      indices:
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_Idle_06
+      rect:
+        serializedVersion: 2
+        x: 1194
+        y: 1000
+        width: 90
+        height: 118
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData:
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f6508780839174240800000000000000
+      internalID: 4775813658300646767
+      vertices: []
+      indices:
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_Idle_07
+      rect:
+        serializedVersion: 2
+        x: 1386
+        y: 1000
+        width: 88
+        height: 118
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData:
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ba8ed886246204850800000000000000
+      internalID: 6359124740510967979
+      vertices: []
+      indices:
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_Walk_00
+      rect:
+        serializedVersion: 2
+        x: 52
+        y: 808
+        width: 96
+        height: 114
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData:
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b48b4df6a0f6a4170800000000000000
+      internalID: 8163459365179013195
+      vertices: []
+      indices:
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_Walk_01
+      rect:
+        serializedVersion: 2
+        x: 248
+        y: 808
+        width: 88
+        height: 112
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData:
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9948e1ad10f5fb350800000000000000
+      internalID: 6034646487258793113
+      vertices: []
+      indices:
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_Walk_02
+      rect:
+        serializedVersion: 2
+        x: 442
+        y: 808
+        width: 82
+        height: 112
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 8717f284ff64b8db7a04971534e76f32
-      internalID: 6416580556862122530
+      spriteID: 7d532ba6570b6f9e0800000000000000
+      internalID: -1587887800253794857
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Fighter_Idle_01
+      name: FighterRebuilt_Walk_03
       rect:
         serializedVersion: 2
-        x: 265
-        y: 872
-        width: 102
-        height: 116
+        x: 634
+        y: 808
+        width: 84
+        height: 114
       alignment: 0
-      pivot: {x: 0.5, y: 0}
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: dc2c7478ffe3f780a0437518717e213e
-      internalID: 966658086203555024
+      spriteID: dd384940e4d021b70800000000000000
+      internalID: 8868165244981380061
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Fighter_Idle_02
+      name: FighterRebuilt_Walk_04
       rect:
         serializedVersion: 2
-        x: 449
-        y: 872
-        width: 102
-        height: 116
+        x: 826
+        y: 808
+        width: 84
+        height: 114
       alignment: 0
-      pivot: {x: 0.5, y: 0}
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 9bb39951daffeeee6384386a90d8f81f
-      internalID: -8293059592220196922
+      spriteID: 178f2d070ad26c450800000000000000
+      internalID: 6108620111685548145
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Fighter_Idle_03
+      name: FighterRebuilt_Walk_05
       rect:
         serializedVersion: 2
-        x: 630
-        y: 871
-        width: 102
-        height: 116
+        x: 1016
+        y: 808
+        width: 86
+        height: 112
       alignment: 0
-      pivot: {x: 0.5, y: 0}
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 04ce60c9fd72fa51f6cf5df6be5b06b1
-      internalID: 7521787606047754259
+      spriteID: c9dbee77c34ceac10800000000000000
+      internalID: 2066805042998853020
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Fighter_Idle_04
+      name: FighterRebuilt_Walk_06
       rect:
         serializedVersion: 2
-        x: 813
-        y: 872
-        width: 102
-        height: 116
+        x: 1210
+        y: 808
+        width: 84
+        height: 112
       alignment: 0
-      pivot: {x: 0.5, y: 0}
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: c92dc03b78ab134fc075c98ae7f3c836
-      internalID: 7246347419078054826
+      spriteID: c873b17f86a5edbd0800000000000000
+      internalID: -2603544127704713332
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Fighter_Idle_05
+      name: FighterRebuilt_Walk_07
+      rect:
+        serializedVersion: 2
+        x: 1400
+        y: 808
+        width: 88
+        height: 114
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 50a9b1b917af4a600800000000000000
+      internalID: 478782826248641029
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_Jump_00
+      rect:
+        serializedVersion: 2
+        x: 40
+        y: 616
+        width: 92
+        height: 120
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f8a5df1537964d0b0800000000000000
+      internalID: -5704818883953862001
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_Jump_01
+      rect:
+        serializedVersion: 2
+        x: 240
+        y: 616
+        width: 86
+        height: 114
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 480f035b53a34e1d0800000000000000
+      internalID: -3322466622745022332
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_Jump_02
+      rect:
+        serializedVersion: 2
+        x: 426
+        y: 626
+        width: 94
+        height: 102
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0d89f870c36607ff0800000000000000
+      internalID: -40419988635412272
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_Jump_03
+      rect:
+        serializedVersion: 2
+        x: 610
+        y: 610
+        width: 108
+        height: 116
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8a0295794c21f5330800000000000000
+      internalID: 3701698054283927720
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_Jump_04
+      rect:
+        serializedVersion: 2
+        x: 804
+        y: 620
+        width: 118
+        height: 96
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e0eb335529046dab0800000000000000
+      internalID: -4983724940400017906
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_Jump_05
       rect:
         serializedVersion: 2
         x: 994
-        y: 872
-        width: 102
+        y: 624
+        width: 114
+        height: 92
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 35efadaffe9724ab0800000000000000
+      internalID: -5025320162579251629
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_Jump_06
+      rect:
+        serializedVersion: 2
+        x: 1194
+        y: 614
+        width: 96
+        height: 114
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 988fa85ffe7d5b3e0800000000000000
+      internalID: -2038485830698600311
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_Jump_07
+      rect:
+        serializedVersion: 2
+        x: 1404
+        y: 624
+        width: 86
+        height: 102
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9801d669af99616e0800000000000000
+      internalID: -1867135693953888119
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_Jump_08
+      rect:
+        serializedVersion: 2
+        x: 1594
+        y: 622
+        width: 84
+        height: 104
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c4cab14b550847180800000000000000
+      internalID: -9118522239936123828
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_Punch_00
+      rect:
+        serializedVersion: 2
+        x: 46
+        y: 424
+        width: 82
+        height: 112
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ea5b458164fbb2ae0800000000000000
+      internalID: -1572953337059035730
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_Punch_01
+      rect:
+        serializedVersion: 2
+        x: 234
+        y: 422
+        width: 80
+        height: 110
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a97010cd9af41d960800000000000000
+      internalID: 7624963235074082714
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_Punch_02
+      rect:
+        serializedVersion: 2
+        x: 428
+        y: 424
+        width: 80
+        height: 110
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 626fa96e7885ce470800000000000000
+      internalID: 8425206343616099878
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_Kick_00
+      rect:
+        serializedVersion: 2
+        x: 46
+        y: 228
+        width: 84
+        height: 118
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ba2b5583f4c0fd310800000000000000
+      internalID: 1431876740914197163
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_Kick_01
+      rect:
+        serializedVersion: 2
+        x: 232
+        y: 228
+        width: 84
+        height: 120
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e800094c8015df1b0800000000000000
+      internalID: -5621247661789151090
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_Kick_02
+      rect:
+        serializedVersion: 2
+        x: 426
+        y: 224
+        width: 92
+        height: 124
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8143c4f7e273aa4b0800000000000000
+      internalID: -5428465727997987816
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_Kick_03
+      rect:
+        serializedVersion: 2
+        x: 616
+        y: 222
+        width: 106
+        height: 126
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a5e6ff815321e4dd0800000000000000
+      internalID: -2500040723882086822
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_Kick_04
+      rect:
+        serializedVersion: 2
+        x: 802
+        y: 222
+        width: 106
+        height: 122
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 330cc39513a8df690800000000000000
+      internalID: -7566739854357381069
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_Kick_05
+      rect:
+        serializedVersion: 2
+        x: 1006
+        y: 226
+        width: 78
+        height: 124
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 1283f56c7aa1fa680800000000000000
+      internalID: -8741739043812853727
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_Kick_06
+      rect:
+        serializedVersion: 2
+        x: 1194
+        y: 226
+        width: 80
+        height: 124
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: bc2d65513e7a11880800000000000000
+      internalID: -8641941616189844789
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_AirKick_00
+      rect:
+        serializedVersion: 2
+        x: 66
+        y: 38
+        width: 54
+        height: 114
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a32c66442eed023f0800000000000000
+      internalID: -927496459846761926
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_AirKick_01
+      rect:
+        serializedVersion: 2
+        x: 262
+        y: 38
+        width: 70
+        height: 110
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 25485074c42c73210800000000000000
+      internalID: 1312731449266635858
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_AirKick_02
+      rect:
+        serializedVersion: 2
+        x: 442
+        y: 52
+        width: 86
+        height: 88
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3ccd852874d1c62a0800000000000000
+      internalID: -6742982349113729853
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_AirKick_03
+      rect:
+        serializedVersion: 2
+        x: 626
+        y: 38
+        width: 96
+        height: 104
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 33ebf4b593f806410800000000000000
+      internalID: 1468330955030642227
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: FighterRebuilt_AirKick_04
+      rect:
+        serializedVersion: 2
+        x: 830
+        y: 36
+        width: 76
         height: 116
       alignment: 0
-      pivot: {x: 0.5, y: 0}
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: ea37a2988dab5d400ed01a2e612274e1
-      internalID: 8927006553526140056
+      spriteID: 786e6ab4f059e6610800000000000000
+      internalID: 1616393209198864007
       vertices: []
       indices: 
       edges: []
       weights: []
     - serializedVersion: 2
-      name: Fighter_Idle_06
+      name: FighterRebuilt_AirKick_05
       rect:
         serializedVersion: 2
-        x: 1174
-        y: 871
-        width: 102
-        height: 116
+        x: 1030
+        y: 36
+        width: 62
+        height: 118
       alignment: 0
-      pivot: {x: 0.5, y: 0}
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: d557c46baa95520dcf00b8c10e9404f2
-      internalID: 5312931639414449679
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Fighter_Idle_07
-      rect:
-        serializedVersion: 2
-        x: 1354
-        y: 872
-        width: 102
-        height: 116
-      alignment: 0
-      pivot: {x: 0.5, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 9dfb3e0479a2b2b541106cd2874d60e4
-      internalID: -5601683446387270787
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Fighter_Walk_00
-      rect:
-        serializedVersion: 2
-        x: 78
-        y: 678
-        width: 96
-        height: 115
-      alignment: 0
-      pivot: {x: 0.5, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 68d90c2a5158cfd6f98b4ec113817666
-      internalID: 635353161213487548
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Fighter_Walk_01
-      rect:
-        serializedVersion: 2
-        x: 269
-        y: 679
-        width: 96
-        height: 115
-      alignment: 0
-      pivot: {x: 0.5, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 895166ccff5bf92f55e8d31d01941889
-      internalID: -7396025626249946679
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Fighter_Walk_02
-      rect:
-        serializedVersion: 2
-        x: 453
-        y: 680
-        width: 96
-        height: 115
-      alignment: 0
-      pivot: {x: 0.5, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 8fb53dbd6d74c70458b8bcae40ff5a64
-      internalID: 5964273057507650123
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Fighter_Walk_03
-      rect:
-        serializedVersion: 2
-        x: 638
-        y: 679
-        width: 96
-        height: 115
-      alignment: 0
-      pivot: {x: 0.5, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 3e588a49aff48ad74bc8dda45b203917
-      internalID: -8769634361602214830
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Fighter_Walk_04
-      rect:
-        serializedVersion: 2
-        x: 816
-        y: 680
-        width: 96
-        height: 115
-      alignment: 0
-      pivot: {x: 0.5, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 0bff2036cd7c39f3a9a3dca7ed19d3e6
-      internalID: 9091132549315087878
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Fighter_Walk_05
-      rect:
-        serializedVersion: 2
-        x: 998
-        y: 679
-        width: 96
-        height: 115
-      alignment: 0
-      pivot: {x: 0.5, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 3f75e5f528f36d021d1e8f850221fa90
-      internalID: 6854783029718337897
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Fighter_Walk_06
-      rect:
-        serializedVersion: 2
-        x: 1180
-        y: 679
-        width: 96
-        height: 115
-      alignment: 0
-      pivot: {x: 0.5, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 0a66b5d4046b7b8db71760eb71d6d8d8
-      internalID: -4539027391029690831
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Fighter_Walk_07
-      rect:
-        serializedVersion: 2
-        x: 1359
-        y: 679
-        width: 96
-        height: 115
-      alignment: 0
-      pivot: {x: 0.5, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 2419ab802e3b8349754684fd0fbb510c
-      internalID: 4536678039530678905
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Fighter_Jump_00
-      rect:
-        serializedVersion: 2
-        x: 67
-        y: 491
-        width: 120
-        height: 105
-      alignment: 0
-      pivot: {x: 0.5, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 06335a6a617a82fbf4226564fdc50413
-      internalID: 4414090336959396330
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Fighter_Jump_01
-      rect:
-        serializedVersion: 2
-        x: 258
-        y: 491
-        width: 120
-        height: 105
-      alignment: 0
-      pivot: {x: 0.5, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 95b2459c4235144d2f94c1b4c17e990e
-      internalID: -8256688541223394905
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Fighter_Jump_02
-      rect:
-        serializedVersion: 2
-        x: 447
-        y: 490
-        width: 120
-        height: 105
-      alignment: 0
-      pivot: {x: 0.5, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 4f78fbe5a4ba128842ca30f7b9635b0e
-      internalID: -601119878782111544
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Fighter_Jump_03
-      rect:
-        serializedVersion: 2
-        x: 632
-        y: 495
-        width: 120
-        height: 105
-      alignment: 0
-      pivot: {x: 0.5, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: b417f5e5d098e2800d92370ac26d8904
-      internalID: -7307160571792452778
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Fighter_Jump_04
-      rect:
-        serializedVersion: 2
-        x: 814
-        y: 498
-        width: 120
-        height: 105
-      alignment: 0
-      pivot: {x: 0.5, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: f510fdfbb72b4680cc494c1a6c7e1e9b
-      internalID: -2399908528487463498
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Fighter_Jump_05
-      rect:
-        serializedVersion: 2
-        x: 990
-        y: 497
-        width: 120
-        height: 105
-      alignment: 0
-      pivot: {x: 0.5, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 02b9397e448346af359205a397464191
-      internalID: -220068121490847457
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Fighter_Jump_06
-      rect:
-        serializedVersion: 2
-        x: 1166
-        y: 491
-        width: 120
-        height: 105
-      alignment: 0
-      pivot: {x: 0.5, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 143b206712bb3f14977df9918742973b
-      internalID: 8369401445206851527
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Fighter_Jump_07
-      rect:
-        serializedVersion: 2
-        x: 1356
-        y: 494
-        width: 120
-        height: 105
-      alignment: 0
-      pivot: {x: 0.5, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: ea4a210ea6519c06d30d91e7d36a4b5d
-      internalID: 6947291798931185141
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Fighter_Punch_00
-      rect:
-        serializedVersion: 2
-        x: 77
-        y: 298
-        width: 110
-        height: 113
-      alignment: 0
-      pivot: {x: 0.5, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: e93a6af4c40c5b4aae296e0a36a10787
-      internalID: -7363211071436412856
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Fighter_Punch_01
-      rect:
-        serializedVersion: 2
-        x: 270
-        y: 298
-        width: 110
-        height: 113
-      alignment: 0
-      pivot: {x: 0.5, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: b9468b9fa0c42d093c0780187f3db8ff
-      internalID: 5499136287484261559
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Fighter_Kick_00
-      rect:
-        serializedVersion: 2
-        x: 78
-        y: 109
-        width: 108
-        height: 117
-      alignment: 0
-      pivot: {x: 0.5, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: cc83df8cdf2f7c51fd6d8a8a49ff1325
-      internalID: -6345471646519721461
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Fighter_Kick_01
-      rect:
-        serializedVersion: 2
-        x: 265
-        y: 109
-        width: 108
-        height: 117
-      alignment: 0
-      pivot: {x: 0.5, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 8c645ca42e249ecd444e937e4c593e85
-      internalID: -1609875405021310070
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Fighter_Kick_02
-      rect:
-        serializedVersion: 2
-        x: 445
-        y: 110
-        width: 108
-        height: 117
-      alignment: 0
-      pivot: {x: 0.5, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: c876f98af9ae989b5b005afa0950c650
-      internalID: 6725173032045786517
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Fighter_Kick_03
-      rect:
-        serializedVersion: 2
-        x: 647
-        y: 109
-        width: 108
-        height: 117
-      alignment: 0
-      pivot: {x: 0.5, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 05b06996630e080e2803e88343f7433e
-      internalID: -8498120603923588613
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Fighter_Kick_04
-      rect:
-        serializedVersion: 2
-        x: 834
-        y: 107
-        width: 108
-        height: 117
-      alignment: 0
-      pivot: {x: 0.5, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: c05201f77583c45b14bdd172a47ecaf6
-      internalID: -696088642884363206
+      spriteID: ef186f5b1bb0b8a20800000000000000
+      internalID: 3065556829245702654
       vertices: []
       indices: 
       edges: []
@@ -888,7 +1138,7 @@ TextureImporter:
     customData: 
     physicsShape: []
     bones: []
-    spriteID: 1ad118afd10c38570f1887fb6ac882bb
+    spriteID:
     internalID: 0
     vertices: []
     indices: 
@@ -896,41 +1146,49 @@ TextureImporter:
     weights: []
     secondaryTextures: []
     spriteCustomMetadata:
-      entries:
-      - key: SpriteEditor.SliceSettings
-        value: '{"sliceOnImport":false,"gridCellCount":{"x":8.0,"y":5.0},"gridSpriteSize":{"x":192.0,"y":192.0},"gridSpriteOffset":{"x":0.0,"y":0.0},"gridSpritePadding":{"x":0.0,"y":0.0},"pivot":{"x":0.5,"y":0.0},"pivotPixels":{"x":0.0,"y":0.0},"autoSlicingMethod":0,"spriteAlignment":7,"pivotUnitMode":0,"slicingType":1,"keepEmptyRects":false,"isAlternate":false}'
+      entries: []
     nameFileIdTable:
-      Fighter_Idle_00: 6416580556862122530
-      Fighter_Idle_01: 966658086203555024
-      Fighter_Idle_02: -8293059592220196922
-      Fighter_Idle_03: 7521787606047754259
-      Fighter_Idle_04: 7246347419078054826
-      Fighter_Idle_05: 8927006553526140056
-      Fighter_Idle_06: 5312931639414449679
-      Fighter_Idle_07: -5601683446387270787
-      Fighter_Jump_00: 4414090336959396330
-      Fighter_Jump_01: -8256688541223394905
-      Fighter_Jump_02: -601119878782111544
-      Fighter_Jump_03: -7307160571792452778
-      Fighter_Jump_04: -2399908528487463498
-      Fighter_Jump_05: -220068121490847457
-      Fighter_Jump_06: 8369401445206851527
-      Fighter_Jump_07: 6947291798931185141
-      Fighter_Kick_00: -6345471646519721461
-      Fighter_Kick_01: -1609875405021310070
-      Fighter_Kick_02: 6725173032045786517
-      Fighter_Kick_03: -8498120603923588613
-      Fighter_Kick_04: -696088642884363206
-      Fighter_Punch_00: -7363211071436412856
-      Fighter_Punch_01: 5499136287484261559
-      Fighter_Walk_00: 635353161213487548
-      Fighter_Walk_01: -7396025626249946679
-      Fighter_Walk_02: 5964273057507650123
-      Fighter_Walk_03: -8769634361602214830
-      Fighter_Walk_04: 9091132549315087878
-      Fighter_Walk_05: 6854783029718337897
-      Fighter_Walk_06: -4539027391029690831
-      Fighter_Walk_07: 4536678039530678905
+      FighterRebuilt_AirKick_00: -927496459846761926
+      FighterRebuilt_AirKick_01: 1312731449266635858
+      FighterRebuilt_AirKick_02: -6742982349113729853
+      FighterRebuilt_AirKick_03: 1468330955030642227
+      FighterRebuilt_AirKick_04: 1616393209198864007
+      FighterRebuilt_AirKick_05: 3065556829245702654
+      FighterRebuilt_Idle_00: -8716160954999538037
+      FighterRebuilt_Idle_01: 4340239364595024794
+      FighterRebuilt_Idle_02: -8845357007348005554
+      FighterRebuilt_Idle_03: -5349023826991926892
+      FighterRebuilt_Idle_04: -4008406040541973411
+      FighterRebuilt_Idle_05: 4546107596192635574
+      FighterRebuilt_Idle_06: 4775813658300646767
+      FighterRebuilt_Idle_07: 6359124740510967979
+      FighterRebuilt_Jump_00: -5704818883953862001
+      FighterRebuilt_Jump_01: -3322466622745022332
+      FighterRebuilt_Jump_02: -40419988635412272
+      FighterRebuilt_Jump_03: 3701698054283927720
+      FighterRebuilt_Jump_04: -4983724940400017906
+      FighterRebuilt_Jump_05: -5025320162579251629
+      FighterRebuilt_Jump_06: -2038485830698600311
+      FighterRebuilt_Jump_07: -1867135693953888119
+      FighterRebuilt_Jump_08: -9118522239936123828
+      FighterRebuilt_Kick_00: 1431876740914197163
+      FighterRebuilt_Kick_01: -5621247661789151090
+      FighterRebuilt_Kick_02: -5428465727997987816
+      FighterRebuilt_Kick_03: -2500040723882086822
+      FighterRebuilt_Kick_04: -7566739854357381069
+      FighterRebuilt_Kick_05: -8741739043812853727
+      FighterRebuilt_Kick_06: -8641941616189844789
+      FighterRebuilt_Punch_00: -1572953337059035730
+      FighterRebuilt_Punch_01: 7624963235074082714
+      FighterRebuilt_Punch_02: 8425206343616099878
+      FighterRebuilt_Walk_00: 8163459365179013195
+      FighterRebuilt_Walk_01: 6034646487258793113
+      FighterRebuilt_Walk_02: -1587887800253794857
+      FighterRebuilt_Walk_03: 8868165244981380061
+      FighterRebuilt_Walk_04: 6108620111685548145
+      FighterRebuilt_Walk_05: 2066805042998853020
+      FighterRebuilt_Walk_06: -2603544127704713332
+      FighterRebuilt_Walk_07: 478782826248641029
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
