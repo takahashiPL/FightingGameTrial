@@ -123,7 +123,7 @@
 
 - `FighterRebuilt_AirKick_00`〜`05`を`DebugFighterVisual.airKickSequence`へ接続済み
 - 6枚、1 CombatFrame/枚、Loop OFF、Hold Last Frame ON。Startup＋Active 10Fのうち6F表示後は最終コマを保持し、RecoveryでJumpFallへ戻る
-- Ground Kickの`kickSequence`とは分離済み。Air Kick専用Flying Kickが実際に表示されることはユーザー操作で確認済み
+- Ground Kickの`kickSequence`とは分離済み。Air Kick専用Flying Kickが実際に表示されることはユーザー操作で確認済み（Simulation上のP2 AirKick Assist／Air双方未適用検証とは別。詳細は`unity_implementation_status.md`）
 - 専用絵の接続は完了したが、S/A/R `5/5/10`、Hit Box、Air Hit／Air Knockbackは引き続き暫定または未実装である
 
 - Air Kick専用Sprite / Sequenceは接続済み。専用モーションに合わせたフレーム値・Hit Box再調整は将来候補

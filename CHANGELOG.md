@@ -1,15 +1,27 @@
 # CHANGELOG
 
-## 未コミット: P2鏡写し攻撃変換・CombatFrame遅延・異技Clash実測（2026-08-03）
+## 未コミット: P2 AirKick検証アシスト・Air双方未適用実測（2026-08-03）
 
-前提（push済み・今回の未コミットではない）: Clash判定整理と基本の`debugMirrorP1InputToP2`は `5bd3627` / Docs `6bc5f03`。
+前提（push済み・今回の未コミットではない）: 攻撃変換／Delay／異技Clash Docsは `96f8148` / `6be8bb4`。Clash整理と基本鏡写しは `5bd3627` / `6bc5f03`。
 
-- `DebugP2MirrorAttackMode`: SameAsP1 / SwapPunchAndKick / NoAttack（既定 SameAsP1）。双方接地時のみ攻撃入力変換。Air Kick非対象。Start技の直接呼び出しなし
-- `debugP2MirrorAttackDelayFrames`（0〜15、既定0）: P2 Attack/Kick押下開始だけをCombatFrame予約／発火。左右・Up・Downは遅延しない。検証専用（本番AI反応時間ではない）
-- 検証用Debugログ（本番恒常ではない）: Attack started拡張、active/recovery started、Pending hit candidate、mirror delay reserved/fired
-- **Play実測（SwapPunchAndKick・P1 K・近距離）**: Delay4=P2 JPunch先勝ち、Delay5=異技Ground Clash（**P1 GroundKick → P2 JPunch** / Damage0）、Delay6=P1 GroundKick先勝ち。同一CFに双方候補があるかで結果が決まることを確認
-- **確認済み（今回）**: 攻撃変換モード、CombatFrame遅延、検証ログ、**P1 GroundKick → P2 JPunch** の異技Clash（Delay5）、Delay 4/5/6境界、NoAttack時Normal Hit
-- **未確認**: **P1 JPunch → P2 GroundKick** で双方候補が同一CFになる条件でのClash実測、Air双方未適用と警告1回、Debug OFF／Reset後の遅延予約クリアの専用実測
+- `debugEnableP2AirKickAssist`（既定OFF）／`debugP2AirKickDelayFrames`（0〜15・既定0）: Air双方候補の未適用分岐と警告1回制御をPlay確認するための検証専用補助。正式P2操作・本番AI・対戦ルールではない
+- 経路: P1がAirKick開始可能なKickエッジ → Assist予約 → 指定CFでP2 `SimulationInputState`へKickを1tick合成 → 通常のSampleAttack／TryStartKick／CanStartAirKick。`StartAirKick`直接呼び出し・PendingHit注入なし。地上攻撃変換（`DebugP2MirrorAttackMode`）とは別責務。Air双方確認時はNoAttack併用を推奨
+- 安全策: 発火時にP2が`CanStartAirKick`不可（接地・KO・CombatReaction・ActionPlaying・UsedThisJump等）ならKickを載せない（着地後GroundKick化防止）。予約はAwake／Training Reset／Mirror OFF／Assist OFF／発火成功／発火不能破棄でクリア。地上Delay予約とは別状態
+- ログ（状態変化時のみ）: `P2 AirKick assist reserved` / `fired` / `cancelled`
+- Scene既定: 鏡写しOFF、Mode=NoAttack、地上Delay0、Assist OFF、Assist Delay0
+- **Play実測1回目**（Mirror ON・NoAttack・Assist ON・Delay0・近距離Neutral Jump・空中P1 K）: CF1352 reserved+fired → CF1353 双方AirKick開始 → CF1358 双方Active・双方Pending候補・Unsupported mutual hit警告。Ground Clash／Normal Hitなし。Damage／HitStun／ClashRecoil／HitStop／HitCountなし、HP不変。双方Recovery→自然終了→着地。最終HUD AttackResultは既存の攻撃終了Miss表示（未適用分類のNormalHit／Clash結果ではない）
+- **Play実測2回目**（同一Playセッション）: CF387で1回目双方候補＋警告 → CF875〜881で2回目双方候補成立・未適用継続・警告は再出力なし。Training Resetは警告フラグを戻さない現行仕様。Play再開始後の再警告はコード上初期化想定（Play実測は未実施）
+- **確認済み（今回）**: AssistのSimulationInputState経路、Delay0で開始CF同一、同一CF双方Active／双方Pending、Air双方の未適用（Clash／NormalHit非適用）、HP等非適用、自然終了、同一Playセッション中の警告1回、2回目も未適用継続
+- **未確認**: Airを含む異種双方候補、Assist Delay 1〜15境界、Mirror/Assist OFF・Training Reset・着地直前・KO等破棄の各専用Play、Play再開始後の再警告Play、正式Air Clash／正式P2操作・AI。既存未確認の **P1 JPunch → P2 GroundKick** 異技Clashも残す
+
+## P2鏡写し攻撃変換・CombatFrame遅延・異技Clash実測（`96f8148` / Docs `6be8bb4`・push済み）
+
+- `DebugP2MirrorAttackMode`: SameAsP1 / SwapPunchAndKick / NoAttack。双方接地時のみ攻撃入力変換。Air Kick非対象。Start技の直接呼び出しなし
+- `debugP2MirrorAttackDelayFrames`（0〜15、既定0）: P2 Attack/Kick押下開始だけをCombatFrame予約／発火。検証専用（本番AI反応時間ではない）
+- **Play実測（SwapPunchAndKick・P1 K・近距離）**: Delay4=P2 JPunch先勝ち、Delay5=異技Ground Clash（**P1 GroundKick → P2 JPunch** / Damage0）、Delay6=P1 GroundKick先勝ち
+- **確認済み**: 攻撃変換モード、CombatFrame遅延、検証ログ、**P1 GroundKick → P2 JPunch**（Delay5）、Delay 4/5/6境界、NoAttack時Normal Hit、**Mirror OFFおよびTraining Resetによる地上Delay予約破棄**（Delay15・Swap・発火予定CF通過でfiredなし／P2 JPunch開始なし）
+- **未確認（継続）**: **P1 JPunch → P2 GroundKick** で双方候補が同一CFになる条件でのClash実測
+- 注: P2 AirKick Assist側の予約破棄専用Playは未確認（上記地上Delayとは別）
 
 ## Fighter Sprite Sheet再構築版の正式採用（`5bcc3fa` / Docs `d98a99d`・push済み）
 
@@ -33,7 +45,7 @@
 
 ## Debug HUD font glyph atlas（`1b47fc6`・push済み・過去履歴）
 
-- debug HUD用フォントglyph atlas更新。現在の基準HEADではない（現在のpush済みHEADは `6bc5f03`）
+- debug HUD用フォントglyph atlas更新。現在の基準HEADではない（現在のpush済みHEADは `6be8bb4`）
 
 ## Ground Clash recoil separation（`78c4e94`）
 
