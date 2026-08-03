@@ -227,6 +227,17 @@ namespace FightingGameTrial.Fighter
         }
 
         /// <summary>
+        /// 相手にガードされたことを記録します。
+        /// Hit と同様に1攻撃1回の接触解決済みにし、同一攻撃の連続 Guard／Hit を防ぎます。
+        /// HitCount や Damage は触りません（Session の ApplyGuard 側）。
+        /// </summary>
+        public void MarkGuarded()
+        {
+            hasCurrentAttackHit = true;
+            lastAttackResult = "Guard";
+        }
+
+        /// <summary>
         /// 被 Hit で攻撃を即中断します。Miss にはしません。
         /// </summary>
         public void InterruptByHit()

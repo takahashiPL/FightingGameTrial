@@ -54,6 +54,12 @@ namespace FightingGameTrial.Fighter
         /// </summary>
         private int clashRecoilRemainingFrames;
 
+        /// <summary>
+        /// 立ちガード成立後の専用硬直残り Combat Frame。
+        /// HitStun とは分け、HitCount や赤表示へ混ぜません。
+        /// </summary>
+        private int guardStunRemainingFrames;
+
         private bool wasHitThisCombatFrame;
         private int lastHitCombatFrame = -1;
 
@@ -93,13 +99,26 @@ namespace FightingGameTrial.Fighter
             get { return clashRecoilRemainingFrames > 0; }
         }
 
+        public int GuardStunRemainingFrames
+        {
+            get { return guardStunRemainingFrames; }
+        }
+
+        /// <summary>
+        /// 立ちガード硬直中か。通常 HitStun / ClashRecoil とは別状態です。
+        /// </summary>
+        public bool IsInGuardStun
+        {
+            get { return guardStunRemainingFrames > 0; }
+        }
+
         /// <summary>
         /// 入力不能・ノックバック継続の対象となる戦闘リアクション中か。
-        /// 通常 HitStun と Ground Clash 反動をまとめて判定するときだけ使います。
+        /// 通常 HitStun / Ground Clash 反動 / GuardStun をまとめて判定するときだけ使います。
         /// </summary>
         public bool IsInCombatReaction
         {
-            get { return IsInHitStun || IsInClashRecoil; }
+            get { return IsInHitStun || IsInClashRecoil || IsInGuardStun; }
         }
 
         public bool WasHitThisCombatFrame
@@ -155,8 +174,9 @@ namespace FightingGameTrial.Fighter
                 hitStunFrames = 0;
             }
 
-            // 通常 Hit が成立した時点で、Clash 専用反動は終了します。
+            // 通常 Hit が成立した時点で、Clash / Guard 専用状態は終了します。
             clashRecoilRemainingFrames = 0;
+            guardStunRemainingFrames = 0;
             hitStunRemainingFrames = hitStunFrames;
             knockbackVelocityX = knockbackVelocity;
         }
@@ -179,14 +199,39 @@ namespace FightingGameTrial.Fighter
                 recoilFrames = 0;
             }
 
-            // Clash は通常被弾ではないため、HitStun を使い回さない。
+            // Clash は通常被弾ではないため、HitStun / GuardStun を使い回さない。
             hitStunRemainingFrames = 0;
+            guardStunRemainingFrames = 0;
             clashRecoilRemainingFrames = recoilFrames;
             knockbackVelocityX = knockbackVelocity;
         }
 
         /// <summary>
-        /// 1 Combat Frame 分だけ通常 HitStun または ClashRecoil を消費します。
+        /// 立ちガード成立時の専用硬直を開始します。
+        ///
+        /// 通常 Hit / Clash との違い:
+        /// - TotalHitCount を増やさない
+        /// - WasHitThisCombatFrame / LastHitCombatFrame を変更しない
+        /// - Damage は扱わない
+        /// - HitStun を使い回さない（赤被弾表示と混同しない）
+        ///
+        /// HitStop は試合全体の共有時間なので Session が設定します。
+        /// </summary>
+        public void BeginGuardStun(int guardStunFrames, float knockbackVelocity)
+        {
+            if (guardStunFrames < 0)
+            {
+                guardStunFrames = 0;
+            }
+
+            hitStunRemainingFrames = 0;
+            clashRecoilRemainingFrames = 0;
+            guardStunRemainingFrames = guardStunFrames;
+            knockbackVelocityX = knockbackVelocity;
+        }
+
+        /// <summary>
+        /// 1 Combat Frame 分だけ通常 HitStun / ClashRecoil / GuardStun を消費します。
         ///
         /// 呼び出し側（Session）は HitStop 外の Combat 処理の末尾で、
         /// 参加者ごとに1回だけ呼ぶこと。SimulationTick 単位では呼ばない。
@@ -209,6 +254,15 @@ namespace FightingGameTrial.Fighter
                 if (clashRecoilRemainingFrames < 0)
                 {
                     clashRecoilRemainingFrames = 0;
+                }
+            }
+
+            if (guardStunRemainingFrames > 0)
+            {
+                guardStunRemainingFrames = guardStunRemainingFrames - 1;
+                if (guardStunRemainingFrames < 0)
+                {
+                    guardStunRemainingFrames = 0;
                 }
             }
         }
@@ -266,6 +320,7 @@ namespace FightingGameTrial.Fighter
             totalHitCount = 0;
             hitStunRemainingFrames = 0;
             clashRecoilRemainingFrames = 0;
+            guardStunRemainingFrames = 0;
             wasHitThisCombatFrame = false;
             lastHitCombatFrame = -1;
             knockbackVelocityX = 0f;

@@ -210,6 +210,18 @@ namespace FightingGameTrial.Simulation
         [SerializeField]
         private int debugP2AirKickDelayFrames = 0;
 
+        [Header("Debug（立ちガード検証専用・本番機能ではない）")]
+        [Tooltip(
+            "P2の立ちガード検証用です（本番のP2操作・AIではない）。\n"
+            + "Normal: Guard分岐なし（従来どおり）。\n"
+            + "StandGuard: P2が接地・非攻撃・非CombatReaction・相手向きのとき、"
+            + "立ちガード可能な技（JPunch / GroundKick）の片側候補を Guard として解決。\n"
+            + "AirKick・しゃがみ・後ろ入力・Just Guard は対象外。既定 Normal。\n"
+            + "推奨: Mirror ON + NoAttack + StandGuard。"
+        )]
+        [SerializeField]
+        private DebugP2StanceGuardMode debugP2StanceGuardMode = DebugP2StanceGuardMode.Normal;
+
         /// <summary>
         /// P2 専用の Neutral 入力です。
         /// P1 の CurrentInput とは別インスタンスで、毎tick new しません。
@@ -885,7 +897,7 @@ namespace FightingGameTrial.Simulation
         /// <summary>
         /// 1体の Visual State を決定します（見た目の正本決定。Sprite 差し替えは Visual）。
         ///
-        /// 優先: ClashRecoil → KO → HitStun → Attack → Kick → JumpStart → JumpRise → JumpApex → JumpFall → Landing → Walk → Idle
+        /// 優先: ClashRecoil → KO → HitStun → GuardStun(Idle) → Attack → Kick → JumpStart → JumpRise → JumpApex → JumpFall → Landing → Walk → Idle
         /// </summary>
         private FighterVisualState ResolveFighterVisualState(DebugFighterParticipant participant)
         {
@@ -902,6 +914,12 @@ namespace FightingGameTrial.Simulation
             if (participant.IsInHitStun)
             {
                 return FighterVisualState.HitStun;
+            }
+
+            // GuardStun 専用 Visual は未追加。Idle 姿勢 + Participant の Guard 色で区別する。
+            if (participant.IsInGuardStun)
+            {
+                return FighterVisualState.Idle;
             }
 
             DebugFighterAttackState attackState = participant.AttackState;
@@ -1735,7 +1753,15 @@ namespace FightingGameTrial.Simulation
                 return;
             }
 
+            // GuardStun 終了は HitState に Slot が無いので、Session が Tick 前後で検出する。
+            bool wasInGuardStun = participant.IsInGuardStun;
             participant.TickHitStunForCombatFrame();
+            if (wasInGuardStun && participant.IsInGuardStun == false)
+            {
+                Debug.Log(
+                    "[FightDebug] GuardStun ended slot=" + participant.SlotId
+                );
+            }
         }
 
         /// <summary>
@@ -2292,13 +2318,12 @@ namespace FightingGameTrial.Simulation
         /// 2. P2→P1 の命中候補を収集
         /// 3. この段階では Damage や HitStun を適用しない
         /// 4. 双方候補の組み合わせを分類
-        /// 5. Ground Clash または片側 Normal Hit として結果を適用
+        /// 5. Ground Clash / 片側 Guard / 片側 Normal Hit として結果を適用
         ///
         /// 分類方針（現行）:
-        /// - 片側だけ候補成立 → 通常 Hit
-        /// - 双方候補かつ双方とも地上攻撃 → Ground Clash（技種は問わない）
+        /// - 双方候補かつ双方とも地上攻撃 → Ground Clash（技種は問わない・Guardより先）
         /// - 双方候補だが Air Kick 等を含む → Air Clash 未実装のため結果未適用
-        ///   （推測で片側 Hit / 仮 Air Clash にしない。警告はセッション中1回）
+        /// - 片側だけ候補成立 → Defender が立ちガード成立なら Guard、それ以外は Normal Hit
         /// </summary>
         private void CollectAndResolveHitsForCombatFrame()
         {
@@ -2323,13 +2348,19 @@ namespace FightingGameTrial.Simulation
                     return;
                 }
 
-                // Air を含む双方候補: Ground Clash にも通常 Hit にもしない。
+                // Air を含む双方候補: Ground Clash にも通常 Hit / Guard にもしない。
                 LogUnsupportedAirMutualHitOnce(pendingHitP1ToP2, pendingHitP2ToP1);
                 return;
             }
 
             if (pendingHitP1ToP2.IsValid)
             {
+                if (TryApplyStandGuard(pendingHitP1ToP2))
+                {
+                    lastHitResolutionType = DebugHitResolutionType.Guard;
+                    return;
+                }
+
                 ApplyNormalHit(pendingHitP1ToP2);
                 lastHitResolutionType = DebugHitResolutionType.NormalHit;
                 return;
@@ -2337,6 +2368,12 @@ namespace FightingGameTrial.Simulation
 
             if (pendingHitP2ToP1.IsValid)
             {
+                if (TryApplyStandGuard(pendingHitP2ToP1))
+                {
+                    lastHitResolutionType = DebugHitResolutionType.Guard;
+                    return;
+                }
+
                 ApplyNormalHit(pendingHitP2ToP1);
                 lastHitResolutionType = DebugHitResolutionType.NormalHit;
             }
@@ -2558,6 +2595,153 @@ namespace FightingGameTrial.Simulation
                 + " CombatFrame=" + timeState.CombatFrame
                 + " Damage=" + attackData.Damage
                 + " actual=" + actualDamage
+                + " distanceX=" + pendingHit.DistanceX.ToString("0.00")
+            );
+        }
+
+        /// <summary>
+        /// 片側候補を立ちガードとして適用できるなら適用し true を返します。
+        ///
+        /// 最小実装の条件:
+        /// - Defender が P2
+        /// - debugP2StanceGuardMode == StandGuard
+        /// - 技が CanStandGuard（JPunch / GroundKick。AirKick は不可）
+        /// - 接地・非KO・非CombatReaction・非攻撃Action・相手向き
+        ///
+        /// ChipDamage なし / HitCount 非加算 / HitStun 非流用。
+        /// </summary>
+        private bool TryApplyStandGuard(DebugPendingHit pendingHit)
+        {
+            if (CanDefendWithStandGuard(pendingHit) == false)
+            {
+                return false;
+            }
+
+            ApplyStandGuard(pendingHit);
+            return true;
+        }
+
+        private bool CanDefendWithStandGuard(DebugPendingHit pendingHit)
+        {
+            if (pendingHit == null
+                || pendingHit.IsValid == false
+                || pendingHit.Attacker == null
+                || pendingHit.Defender == null
+                || pendingHit.AttackData == null)
+            {
+                return false;
+            }
+
+            // 初回は P2 Debug StandGuard のみ（正式後ろ入力・P1ガードは後工程）。
+            if (debugP2StanceGuardMode != DebugP2StanceGuardMode.StandGuard)
+            {
+                return false;
+            }
+
+            if (pendingHit.Defender != participantP2)
+            {
+                return false;
+            }
+
+            DebugAttackData attackData = pendingHit.AttackData;
+            if (attackData.CanStandGuard == false)
+            {
+                return false;
+            }
+
+            DebugFighterParticipant defender = pendingHit.Defender;
+            if (defender.IsKnockedOut
+                || defender.IsInCombatReaction
+                || defender.Motor == null
+                || defender.Motor.IsGrounded == false)
+            {
+                return false;
+            }
+
+            if (defender.AttackState != null && defender.AttackState.IsActionPlaying)
+            {
+                return false;
+            }
+
+            if (IsFacingTowardOpponent(defender, pendingHit.Attacker) == false)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// 相手の LogicalX 方向を向いているか（正面ガード用）。
+        /// Facing 更新は Hit 収集前に済んでいる前提。
+        /// </summary>
+        private static bool IsFacingTowardOpponent(
+            DebugFighterParticipant self,
+            DebugFighterParticipant opponent)
+        {
+            if (self == null
+                || opponent == null
+                || self.Motor == null
+                || opponent.Motor == null)
+            {
+                return false;
+            }
+
+            float deltaX = opponent.Motor.LogicalX - self.Motor.LogicalX;
+            if (deltaX > FacingSameXEpsilon)
+            {
+                return self.Motor.FacingRight;
+            }
+
+            if (deltaX < -FacingSameXEpsilon)
+            {
+                return self.Motor.FacingRight == false;
+            }
+
+            // ほぼ同位置: 直前 Facing を維持している前提で成立扱い。
+            return true;
+        }
+
+        /// <summary>
+        /// 片側候補を立ちガードとして適用します。
+        /// Damage 0 / HitCount 非加算 / GuardStun + 小Pushback / HitStop / MarkGuarded。
+        /// </summary>
+        private void ApplyStandGuard(DebugPendingHit pendingHit)
+        {
+            DebugFighterParticipant attacker = pendingHit.Attacker;
+            DebugFighterParticipant defender = pendingHit.Defender;
+            DebugAttackData attackData = pendingHit.AttackData;
+
+            float pushbackVelocityX = ResolveKnockbackVelocityX(
+                attacker,
+                defender,
+                attackData.GuardPushbackInitialVelocityX
+            );
+
+            defender.ReceiveGuardStun(
+                attackData.GuardStunFrames,
+                pushbackVelocityX
+            );
+
+            if (attacker.AttackState != null)
+            {
+                attacker.AttackState.MarkGuarded();
+            }
+
+            RefreshOneFighterVisual(defender, false);
+            timeState.HitStopRemaining = attackData.HitStopFrames;
+            timeState.LastStatusMessage =
+                attacker.SlotId + " " + attackData.AttackId + " Guarded";
+
+            Debug.Log(
+                "[FightDebug] Stand guard"
+                + " attack=" + attackData.AttackId
+                + " attacker=" + attacker.SlotId
+                + " defender=" + defender.SlotId
+                + " CombatFrame=" + timeState.CombatFrame
+                + " GuardStun=" + attackData.GuardStunFrames
+                + " ChipDamage=0"
+                + " HitCount unchanged"
                 + " distanceX=" + pendingHit.DistanceX.ToString("0.00")
             );
         }

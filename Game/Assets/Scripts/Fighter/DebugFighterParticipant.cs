@@ -111,6 +111,13 @@ namespace FightingGameTrial.Fighter
         private Color clashRecoilDisplayColor = new Color(1f, 0.85f, 0.2f, 1f);
 
         [Tooltip(
+            "立ちガード硬直中の専用表示色です。"
+            + " 通常被弾の赤色・Clash の黄と区別します（検証用）。"
+        )]
+        [SerializeField]
+        private Color guardStunDisplayColor = new Color(0.45f, 0.7f, 0.95f, 1f);
+
+        [Tooltip(
             "KO 中の表示色です（段階14B）。"
             + " 被 Hit 表示（HitStun 中）が終わったあとだけ適用します。"
             + " Scene / Prefab 変更なしで既定の暗いグレーを使います。"
@@ -376,9 +383,23 @@ namespace FightingGameTrial.Fighter
             }
         }
 
+        /// <summary>立ちガード硬直中か。</summary>
+        public bool IsInGuardStun
+        {
+            get
+            {
+                if (hitState == null)
+                {
+                    return false;
+                }
+
+                return hitState.IsInGuardStun;
+            }
+        }
+
         /// <summary>
         /// 入力・通常移動を止める戦闘リアクション中か。
-        /// 通常 HitStun と Ground Clash 反動の共通ゲートに使います。
+        /// 通常 HitStun / Ground Clash 反動 / GuardStun の共通ゲートに使います。
         /// </summary>
         public bool IsInCombatReaction
         {
@@ -964,6 +985,29 @@ namespace FightingGameTrial.Fighter
         }
 
         /// <summary>
+        /// 立ちガード成立後の専用硬直を開始します。
+        ///
+        /// 通常 ReceiveHit と分ける理由:
+        /// - HitCount を増やさない
+        /// - Damage を入れない
+        /// - 赤い HitStun 表示ではなく Guard 専用色を使う
+        ///
+        /// HitStop は共有時間なので Session が設定します。
+        /// </summary>
+        public void ReceiveGuardStun(
+            int guardStunFrameCount,
+            float knockbackVelocityX)
+        {
+            if (hitState == null)
+            {
+                hitState = new DebugFighterHitState();
+            }
+
+            hitState.BeginGuardStun(guardStunFrameCount, knockbackVelocityX);
+            ApplyDisplayColor();
+        }
+
+        /// <summary>
         /// Damage を適用し、実際に減った HP 量を返します（段階14A）。
         ///
         /// 何をするか:
@@ -1092,7 +1136,7 @@ namespace FightingGameTrial.Fighter
 
             if (wasInCombatReaction && hitState.IsInCombatReaction == false)
             {
-                // 通常 HitStun / ClashRecoil の終了時に残速度を 0 へ。
+                // 通常 HitStun / ClashRecoil / GuardStun の終了時に残速度を 0 へ。
                 // KO 中でもリアクション終了はするが、isKnockedOut は維持する。
                 hitState.ClearKnockback();
                 ApplyDisplayColor();
@@ -1130,6 +1174,16 @@ namespace FightingGameTrial.Fighter
             if (hitState != null && hitState.IsInClashRecoil)
             {
                 return "ClashRecoil";
+            }
+
+            if (hitState != null && hitState.IsInGuardStun)
+            {
+                if (sharedHitStopRemaining > 0)
+                {
+                    return "HitStop";
+                }
+
+                return "GuardStun";
             }
 
             if (hitState != null && hitState.IsInHitStun)
@@ -1209,6 +1263,13 @@ namespace FightingGameTrial.Fighter
             if (hitState != null && hitState.IsInClashRecoil)
             {
                 spriteRenderer.color = clashRecoilDisplayColor;
+                return;
+            }
+
+            // 立ちガード硬直は被弾赤と区別する。
+            if (hitState != null && hitState.IsInGuardStun)
+            {
+                spriteRenderer.color = guardStunDisplayColor;
                 return;
             }
 

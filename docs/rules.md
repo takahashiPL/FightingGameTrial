@@ -167,7 +167,7 @@ Participant 共通の **HP / Damage** は**実装済み**である（段階14A�
 最後の一撃の HitStop / HitStun / Knockback は通常どおり成立し、HitStun 終了後も KO は Reset まで維持する。
 KO 中は本人の入力移動と新規攻撃を禁止し、KO 済み防御者への追加 Hit は成立させない。
 表示色の現在仕様は **HitStun 被 Hit 表示 > KO 暗色 > 通常 Tint**（段階15で回帰修正。KO 状態の開始時点は変えない）。
-Reset（R）は練習モードの **Training Reset** である（§15.4）。HP は最大へ全回復し、KO も解除する。加えて P1/P2 の**論理位置 X/Y**とジャンプ状態を Scene 開始時へ戻し、両者の位置復帰後に位置関係から Facing を再計算する（**実装済み・Editor 確認済み**。Transform 直書きではない）。Reset 受理フレームは通常 SimulationTick へ進めない。Reset 後は全ゲーム操作を一度離すまで有効入力を抑制する（R 自体は解除条件に含めない）。Pause 中 R による Training Reset の受理、主要状態初期化、AirKick Assist 予約破棄、Pause 解除後の Gameplay input 再有効化は Play 確認済み。全戦闘状態・全入力条件・Development Build を含む詳細総合回帰は未確認。HP バー・Guard は未実装。Round 終了・勝敗判定は**対戦モード固有・未実装**であり、FightDebugScene（練習）には混在させない。
+Reset（R）は練習モードの **Training Reset** である（§15.4）。HP は最大へ全回復し、KO も解除する。加えて P1/P2 の**論理位置 X/Y**とジャンプ状態を Scene 開始時へ戻し、両者の位置復帰後に位置関係から Facing を再計算する（**実装済み・Editor 確認済み**。Transform 直書きではない）。Reset 受理フレームは通常 SimulationTick へ進めない。Reset 後は全ゲーム操作を一度離すまで有効入力を抑制する（R 自体は解除条件に含めない）。Pause 中 R による Training Reset の受理、主要状態初期化、AirKick Assist 予約破棄、Pause 解除後の Gameplay input 再有効化は Play 確認済み。GuardStun を含む戦闘状態クリアも最小立ちガード検証で Play 確認済み（§18.8）。全戦闘状態・全入力条件・Development Build を含む詳細総合回帰は未確認。HP バー・**正式後ろ入力 Guard** は未実装（P2 Debug StandGuard は §18.8 の検証補助）。Round 終了・勝敗判定は**対戦モード固有・未実装**であり、FightDebugScene（練習）には混在させない。
 
 Jパンチの **攻撃設定値の正本**は `DebugAttackData.JPunch` である（段階15。ScriptableObject ではない読み取り専用データ）。
 Startup/Active/Recovery・Damage・HitStop・HitStun・Knockback・local Hit Box をここから参照する。
@@ -616,7 +616,8 @@ Session が状態を決定し、`DebugFighterVisual` が `FighterSpriteSequence`
 - 異技Clash（**P1 GroundKick → P2 JPunch**）は鏡写しSwap＋Delay5でPlay実測済み（Damage 0）。発生差により片側Normal Hitになる場合もある（Delay4/6で実測）
 - Counter Hit専用補正、Attack Priority、技の固定重み、先出し／後出し勝敗は導入しない
 - Air Kickを含む双方候補はGround Clashへ分類しない。結果未適用・仮Air Clashなし・片側Normal Hitへ落とさない・MarkHitしない（正式Air Clashではない）。双方AirKick同士はPlay実測済み（§18.7）。Airを含む異種双方候補は未確認
-- 分類の要約: (1) 双方候補かつ双方地上攻撃 → Ground Clash (2) 双方候補かつ片方以上がAirKick → 未適用 (3) 片側候補のみ → Normal Hit。Counter Hit／Attack Priorityなし
+- 分類の要約: (1) 双方候補かつ双方地上攻撃 → Ground Clash (2) 双方候補かつ片方以上がAirKick → 未適用 (3) 片側候補のみ → P2 Debug StandGuard成立なら Guard、それ以外は Normal Hit（§18.8）。Counter Hit／Attack Priorityなし
+- 正式後ろ入力ガード／しゃがみガード／Just Guard／Chip Damageは未実装
 
 ## 17. Air Kick最小検証版と攻撃Visualの暫定仕様
 
@@ -683,12 +684,12 @@ Attack started（SimulationTick／CombatFrame／mirrorDelay／mode等）、Attac
 
 **確認済み**: 左右／Jump鏡写し、攻撃変換・遅延・検証ログ、NoAttack時Normal Hit、異技Clash **P1 GroundKick → P2 JPunch**（Delay5）、Delay 4/5/6境界、Mirror OFFおよびTraining Resetによる地上Delay予約破棄。
 
-**未確認**: **P1 JPunch → P2 GroundKick** で双方候補が同一CFになる条件でのClash実測。将来のP2 Movement／Stance／Guard Mode。
+**未確認**: **P1 JPunch → P2 GroundKick** で双方候補が同一CFになる条件でのClash実測。Force Crouch／Crouch Guard 等の将来拡張。
 
-### 18.6 将来のP2検証設定案（未実装）
+### 18.6 将来のP2検証設定案
 
-- P2 Movement Mode: Neutral / Mirror P1
-- P2 Stance／Guard Mode: Normal / Force Stand / Force Crouch / Stand Guard / Crouch Guard
+- P2 Movement Mode: Neutral / Mirror P1（現行は `debugMirrorP1InputToP2`）
+- P2 Stance／Guard Mode: **Normal / StandGuard は未コミットで最小実装済み**（§18.8）。Force Stand / Force Crouch / Crouch Guard は未実装
 
 Down入力の扱いはしゃがみ実装時に再検討する。
 
@@ -717,7 +718,7 @@ P1がAirKick開始可能なKickエッジ
 
 結果: Ground Clash／Normal Hitなし。HP等不変。自然終了。最終HUD AttackResultは既存Miss表示。同一Playで警告1回（CF387→CF881）。
 
-#### Assist予約安全確認（2026-08-03・未コミット・Play実測）
+#### Assist予約安全確認（Play実測・Docs push済み `f9e56d3`）
 
 Delay15・NoAttack・初期距離3.0・Neutral Jump。地上Delay（§18.2）とは別系統。
 
@@ -733,3 +734,39 @@ Delay15・NoAttack・初期距離3.0・Neutral Jump。地上Delay（§18.2）と
 **確認済み（Assist）**: SimulationInputState経路、Air双方未適用＋警告1回、Mirror OFF／Assist OFF／Training Resetによる予約無効化、OFF/Reset後の発火予定CF通過でも古い予約が発火しない、接地時P2CannotStartAirKick、着地後GroundKick化防止、Reset後の主要状態初期化と入力再有効化。
 
 **未確認（Assist）**: KO／HitStun／ClashRecoil等CombatReaction／ActionPlaying／AirKickUsedThisJumpの各単独破棄、Assist Delay 1〜14境界、Play再開始後の警告再出力、異種Air双方、正式Air Clash／正式P2操作・AI。
+
+### 18.8 P2 Debug 最小立ちガード（2026-08-03・未コミット・検証専用）
+
+P2専用のガード仕様確認用Debug補助。正式なプレイヤー入力・AI・後ろ入力ガードではない。Inspector上も検証専用。Scene既定は`debugP2StanceGuardMode=Normal`で通常動作へ影響させない。確認時はMirror ON + `debugP2MirrorAttackMode=NoAttack` + `StandGuard`を推奨。
+
+```text
+DebugP2StanceGuardMode
+- Normal: Guard分岐なし（従来どおり片側Normal Hit）
+- StandGuard: P2が条件を満たすとき、立ちガード可能な技の片側候補を Guard として解決
+```
+
+分類順（Clash／Air未適用は維持）:
+
+1. 双方地上 → Ground Clash（Guardより先）
+2. Air含む双方 → 未適用（Guardへ分解しない）
+3. 片側 → `TryApplyStandGuard` → 失敗時 Normal Hit
+
+成立条件（P2・StandGuard時）: 接地・非KO・非CombatReaction・非攻撃Action・相手向き・技が`CanStandGuard`（JPunch／GroundKick。**AirKickは`CanStandGuard=false`で対象外**）。
+
+結果: ChipDamage 0 / HitCount非加算 / HP非減算 / 専用GuardStun（HitStun非流用）+ 小Pushback / 共有HitStop / `MarkGuarded`（AttackResult=`Guard`）。GuardStunFramesは JPunch **7** / GroundKick **9**。VisualはIdle流用＋青系専用色。自然終了は`TickCombatFrame`減算で0到達。終了ログはSessionがTick前後比較で`[FightDebug] GuardStun ended slot=`を出す（**JPunch／GroundKickともPlay確認済み**）。Mode=Normalへ戻すと従来どおり Normal Hit（Play確認済み）。StandGuard有効中でもAirKickはGuardされず Normal Hit（今回のDebug最小実装では対象外。正式な空中攻撃ガード仕様は未決定）。
+
+#### Play実測（未コミット）
+
+| 確認 | 結果 |
+|---|---|
+| JPunch Guard（修正前 CF1478） | Stand guard成立・Chip0・HitCount非加算・HitStop・Pushback・Idle相当復帰・AttackResult=Guard（当時GuardStun=8） |
+| JPunch Guard（修正後 CF798） | `Stand guard ... GuardStun=7` ＋ `GuardStun ended slot=P2` |
+| GroundKick Guard（修正前 CF3114） | 成立・Chip0・HitCount非加算・HitStop・Pushback・Idle復帰・AttackResult=Guard（当時GuardStun=10） |
+| GroundKick Guard（修正後 CF1450） | `Stand guard ... GuardStun=9` → HitStop ended → `GuardStun ended slot=P2`（1回）→ Attack ended P1。Chip0・HP非減・HitCount0・Pushback・AttackResult=Guard・Idle復帰・赤エラーなし |
+| Training Reset（Guard直後・Pause中R） | GuardStun／HitStopクリア、位置0.00/3.00、HitCount0、Idle、AttackResult=None、input再有効化。古いGuard再発なし |
+| Mode=Normal 回帰 | `Normal hit attack=JPunch`・Damage=10・P2HitCount=1・AttackResult=Hit |
+| StandGuard中 AirKick | Guardされず Normal Hit・Damage=14・P2HitCount=1・AttackResult=Hit。`Stand guard attack=AirKick`なし |
+
+**確認済み**: 片側Guard、専用GuardStun、Chip0／HitCount非加算、Idle復帰、Resetクリア、成立ログ、**修正後JPunch=7／GroundKick=9と双方の`GuardStun ended`**、**Mode=Normalで従来Normal Hitへ復帰**、**AirKickはCanStandGuard=falseでStandGuard有効中もNormal Hit**。
+
+**未確認**: P1ガード、正式な後ろ入力Guard、しゃがみGuard、Just Guard、正式Chip Damage仕様、正式な空中攻撃ガード仕様（将来AirKickをガード可能にするか／上段・中段・空中ガード分類は未決定）、正式P2操作／AI、Development Build。

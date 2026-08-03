@@ -1,15 +1,28 @@
 # CHANGELOG
 
-## 未コミット: P2 AirKick Assist予約安全確認（2026-08-03）
+## 未コミット: P2 Debug 最小立ちガード（2026-08-03）
 
-前提（push済み・今回の未コミットではない）: Assist実装 `03bfd72` / Air双方未適用Docs `988f36f`。地上Delay破棄Playは既確認済み（地上Delayとは別系統）。
+前提（push済み・今回の未コミットではない）: Assist実装 `03bfd72` / Air双方Docs `988f36f` / Assist予約安全Docs `f9e56d3`。
+
+- `DebugP2StanceGuardMode`（Normal／StandGuard・Scene既定Normal）: P2専用の立ちガード検証補助。正式後ろ入力・AIではない
+- 分類: 双方地上Clash／Air未適用は維持。片側候補のみ `TryApplyStandGuard` → Guard、失敗時 Normal Hit
+- 専用`GuardStun`（HitStun非流用）・Chip0・HitCount非加算・小Pushback・共有HitStop・`MarkGuarded`（AttackResult=Guard）
+- GuardStunFrames: JPunch **7**／GroundKick **9**（初回実装の8／10は指定ずれのため修正。修正後JPunch=7／GroundKick=9をPlay再確認）
+- 終了ログ: SessionがTick前後比較で`[FightDebug] GuardStun ended slot=`（**JPunch CF798／GroundKick CF1450でPlay確認済み**）
+- AirKick: `CanStandGuard=false`。StandGuard有効中もNormal Hit（Play確認済み）。正式な空中攻撃ガード仕様は未決定
+- **Play確認**: 修正前JPunch（CF1478・当時8）／GroundKick（CF3114・当時10）で成立・Idle復帰。Training ResetでGuardStun／HitStopクリアと状態初期化。修正後JPunch（CF798・7）／GroundKick（CF1450・9）で`GuardStun ended slot=P2`（各1回）。**Mode=Normalで`Normal hit attack=JPunch`・Damage=10・HitCount=1**。**StandGuard中AirKickはNormal Hit・Damage=14・HitCount=1（Stand guardログなし）**
+- **未確認**: P1ガード、正式な後ろ入力Guard、しゃがみGuard、Just Guard、正式Chip Damage仕様、正式な空中攻撃ガード仕様、正式P2操作／AI、Development Build
+
+## P2 AirKick Assist予約安全確認（Docs push済み `f9e56d3`）
+
+前提（push済み）: Assist実装 `03bfd72` / Air双方未適用Docs `988f36f`。地上Delay破棄Playは既確認済み（地上Delayとは別系統）。
 
 - **Mirror OFF**: Delay15予約（例CF670→fire685）後、Pause中にMirror OFF。発火予定CF通過でも`fired`なし／P2 AirKick・GroundKick開始なし。`reason=MirrorOff`明示ログは未確認（予約→OFF→未発火のPlay結果で確認）
 - **Assist OFF**: Mirror ON維持のままAssistのみOFF（例CF938→fire953）。発火予定CF通過でも`fired`なし／P2攻撃開始なし。`reason=AssistOff`明示ログは未確認
 - **Training Reset（Pause中R）**: Delay15予約（例CF681→fire696）後、Pause中にR。`Training reset (...LogicalX/LogicalY/Jump/Facing)`ログあり。発火予定CF通過でも`fired`なし。位置0.00/3.00・HitCount0・Idle・Jump解除・HitStop0・HP/KO初期化・Gameplay input再有効化。Pause中Rの受理・主要状態初期化・Assist予約破棄・解除後input再有効化はPlay確認済み。詳細総合回帰は未確認。`reason=Reset`明示ログは未確認（Training Resetログ＋未発火で確認）
 - **接地時破棄**: 発火時P2着地済みで`cancelled ... reason=P2CannotStartAirKick`（CF1367／CF1856）。AirKickなし・GroundKick化なし（実ログ確認済み）
 - **複合条件**: P1 AirKickがP2へNormal Hitした試行で、発火予定時にP2がCombatReaction中となり誤発火なし。CombatReaction単独の専用Playではない
-- **確認済み（今回）**: AssistのMirror OFF／Assist OFF／Training Resetによる予約無効化、OFF/Reset後の発火予定CF通過でも古い予約が発火しない、接地時P2CannotStartAirKick、着地後GroundKick化防止、Reset後の主要戦闘状態初期化と入力再有効化
+- **確認済み**: AssistのMirror OFF／Assist OFF／Training Resetによる予約無効化、OFF/Reset後の発火予定CF通過でも古い予約が発火しない、接地時P2CannotStartAirKick、着地後GroundKick化防止、Reset後の主要戦闘状態初期化と入力再有効化
 - **未確認**: KO／HitStun／ClashRecoil等CombatReaction／ActionPlaying／AirKickUsedThisJumpの各単独破棄、Assist Delay 1〜14境界、Play再開始後の警告再出力、異種Air双方、正式Air Clash／正式P2操作・AI
 
 ## P2 AirKick検証アシスト・Air双方未適用実測（`03bfd72` / Docs `988f36f`・push済み）

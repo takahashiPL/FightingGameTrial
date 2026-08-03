@@ -273,6 +273,7 @@ MonoBehaviour:
   debugP2MirrorAttackDelayFrames: 0
   debugEnableP2AirKickAssist: 0
   debugP2AirKickDelayFrames: 0
+  debugP2StanceGuardMode: 0
 --- !u!1 &400000001
 GameObject:
   m_ObjectHideFlags: 0

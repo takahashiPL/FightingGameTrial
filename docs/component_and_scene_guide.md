@@ -466,6 +466,7 @@ Keyboard (J)
 | Debug鏡写し | `debugMirrorP1InputToP2` ON 時のみ、P2 へ `p2MirrorInput` を渡す。OFFは従来どおり Neutral |
 | 攻撃変換／遅延 | `DebugP2MirrorAttackMode`（SameAsP1／Swap／NoAttack）と `debugP2MirrorAttackDelayFrames`（0〜15）。入力経路のみ。Start技の直接呼び出しなし |
 | AirKick Assist | `debugEnableP2AirKickAssist`／`debugP2AirKickDelayFrames`（既定OFF・0）。P2へKickエッジを1tick載せる検証専用。正式P2操作／AIではない |
+| StandGuard（未コミット） | `debugP2StanceGuardMode`（Normal／StandGuard・既定Normal）。片側候補のGuard分岐のみ。正式後ろ入力ガードではない |
 | Dummy 専用分岐ではない | P2 用の別戦闘ロジッククラスはない。移動・Jump・攻撃開始はP1と同じ通常経路 |
 | opponent 相互参照 | Scene で交差接続 |
 | Facing / Push | 両者に同じ Session 経路が適用される |
@@ -483,14 +484,17 @@ P2 が動かないのは「Dummy 専用コード」ではなく、**既定入力
 | KO 正本 | `isKnockedOut` | 色が暗いから KO、ではない |
 | Sprite 差し替え（現状） | `DebugFighterVisual.Apply` + `FighterSpriteSequence` | シート sub-sprite。Animator は未使用 |
 
-**現在の色優先（Stage 15 回帰後）**
+**現在の色優先**
 
-1. HitStun 中（`hitState.IsInHitStun`）→ 赤系
-2. KO → 暗色
-3. それ以外 → 通常 Tint
+1. ClashRecoil 中 → 黄系
+2. GuardStun 中 → 青系（未コミットの立ちガード）
+3. HitStun 中 → 赤系
+4. KO → 暗色
+5. それ以外 → 通常 Tint
 
 最後の一撃では、KO 状態は Hit 成立時点で立つが、**赤表示が終わってから**暗色へ移る。
 表示だけを変えても Damage / HitStop は変わらない（`ApplyDisplayColor` は色設定のみ）。
+GuardStun 中は Visual State が Idle でも専用色で区別する（専用 Guard Visual 未追加）。
 
 **方針（将来・§17）**: 戦闘処理がコマを直接決めず、戦闘状態 → Visual State → Animator または Sprite 差し替え。現状の直接差し替えはその簡易版。
 
@@ -1334,8 +1338,9 @@ P1/P2の `DebugFighterVisual > Kick Sequence`:
 - `debugP2MirrorAttackDelayFrames` = 0
 - `debugEnableP2AirKickAssist` = OFF
 - `debugP2AirKickDelayFrames` = 0
+- `debugP2StanceGuardMode` = Normal（0）（未コミット）
 
-Clash / 左右対称 / 異技Clash / Air双方未適用の検証時だけPlay中にON・モード変更する。本番AIではない。
+Clash / 左右対称 / 異技Clash / Air双方未適用 / 立ちガードの検証時だけPlay中にON・モード変更する。本番AIではない。
 
 入力経路:
 
@@ -1355,9 +1360,11 @@ P1 CurrentInput
 
 **確認済み（AirKick Assist・push済み）**: SimulationInputState経由、Delay0で双方AirKick同一開始CF、同一CF双方Pending、未適用＋警告1回。
 
-**確認済み（Assist予約安全・未コミットDocs）**: Mirror OFF／Assist OFF／Training Resetで予約無効化、接地時`P2CannotStartAirKick`、GroundKick化防止（詳細は§18.6）。
+**確認済み（Assist予約安全・Docs push済み `f9e56d3`）**: Mirror OFF／Assist OFF／Training Resetで予約無効化、接地時`P2CannotStartAirKick`、GroundKick化防止（詳細は§18.6）。
 
-**未確認**: **P1 JPunch → P2 GroundKick** で双方候補が同一CFになる条件でのClash実測。AssistのKO等単独破棄・Delay 1〜14境界・Play再開始後の再警告（§18.6）。
+**確認済み（最小立ちガード・未コミット）**: Mirror ON + NoAttack + StandGuardでJPunch／GroundKickの片側Guard、Chip0／HitCount非加算、Idle復帰、Training Resetクリア。**修正後JPunch（CF798・GuardStun=7）／GroundKick（CF1450・GuardStun=9）で`GuardStun ended slot=P2`**。**Mode=Normalで従来Normal Hitへ復帰**。**StandGuard有効中でもAirKickはNormal Hit（CanStandGuard=false）**（詳細は§18.7）。
+
+**未確認**: **P1 JPunch → P2 GroundKick** で双方候補が同一CFになる条件でのClash実測。AssistのKO等単独破棄・Delay 1〜14境界・Play再開始後の再警告（§18.6）。P1ガード、正式な後ろ入力Guard、しゃがみGuard、Just Guard、正式Chip Damage仕様、正式な空中攻撃ガード仕様、正式P2操作／AI、Development Build（§18.7）。
 
 ### 18.2 Ground Kickの確認値
 
@@ -1418,7 +1425,7 @@ P1 AirKick開始可能Kickエッジ → Assist予約 → P2 SimulationInputState
 
 Assist ON・Delay0・近距離Neutral Jump・空中P1 K。CF1352 reserved/fired → CF1353双方開始 → CF1358双方Active・双方Pending・Unsupported mutual hit警告。Clash／Normal Hitなし、HP等不変、自然終了。最終HUD AttackResultは既存Miss表示。同一Playで警告1回（CF387→CF881）。
 
-#### Assist予約安全確認（未コミットDocs・Play実測）
+#### Assist予約安全確認（Docs push済み `f9e56d3`・Play実測）
 
 検証手順例（Delay15・NoAttack・距離3.0・Neutral Jump）:
 
@@ -1436,6 +1443,33 @@ Assist ON・Delay0・近距離Neutral Jump・空中P1 K。CF1352 reserved/fired 
 複合条件: 被弾・CombatReactionを含む条件でも誤発火しない（単独専用テストではない）。
 
 **未確認**: KO／HitStun／CombatReaction／ActionPlaying／UsedThisJumpの各単独破棄、Assist Delay 1〜14境界、Play再開始後の警告再出力、異種Air双方、正式Air Clash。
+
+### 18.7 P2 Debug 最小立ちガード（未コミット・検証専用）
+
+正式なプレイヤー入力／AI／後ろ入力ガードではない。Scene既定は`debugP2StanceGuardMode=Normal`。検証時のみPlay中に`StandGuard`へ変更する（Scene保存ではない）。推奨: Mirror ON + NoAttack + StandGuard。
+
+```text
+片側候補収集後
+→ TryApplyStandGuard（P2・StandGuard・CanStandGuard・接地等）
+→ 成功: GuardStun + 小Push + HitStop + MarkGuarded
+→ 失敗: 従来どおり Normal Hit
+```
+
+双方地上Clash／Air双方未適用は変更なし（Guardより先／Guardへ分解しない）。GuardStunFrames: JPunch 7 / GroundKick 9。VisualはIdle流用＋青系色。終了ログは`[FightDebug] GuardStun ended slot=`（Session Tick前後比較・**JPunch／GroundKickともPlay確認済み**）。AirKickは`CanStandGuard=false`（StandGuard有効中もNormal Hit。正式な空中攻撃ガード仕様は未決定）。
+
+#### Play実測（未コミット）
+
+- JPunch Guard（修正前 CF1478）: Chip0・HitCount非加算・HitStop・Pushback・Idle復帰・AttackResult=Guard（当時GuardStun=8）
+- JPunch Guard（修正後 CF798）: `Stand guard ... GuardStun=7` ＋ `GuardStun ended slot=P2`
+- GroundKick Guard（修正前 CF3114）: 成立・Idle復帰（当時GuardStun=10）
+- GroundKick Guard（修正後 CF1450）: `Stand guard ... GuardStun=9` → HitStop ended → `GuardStun ended slot=P2`（1回）→ Attack ended P1。Chip0・HP非減・HitCount0・Pushback・AttackResult=Guard・Idle復帰・赤エラーなし
+- Training Reset（Guard直後・Pause中R）: GuardStun／HitStopクリア、位置初期化、input再有効化、古いGuard再発なし
+- Mode=Normal 回帰: `Normal hit attack=JPunch`・Damage=10・P2HitCount=1・AttackResult=Hit
+- StandGuard中 AirKick: Guardされず Normal Hit・Damage=14・P2HitCount=1・AttackResult=Hit。`Stand guard attack=AirKick`なし
+
+**確認済み**: 片側Guard、専用GuardStun、Chip0／HitCount非加算、Idle復帰、Resetクリア、成立／終了ログ、**Mode=Normalで従来Normal Hitへ復帰**、**AirKickはCanStandGuard=falseで対象外**。
+
+**未確認**: P1ガード、正式な後ろ入力Guard、しゃがみGuard、Just Guard、正式Chip Damage仕様、正式な空中攻撃ガード仕様（将来AirKickをガード可能にするか／上段・中段・空中ガード分類は未決定）、正式P2操作／AI、Development Build。
 
 ## 19. Air Kick最小検証版とRecovery Visual
 

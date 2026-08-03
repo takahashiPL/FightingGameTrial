@@ -56,6 +56,9 @@ namespace FightingGameTrial.Combat
         private readonly float hitBoxLocalCenterY;
         private readonly float hitBoxHalfWidth;
         private readonly float hitBoxHalfHeight;
+        private readonly bool canStandGuard;
+        private readonly int guardStunFrames;
+        private readonly float guardPushbackInitialVelocityX;
 
         private DebugAttackData(
             DebugAttackId attackId,
@@ -71,7 +74,10 @@ namespace FightingGameTrial.Combat
             float hitBoxLocalCenterX,
             float hitBoxLocalCenterY,
             float hitBoxHalfWidth,
-            float hitBoxHalfHeight)
+            float hitBoxHalfHeight,
+            bool canStandGuard,
+            int guardStunFrames,
+            float guardPushbackInitialVelocityX)
         {
             if (attackId == DebugAttackId.None)
             {
@@ -90,7 +96,9 @@ namespace FightingGameTrial.Combat
                 || hitStopFrames < 0
                 || hitStunFrames < 0
                 || knockbackInitialVelocityX < 0f
-                || knockbackDecelerationPerCombatFrame < 0f)
+                || knockbackDecelerationPerCombatFrame < 0f
+                || guardStunFrames < 0
+                || guardPushbackInitialVelocityX < 0f)
             {
                 throw new ArgumentException("攻撃データの数値が不正です: " + attackIdLabel);
             }
@@ -109,6 +117,9 @@ namespace FightingGameTrial.Combat
             this.hitBoxLocalCenterY = hitBoxLocalCenterY;
             this.hitBoxHalfWidth = hitBoxHalfWidth;
             this.hitBoxHalfHeight = hitBoxHalfHeight;
+            this.canStandGuard = canStandGuard;
+            this.guardStunFrames = guardStunFrames;
+            this.guardPushbackInitialVelocityX = guardPushbackInitialVelocityX;
         }
 
         /// <summary>enum の攻撃 ID（Hit 解決・技相性用）。</summary>
@@ -181,6 +192,31 @@ namespace FightingGameTrial.Combat
         public float HitBoxHalfHeight
         {
             get { return hitBoxHalfHeight; }
+        }
+
+        /// <summary>
+        /// 立ちガード可能な技か（最小実装: JPunch / GroundKick）。
+        /// AirKick は上段・中段未定のため false。
+        /// </summary>
+        public bool CanStandGuard
+        {
+            get { return canStandGuard; }
+        }
+
+        /// <summary>
+        /// Guard 成立時の専用硬直（CombatFrame）。通常 HitStun とは別値。
+        /// </summary>
+        public int GuardStunFrames
+        {
+            get { return guardStunFrames; }
+        }
+
+        /// <summary>
+        /// Guard 成立時の防御側 Pushback 初速（絶対値）。通常 Knockback より小さくする。
+        /// </summary>
+        public float GuardPushbackInitialVelocityX
+        {
+            get { return guardPushbackInitialVelocityX; }
         }
 
         public int TotalFrames
@@ -272,7 +308,10 @@ namespace FightingGameTrial.Combat
                 0.75f,
                 1.25f,
                 0.55f,
-                0.35f
+                0.35f,
+                true,
+                7,
+                0.08f
             );
         }
 
@@ -297,7 +336,10 @@ namespace FightingGameTrial.Combat
                 0.95f,
                 0.55f,
                 0.60f,
-                0.25f
+                0.25f,
+                true,
+                9,
+                0.10f
             );
         }
 
@@ -319,7 +361,10 @@ namespace FightingGameTrial.Combat
                 0.95f,
                 0.55f,
                 0.60f,
-                0.25f
+                0.25f,
+                false,
+                0,
+                0f
             );
         }
     }
