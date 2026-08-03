@@ -68,12 +68,14 @@ Hitの正本は `CollectAndResolveHitsForCombatFrame` である。
 P2鏡写しDebug（`debugMirrorP1InputToP2`）は、戦闘ロジックを分岐させず **入力ソースだけ** を差し替える例である。
 
 ```text
-P1 CurrentInput → 鏡写し変換 → p2MirrorInput → ResolveInput(P2) → 通常の移動・Jump・攻撃開始
+P1 CurrentInput → 鏡写し／攻撃モード変換／遅延予約 → p2MirrorInput → ResolveInput(P2) → 通常の移動・Jump・攻撃開始
 ```
 
-将来のP2 AIも、同じ「P2用 SimulationInputState を埋める」箇所を差し替えればよく、StartAttackをSessionから直接叩く裏口は避ける。
+`DebugP2MirrorAttackMode`（SameAsP1／SwapPunchAndKick／NoAttack）と `debugP2MirrorAttackDelayFrames` も、入力埋めの段階だけで扱う。StartJPunch／StartGroundKickを直接呼ばない。Delayは攻撃性能を変えずActiveを重ねる検証専用であり、本番AIの反応時間ではない。
 
-確認状態の要約: 移動／Jump／Air Kick非模倣は確認済み。新経路での地上攻撃模倣・異技Clash・Air双方未適用・Debug OFF回帰は未確認（詳細は `docs/unity_implementation_status.md`）。
+異技ClashのPlay実測（Swap・**P1 GroundKick → P2 JPunch**・Delay5）では、処理順の有利ではなく **同一CombatFrameに双方候補があるか** でClash／先勝ちが分かれた。**P1 JPunch → P2 GroundKick** の双方候補同一CF実測は未確認。候補収集→分類→適用の理解に、検証用ログ（Attack started／active started／Pending hit candidate／delay reserved/fired）を使う（本番恒常ログではない）。
+
+将来のP2 AIも、同じ「P2用 SimulationInputState を埋める」箇所を差し替えればよい。詳細と未確認事項は `docs/unity_implementation_status.md`。
 
 ---
 

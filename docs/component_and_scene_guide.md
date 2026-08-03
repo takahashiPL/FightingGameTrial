@@ -5,7 +5,7 @@
 対象コミット（資料作成時点）: **`2341e4c`**（Add component and scene learning guide）
 方針追記時点の HEAD: **`dfcb9e0`**（Reduce status HUD allocations）※コード変更なしの Docs 追記
 対象 Scene: `Game/Assets/Scenes/FightDebugScene.unity`
-実装到達点: **Stage 15完了後 + Ground Kick / 共通Hit解決基盤（`bc80ddb`）+ Ground Clash recoil separation（`78c4e94`）+ Clash判定整理 / P2鏡写しDebug（2026-08-03・未コミット）**
+実装到達点: **Stage 15完了後 + Ground Kick / 共通Hit解決基盤 + Ground Clash recoil + Clash判定整理／基本P2鏡写し（push済み `5bd3627` / `6bc5f03`）+ P2攻撃変換・CombatFrame遅延・異技Clash実測（2026-08-03・未コミット）**
 Scene の役割: **正式な練習・検証モード**（対戦モードではない。§2・§17）
 
 ---
@@ -463,7 +463,8 @@ Keyboard (J)
 | Participant は参加枠 | キャラクター種類の選択ではない（`slotId` が P1/P2） |
 | 同一 Component 構成 | DebugPlayer / DebugDummy とも Motor + Visual + Participant + SpriteRenderer |
 | 入力の差だけ | P1: `usesGameplayInput = true`、P2: `false` → 既定は Session が Neutral を渡す |
-| Debug鏡写し | `debugMirrorP1InputToP2` ON 時のみ、P2 へ `p2MirrorInput`（変換済み論理入力）を渡す。OFFは従来どおり Neutral |
+| Debug鏡写し | `debugMirrorP1InputToP2` ON 時のみ、P2 へ `p2MirrorInput` を渡す。OFFは従来どおり Neutral |
+| 攻撃変換／遅延 | `DebugP2MirrorAttackMode`（SameAsP1／Swap／NoAttack）と `debugP2MirrorAttackDelayFrames`（0〜15）。入力経路のみ。Start技の直接呼び出しなし |
 | Dummy 専用分岐ではない | P2 用の別戦闘ロジッククラスはない。移動・Jump・攻撃開始はP1と同じ通常経路 |
 | opponent 相互参照 | Scene で交差接続 |
 | Facing / Push | 両者に同じ Session 経路が適用される |
@@ -1325,23 +1326,31 @@ P1/P2の `DebugFighterVisual > Kick Sequence`:
 - Loop: OFF
 - Hold Last Frame: ON
 
-`SimulationSession.debugMirrorP1InputToP2`（旧名 `debugForceP2AttackWithP1ForClashTest`）は通常 **OFF**。Clash / 左右対称の検証時だけPlay中にONにする。Scene既定はOFF。本番AIではない。
+`SimulationSession` のDebug設定（Scene既定）:
+
+- `debugMirrorP1InputToP2` = OFF
+- `debugP2MirrorAttackMode` = SameAsP1（0）
+- `debugP2MirrorAttackDelayFrames` = 0
+
+Clash / 左右対称 / 異技Clashの検証時だけPlay中にON・モード変更する。本番AIではない。
 
 入力経路:
 
 ```text
 P1 CurrentInput
-→ UpdateDebugMirrorP2InputFromP1
+→ UpdateDebugMirrorP2InputFromP1（左右反転・攻撃モード変換・遅延予約）
 → p2MirrorInput
 → ResolveInputForParticipant(P2)
 → P2の通常の移動・Jump・攻撃開始
 ```
 
-左右反転、Upそのまま、Attackそのまま、Kickは双方接地時のみ（Air Kick非模倣）。Transform / 状態の直接コピーなし。
+- SameAsP1 / SwapPunchAndKick / NoAttack（双方接地時のみ攻撃変換。Air Kick非対象）
+- 遅延はAttack／Kick押下開始のみ（左右・Up・Downは遅延しない）。検証専用
+- Transform / 状態の直接コピーなし。StartJPunch／StartGroundKickの直接呼び出しなし
 
-**確認済み**（通常入力経路統一後・ユーザー操作とログ）: 左右鏡写し移動、Neutral Jump同時開始・同時着地、Forward Jump鏡写し、P1のみAir Kick・P2非模倣、P1 Air Kick→P2 Normal Hit、コンパイル／Play Mode動作。
+**確認済み**: 左右／Jump／地上攻撃の基本鏡写し（push済み）、攻撃変換・遅延・検証ログ、NoAttack時Normal Hit、異技Clash **P1 GroundKick → P2 JPunch**（Swap・Delay5）、Delay 4/5/6境界。
 
-**未確認**: 新経路でのJPunch／Ground Kick模倣、異技Clash、Air双方候補の未適用と警告1回、Debug OFF回帰。
+**未確認**: **P1 JPunch → P2 GroundKick** で双方候補が同一CFになる条件でのClash実測、Air双方未適用と警告1回、Debug OFF／Reset後の遅延予約クリア専用実測。
 
 ### 18.2 Ground Kickの確認値
 
@@ -1367,14 +1376,25 @@ P1をP2へPush Box最小距離まで近づけ、旧フラグ `debugForceP2Attack
 - Clashでは通常HitCountを増やさず、JPunch同士／Ground Kick同士とも`P2HitCount=0`を確認
 - 専用Sprite Sequenceは未設定で、Idle Sequenceへfallbackする
 
-### 18.5 Clash判定整理と確認状態（2026-08-03・未コミット）
+### 18.5 異技Clash実測（攻撃変換・遅延・2026-08-03・未コミット）
 
-現行コードの正本は `CollectAndResolveHitsForCombatFrame`（候補収集 → 分類 → 適用）。Ground Clashは双方地上攻撃なら技種不問。Airを含む双方候補はコード上結果未適用（正式Air Clashではない）。
+Clash判定整理と基本鏡写しはpush済み（`5bd3627` / `6bc5f03`）。今回の未コミットは攻撃変換モード・CombatFrame遅延・検証ログと下記実測。Ground Clashは双方地上攻撃なら技種不問。Airを含む双方候補はコード上結果未適用（正式Air Clashではない。実測未確認）。
 
-- **確認済み**: 同技Ground Clash（旧検証フラグ時代）。鏡写しの移動／Jump／Air Kick非模倣／Air Kick→Normal Hit（上記18.1）
-- **未確認**: 異技Clash（JPunch対GroundKick／逆）、新経路での地上攻撃模倣、Air双方候補の未適用と警告1回、Debug OFF回帰
+#### 異技Clash Play実測（SwapPunchAndKick・**P1 GroundKick → P2 JPunch**・近距離）
 
-通常作業では検証フラグをOFFのまま使う。
+| Delay | 結果 |
+|---:|---|
+| 4 | P2 JPunch先勝ち（Normal Hit） |
+| 5 | Ground Clash（**P1 GroundKick → P2 JPunch** / Damage0）。双方候補同一CF |
+| 6 | P1 GroundKick先勝ち（Normal Hit） |
+
+同一CFに双方候補があるかで結果が決まることを実測確認した。Counter Hit／Attack Priorityなし。Delayは検証補助であり正式対戦ルールではない。**P1 JPunch → P2 GroundKick** の双方候補同一CF実測は未確認。
+
+#### 検証用ログ（本番恒常ではない）
+
+Attack started拡張、Attack active/recovery started、Pending hit candidate、Mirror attack delay reserved/fired。
+
+通常作業では検証フラグをOFF・SameAsP1・遅延0のまま使う。
 
 ## 19. Air Kick最小検証版とRecovery Visual
 

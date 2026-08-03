@@ -1,18 +1,15 @@
 # CHANGELOG
 
-## 未コミット: Clash判定整理 + P2鏡写しDebug入力経路（2026-08-03）
+## 未コミット: P2鏡写し攻撃変換・CombatFrame遅延・異技Clash実測（2026-08-03）
 
-- Hit解決の正本を `CollectAndResolveHitsForCombatFrame` に明確化。候補収集 → 分類 → 適用の3段階。候補発見時にDamage / HitStunを即時適用しない
-- 旧即時Hit経路 `TryResolveJPunchHit` と専用2引数 `ResolveKnockbackVelocityX` を参照0確認のうえ削除
-- Ground Clashは双方候補かつ双方とも地上攻撃（現行: JPunch / GroundKick）のとき。技種一致は条件にしない（異技同士もコード上Clash対象）
-- Air Kickを含む双方候補はGround Clashへ分類せず、結果未適用・仮Air Clashなし・片側Normal Hitへ落とさない。警告はセッション中1回
-- 旧 `debugForceP2AttackWithP1ForClashTest` を `debugMirrorP1InputToP2` へ置換。Scene既定OFF
-- 鏡写しは `P1 CurrentInput → UpdateDebugMirrorP2InputFromP1 → p2MirrorInput → ResolveInput(P2) → 通常の移動・Jump・攻撃開始`。攻撃開始の直接呼び出しは使わない
-- 左右反転、Upはそのまま、Attackはそのまま、Kickは双方接地時のみ（Air Kick模倣なし）。OFF時はP2 Neutralの既存挙動
-- 本番AIではない。将来のP2 AIは入力ソース差し替えで接続する入口
-- **確認済み**: 左右鏡写し移動、Neutral/Forward Jump鏡写し、P1のみAir Kick・P2非模倣、P1 Air Kick→P2 Normal Hit、コンパイル／Play Mode動作
-- **未確認**: 新経路でのJPunch／Ground Kick模倣、異技Clash、Air双方候補の未適用と警告1回、Debug OFF回帰
-- 今回の未コミット範囲は本Clash整理・P2鏡写しDebug・関連Docsのみ（Sprite／Air Kick／Font Atlasはpush済み）
+前提（push済み・今回の未コミットではない）: Clash判定整理と基本の`debugMirrorP1InputToP2`は `5bd3627` / Docs `6bc5f03`。
+
+- `DebugP2MirrorAttackMode`: SameAsP1 / SwapPunchAndKick / NoAttack（既定 SameAsP1）。双方接地時のみ攻撃入力変換。Air Kick非対象。Start技の直接呼び出しなし
+- `debugP2MirrorAttackDelayFrames`（0〜15、既定0）: P2 Attack/Kick押下開始だけをCombatFrame予約／発火。左右・Up・Downは遅延しない。検証専用（本番AI反応時間ではない）
+- 検証用Debugログ（本番恒常ではない）: Attack started拡張、active/recovery started、Pending hit candidate、mirror delay reserved/fired
+- **Play実測（SwapPunchAndKick・P1 K・近距離）**: Delay4=P2 JPunch先勝ち、Delay5=異技Ground Clash（**P1 GroundKick → P2 JPunch** / Damage0）、Delay6=P1 GroundKick先勝ち。同一CFに双方候補があるかで結果が決まることを確認
+- **確認済み（今回）**: 攻撃変換モード、CombatFrame遅延、検証ログ、**P1 GroundKick → P2 JPunch** の異技Clash（Delay5）、Delay 4/5/6境界、NoAttack時Normal Hit
+- **未確認**: **P1 JPunch → P2 GroundKick** で双方候補が同一CFになる条件でのClash実測、Air双方未適用と警告1回、Debug OFF／Reset後の遅延予約クリアの専用実測
 
 ## Fighter Sprite Sheet再構築版の正式採用（`5bcc3fa` / Docs `d98a99d`・push済み）
 
@@ -34,9 +31,9 @@
 - Play確認: J Punchは軽い技として見やすく、Air Kickは立ち相手へ以前より当てやすい。Ground Kickの見た目改善は限定的で、脚の伸び・シルエットを改善したSprite再制作後に再調整する
 - Air Hit / Air Knockback / 縦Knockback / Air Clash / 正式Tradeは未実装。Air KickをAir Hit基盤完成とは扱わない
 
-## Debug HUD font glyph atlas（`1b47fc6`・push済み）
+## Debug HUD font glyph atlas（`1b47fc6`・push済み・過去履歴）
 
-- debug HUD用フォントglyph atlas更新。現在のpush済みHEAD
+- debug HUD用フォントglyph atlas更新。現在の基準HEADではない（現在のpush済みHEADは `6bc5f03`）
 
 ## Ground Clash recoil separation（`78c4e94`）
 

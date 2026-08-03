@@ -36,8 +36,10 @@ GC-2（Editor）: `DebugHudView.Update` 約17.2 KB → 約3.2 KB / frame。Devel
 ## Unity 実装の到達点（要約）
 
 ブランチ `unity` 上で、**段階1〜15まで完了**しています。
-内容反映済み基準コミット（push済みHEAD）: **`1b47fc6`**（Update debug HUD font glyph atlas）。
-今回の未コミット範囲: Clash判定整理、P2鏡写しDebug入力経路、関連Docs更新のみ。
+内容反映済み基準コミット（push済みHEAD）: **`6bc5f03`**（Document clash resolution and P2 mirror input）。直前コードは `5bd3627`（Refine clash resolution and mirror P2 input）。
+過去履歴の例: `1b47fc6`（HUD font atlas。現在の基準ではない）。
+今回の未コミット範囲: `DebugP2MirrorAttackMode`、`debugP2MirrorAttackDelayFrames`、P2攻撃入力のCombatFrame予約／発火、検証用ログ、Delay 4/5/6実測、**P1 GroundKick → P2 JPunch** 異技Clash実測、および上記のDocs反映。
+（Clash判定整理・基本の`debugMirrorP1InputToP2`・左右／Jump／地上攻撃鏡写しの基本経路は push済みで、今回の未コミットには含めない。）
 段階14全体（14A+14B）・段階15（J Punch 攻撃データ化）: **完了・push 済み**（SO 化は見送り）。
 GC-1 / GC-2（補助改善・正式 Stage ではない）: **完了・push 済み**。
 Training Reset 位置・向き復帰: **実装・Editor 確認済み**（正式 Stage 番号なし）。
@@ -49,7 +51,7 @@ Training Reset 共通 release gate（全操作 release まで入力抑制）: **
 
 | 区分 | 内容 |
 |---|---|
-| **実装済み** | 60Hz SimulationTick、Pause/Step、HUD、HitStop、入力、左右移動、Facing、Participant / AttackState / HitState、Push Box、Box可視化、Hit×Hurt判定、J Punch、Ground Kick、**Air Kick最小検証版**、1攻撃1Hit、横ノックバック、HP/Damage、KO、Training Reset、Visual Sequence、ジャンプ基盤、**Hit候補収集→分類→適用**、**Ground Clash（地上攻撃同士）**、**P2鏡写しDebug入力経路**（`debugMirrorP1InputToP2`、既定OFF） |
+| **実装済み** | 60Hz SimulationTick、Pause/Step、HUD、HitStop、入力、左右移動、Facing、Participant / AttackState / HitState、Push Box、Box可視化、Hit×Hurt判定、J Punch、Ground Kick、**Air Kick最小検証版**、1攻撃1Hit、横ノックバック、HP/Damage、KO、Training Reset、Visual Sequence、ジャンプ基盤、**Hit候補収集→分類→適用**、**Ground Clash（同技・異技とも技種不問）**、**P2鏡写しDebug**（`debugMirrorP1InputToP2` / `DebugP2MirrorAttackMode` / `debugP2MirrorAttackDelayFrames`、既定OFF・SameAsP1・遅延0） |
 | **暫定** | J Punch `4/3/8`、Ground Kick `9/4/13`、Air Kick `5/5/10`。Active中だけHit Boxを出す。J PunchはAF8〜10、Ground KickはAF14〜19まで振り切りVisualを残し、後半はIdleへ戻すが内部Recoveryは継続。Air Kickは空中K・1ジャンプ1回・着地即終了。Startup／Activeは専用Flying Kick、RecoveryはJumpFall表示。Hurt／Push BoxはCenterX `0`、HalfWidth `0.75`の左右対称暫定値。Airを含む双方候補は結果未適用（正式Air Clashではない） |
 | **未実装（方針確定含む）** | 対戦モード進行、HPバー、Guard、Animator、正式Character Data SO、複数Hit/Hurt Box、コンボ・Cancel、Counter Hit、Attack Priority、**Air Hit / Air Knockback・縦Knockback・Air Clash・正式Trade**、本番P2 AI。Air Kickは空中攻撃の最小検証であり、Air Hit基盤完成ではない |
 
@@ -207,19 +209,17 @@ Unity_FightingGameTrial
 - Sprite: `Fighter_Kick_00`〜`_04`、3 CombatFrame/枚、Loop OFF、Hold Last Frame ON（P1/P2）
 - Editor確認: 通常 Hit、1攻撃1Hit、14 damage、HitStop、ノックバック、左右向き、空中開始禁止、Punch/Kick相互キャンセルなし
 - Ground Clash（同技）は旧P2同時攻撃デバッグ経路でEditor実測済み。JPunch同士／Ground Kick同士とも Damage 0、HitStop、双方反動、攻撃終了、Idle復帰を確認。コミット`78c4e94`で通常Hitから`ClashRecoil`へ分離し、黄色系専用色、`P2HitCount=0`維持、専用Sprite未設定時のIdle fallbackを確認済み
-- 現行コード: Ground Clashは技種一致を条件にしない（JPunch対GroundKickも含む）。異技Clashは未確認
+- 現行: Ground Clashは技種一致を条件にしない。異技 **P1 GroundKick → P2 JPunch** は Delay5 でPlay実測済み（push済みのClash基盤＋未コミットの攻撃変換／遅延）
 
 上記`8/3/4`はコミット`bc80ddb`時点の履歴値。現行暫定値（push済み）は、J Punch `4/3/8`、Ground Kick `9/4/13`、Air Kick `5/5/10`。
 
-## Clash判定整理 + P2鏡写しDebug（2026-08-03・未コミット）
+## P2鏡写し攻撃変換・CombatFrame遅延・異技Clash実測（2026-08-03・未コミット）
 
-- Hit正本: `CollectAndResolveHitsForCombatFrame`（候補収集 → 分類 → 適用）。旧 `TryResolveJPunchHit` は削除済み
-- Ground Clash: 双方候補かつ双方地上攻撃（JPunch / GroundKick）。Damage 0、双方HitStop、双方ClashRecoil、通常HitStun/HitCountなし。同技は確認済み、異技は未確認
-- Airを含む双方候補: コード上は結果未適用、仮Air Clashなし、警告はセッション中1回（正式Air Clashではない。実測は未確認）
-- Debug: `debugMirrorP1InputToP2`（旧 `debugForceP2AttackWithP1ForClashTest` 置換）。Scene既定OFF。本番AIではない
-- 入力経路: P1 CurrentInput → 鏡写し変換 → `p2MirrorInput` → ResolveInput(P2) → 通常の移動・Jump・攻撃開始。左右反転、Upそのまま、Kickは双方接地時のみ（Air Kick非模倣）
-- **確認済み**: 左右鏡写し移動、Neutral/Forward Jump鏡写し、P1のみAir Kick・P2非模倣、P1 Air Kick→P2 Normal Hit、コンパイル／Play Mode動作
-- **未確認**: 新経路でのJPunch／Ground Kick模倣、異技Clash、Air双方候補の未適用と警告1回、Debug OFF回帰
+- 前提（push済み `5bd3627` / `6bc5f03`）: Hit候補収集→分類→適用、Ground Clash地上限定、基本の`debugMirrorP1InputToP2`と左右／Jump／地上攻撃鏡写し
+- 今回追加: `DebugP2MirrorAttackMode`（SameAsP1／SwapPunchAndKick／NoAttack）、`debugP2MirrorAttackDelayFrames`（0〜15・既定0）、攻撃入力のCombatFrame予約／発火、検証用ログ
+- **異技Clash Play実測**（Swap・P1 K・近距離）: Delay4=P2先勝ち、Delay5=Clash（**P1 GroundKick → P2 JPunch** / Damage0）、Delay6=P1先勝ち。同一CF双方候補の有無で結果が決まる
+- **確認済み（今回）**: 攻撃変換・遅延・検証ログ、**P1 GroundKick → P2 JPunch**（Delay5）、Delay 4/5/6境界、NoAttack時Normal Hit
+- **未確認**: **P1 JPunch → P2 GroundKick** で双方候補が同一CFになる条件でのClash実測、Air双方未適用と警告1回、Debug OFF／Reset後の遅延予約クリア専用実測
 
 ## Air Kick最小検証版・攻撃フレーム調整（push済み）
 

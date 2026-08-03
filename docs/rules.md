@@ -612,9 +612,10 @@ Session が状態を決定し、`DebugFighterVisual` が `FighterSpriteSequence`
 - 候補発見時点ではDamage / HitStunを即時適用しない。先に片側だけ適用すると処理順で結果が変わるため
 - Ground Clash: 双方候補かつ双方とも地上攻撃（現行: JPunch / GroundKick）。技種一致は条件にしない
 - Ground Clash結果: Damage 0、双方HitStop、双方ClashRecoil、通常HitStunへ入れない、通常HitCount非加算、攻撃をClash終了
-- 同技Clash（JPunch同士／Ground Kick同士）は旧検証フラグでEditor実測済み。異技ClashのEditor確認は未確認
+- 同技Clash（JPunch同士／Ground Kick同士）は旧検証フラグでEditor実測済み
+- 異技Clash（**P1 GroundKick → P2 JPunch**）は鏡写しSwap＋Delay5でPlay実測済み（Damage 0）。発生差により片側Normal Hitになる場合もある（Delay4/6で実測）
 - Counter Hit専用補正、Attack Priority、技の固定重み、先出し／後出し勝敗は導入しない
-- Air Kickを含む双方候補はGround Clashへ分類しない。結果未適用・仮Air Clashなし・片側Normal Hitへ落とさない（正式Air Clashではない）
+- Air Kickを含む双方候補はGround Clashへ分類しない。結果未適用・仮Air Clashなし・片側Normal Hitへ落とさない（正式Air Clashではない。実測は未確認）
 
 ## 17. Air Kick最小検証版と攻撃Visualの暫定仕様
 
@@ -638,24 +639,53 @@ BoxはP1/P2ともHurt／Push CenterX `0`、HalfWidth `0.75`の左右対称暫定
 
 旧 `debugForceP2AttackWithP1ForClashTest` を `debugMirrorP1InputToP2` へ置換済み。Scene既定はOFF。OFF時はP2 Neutralの既存挙動を変えない。
 
-目的: Clash確認、左右対称動作確認、将来のP2 AI入力ソース差し替え入口の確認。
+目的: 同技／異技Clash確認、左右対称動作確認、将来のP2 AI入力ソース差し替え入口の確認。本番AIではない。
 
 ```text
 P1 CurrentInput
-→ UpdateDebugMirrorP2InputFromP1
+→ UpdateDebugMirrorP2InputFromP1（左右反転・攻撃モード変換・遅延予約）
 → p2MirrorInput
 → ResolveInputForParticipant(P2)
 → P2の通常の移動・Jump・攻撃開始処理
 ```
 
-- 左右は反転（対面で接近／後退が揃うようにする）
-- Upはそのまま（JumpはP2の通常開始条件を通る）
-- Attackはそのまま（J Punchは既存の地上ゲート）
-- Kickは双方接地のときだけ渡す（Air Kickは模倣しない）
-- Transformや戦闘状態の直接コピーはしない
-- 攻撃開始をSessionから直接叩く裏口は使わない
-- 本番AIは未実装。将来はP2入力ソース差し替えで接続する
+### 18.1 DebugP2MirrorAttackMode（既定 SameAsP1）
 
-**確認済み**（通常入力経路統一後・ユーザー操作とログ）: 左右鏡写し移動、Neutral Jump同時開始・同時着地、Forward Jump鏡写し、P1のみAir Kick・P2非模倣、P1 Air Kick→P2 Normal Hit、コンパイル／Play Mode動作。
+- SameAsP1: P1 J→P2 JPunch、P1 K→P2 GroundKick
+- SwapPunchAndKick: P1 J→P2 GroundKick、P1 K→P2 JPunch（異技Clash確認用）
+- NoAttack: 地上攻撃をP2へ渡さない（片側Normal Hit確認用）。左右・Jump鏡写しは維持
 
-**未確認**: 新経路でのJPunch／Ground Kick模倣、異技Clash、Air双方候補の未適用と警告1回、Debug OFF回帰。
+攻撃変換は双方接地時のみ。StartJPunch／StartGroundKickは直接呼ばない。Air Kickは対象外。
+
+### 18.2 debugP2MirrorAttackDelayFrames（0〜15・既定0）
+
+鏡写しON時だけ、P2へ渡すAttack／Kickの押下開始をCombatFrame数だけ遅らせる検証補助。左右・Up・Downは遅延しない。本番AIの反応時間ではない。攻撃性能やClash条件は変えない。
+
+流れ: 意図作成 → 立ち上がりを予約 → 予約CFでHeldを1回true → 通常SampleAttack／TryStart。OFF／NoAttack／Training Reset等で予約破棄。
+
+### 18.3 異技Clash Play実測（Swap・**P1 GroundKick → P2 JPunch**・近距離）
+
+| Delay | 結果 |
+|---:|---|
+| 4 | P2 JPunch先勝ち（Normal Hit）。P1 GroundKickは同CFで候補成立前 |
+| 5 | Ground Clash。双方Active／双方候補が同一CF。**P1 GroundKick → P2 JPunch** / Damage0 |
+| 6 | P1 GroundKick先勝ち（Normal Hit）。P2 JPunchは同CFでまだActive前 |
+
+これにより、処理順の有利ではなく、同じCombatFrameに双方候補があるかで結果が決まることを実測確認した。
+
+### 18.4 検証用ログ（本番恒常ログではない）
+
+Attack started（SimulationTick／CombatFrame／mirrorDelay／mode等）、Attack active/recovery started、Pending hit candidate、Mirror attack delay reserved/fired。
+
+### 18.5 確認状態
+
+**確認済み**: 左右／Jump鏡写し（push済み）、攻撃変換・遅延・検証ログ（未コミット）、NoAttack時Normal Hit、異技Clash **P1 GroundKick → P2 JPunch**（Delay5）、Delay 4/5/6境界。
+
+**未確認**: **P1 JPunch → P2 GroundKick** で双方候補が同一CFになる条件でのClash実測、Air双方未適用と警告1回、Debug OFF／Reset後の遅延予約クリアの専用実測。
+
+### 18.6 将来のP2検証設定案（未実装）
+
+- P2 Movement Mode: Neutral / Mirror P1
+- P2 Stance／Guard Mode: Normal / Force Stand / Force Crouch / Stand Guard / Crouch Guard
+
+Down入力の扱いはしゃがみ実装時に再検討する。
