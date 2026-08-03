@@ -2,6 +2,7 @@ using FightingGameTrial.Combat;
 using FightingGameTrial.Fighter;
 using FightingGameTrial.Input;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace FightingGameTrial.Simulation
 {
@@ -78,7 +79,8 @@ namespace FightingGameTrial.Simulation
     /// 9. Push Box 重なり解消（Participant 共通。速度は触らない）
     /// 10. P1 Facing / P2 Facing（Push 後の最終位置基準）
     /// 11. P1/P2 ActionFrame 進行
-    /// 12. P1→P2 Hit / P2→P1 Hit（成立時: Damage / KO遷移 / HitStun / KB / HitStop）
+    /// 12. Hit 候補収集→分類→適用（CollectAndResolveHitsForCombatFrame）
+    ///    片側 NormalHit / 地上同士 Ground Clash / Air 含む双方は未対応で未適用
     /// 13. Visual 更新（AttackState 反映）
     /// 14. P1/P2 攻撃終了判定
     /// 15. HitStun 消費（0 ならノックバック残速度もクリア）
@@ -146,14 +148,19 @@ namespace FightingGameTrial.Simulation
         [SerializeField]
         private bool enableJumpDebugLog = true;
 
-        [Header("Debug（Clash 再現用・本番機能ではない）")]
+        [Header("Debug（Clash / 左右対称検証専用・本番機能ではない）")]
         [Tooltip(
-            "true のとき、P1 が地上攻撃を開始した同じ CombatFrame で P2 も同じ技を開始します。"
-            + " P2 手動操作が無い環境で Ground Clash を確認するための最小 Debug です。"
+            "Clash や左右対称動作の検証専用です（本番機能ではない）。\n"
+            + "ON: P1 の確定済み入力を鏡写し変換し、P2 用 SimulationInputState へ渡します。"
+            + " その後は P2 の通常経路（移動・Jump・攻撃開始）だけを使います。\n"
+            + "左右は反転、Jump / J Punch / Ground Kick は通常開始処理で模倣します。"
+            + " Air Kick は入力へ載せません。\n"
+            + "OFF: P2 の既存入力（Neutral）と既存挙動を変更しません。"
             + " 通常プレイでは false のままにしてください。"
         )]
+        [FormerlySerializedAs("debugForceP2AttackWithP1ForClashTest")]
         [SerializeField]
-        private bool debugForceP2AttackWithP1ForClashTest = false;
+        private bool debugMirrorP1InputToP2 = false;
 
         /// <summary>
         /// P2 専用の Neutral 入力です。
@@ -161,6 +168,16 @@ namespace FightingGameTrial.Simulation
         /// 静的共有値にもしません（誤って書き換えられるのを防ぐため）。
         /// </summary>
         private SimulationInputState p2NeutralInput;
+
+        /// <summary>
+        /// P2 用の論理入力バッファです（Debug 鏡写し ON 時にだけ埋める）。
+        ///
+        /// 経路の考え方（将来 AI 差し替え用）:
+        /// P1 確定入力 →（ここを鏡写し／将来は AI）→ P2 用 SimulationInputState
+        /// → ResolveInput → 通常の移動・Jump・攻撃開始。
+        /// 攻撃開始を Session から直接叩く裏口は使いません。
+        /// </summary>
+        private SimulationInputState p2MirrorInput;
 
         /// <summary>
         /// 両方向 Hit 候補の再利用バッファ（毎 Frame new しない）。
@@ -172,6 +189,12 @@ namespace FightingGameTrial.Simulation
         /// HUD 用: 直近の Hit 解決結果（None / NormalHit / Clash）。
         /// </summary>
         private DebugHitResolutionType lastHitResolutionType = DebugHitResolutionType.None;
+
+        /// <summary>
+        /// Air を含む双方命中候補を未対応扱いにしたとき、警告をセッション中1回だけ出すための旗です。
+        /// 毎フレームログで通常 Play を汚さないために使います。
+        /// </summary>
+        private bool hasLoggedUnsupportedAirMutualHitWarning;
 
         /// <summary>
         /// HUD 用: 直近 CombatFrame の Push 中心間距離（補正後）。
@@ -347,9 +370,13 @@ namespace FightingGameTrial.Simulation
                 timeState = new SimulationTimeState();
             }
 
-            // P2 Neutral: 別インスタンスを1つだけ作り、以後書き換えない（全 false のまま）。
+            // P2 Neutral: 別インスタンスを1つだけ作り、OFF時は全 false のまま使う。
             p2NeutralInput = new SimulationInputState();
             p2NeutralInput.ResetToInitialValues();
+
+            // P2 鏡写し用バッファ（ON時だけ毎tick更新。OFF時は参照されない）。
+            p2MirrorInput = new SimulationInputState();
+            p2MirrorInput.ResetToInitialValues();
 
             timeState.ResetToInitialValues();
             timeState.LastStepResult = "未実行";
@@ -370,10 +397,13 @@ namespace FightingGameTrial.Simulation
             // 1. SimulationTick +1（HitStop中も進む）
             timeState.SimulationTick = timeState.SimulationTick + 1;
 
-            // 2. 物理入力 → P1 用 CurrentInput（P2 Neutral は別オブジェクト）
+            // 2. 物理入力 → P1 用 CurrentInput（P2 Neutral / Mirror は別オブジェクト）
             SampleCurrentInputFromGameplay();
+            // 2b. Debug 鏡写し ON のときだけ「入力ソース」を埋める（以後は通常経路のみ）。
+            //     P1確定入力 → 鏡写し変換 → P2用 SimulationInputState
+            UpdateDebugMirrorP2InputFromP1();
 
-            // 3. P1/P2 入力を一度だけ解決（以後の移動・攻撃サンプリングで共用）
+            // 3. P1/P2 入力を一度だけ解決（以後の移動・Jump・攻撃サンプリングで共用）
             SimulationInputState inputP1 = ResolveInputForParticipant(participantP1);
             SimulationInputState inputP2 = ResolveInputForParticipant(participantP2);
 
@@ -422,9 +452,9 @@ namespace FightingGameTrial.Simulation
             // 地上 Up+K は Jump より先に Ground Kick が始まり、空中への入力予約にはならない。
             TryStartKickForParticipant(participantP1);
             TryStartKickForParticipant(participantP2);
-            TryForceP2AttackWithP1ForClashDebug();
 
             // 8b. ジャンプ開始（地上・非 Attack・非 Landing。空中再ジャンプなし）
+            //     鏡写し ON でも専用 Jump 開始はせず、inputP2.Up の通常経路だけを使う。
             TryStartJumpForParticipant(participantP1, inputP1, jumpPressedP1);
             TryStartJumpForParticipant(participantP2, inputP2, jumpPressedP2);
             FlushJumpDebugLogsForParticipant(participantP1);
@@ -660,6 +690,11 @@ namespace FightingGameTrial.Simulation
             if (p2NeutralInput != null)
             {
                 p2NeutralInput.ResetToInitialValues();
+            }
+
+            if (p2MirrorInput != null)
+            {
+                p2MirrorInput.ResetToInitialValues();
             }
 
             // 有効入力はニュートラル前提なので、エッジ用 previous も false に揃える。
@@ -1135,49 +1170,6 @@ namespace FightingGameTrial.Simulation
         }
 
         /// <summary>
-        /// Clash 確認用 Debug: P1 が今フレーム攻撃を開始したら P2 も同じ技を開始する。
-        /// </summary>
-        private void TryForceP2AttackWithP1ForClashDebug()
-        {
-            if (debugForceP2AttackWithP1ForClashTest == false)
-            {
-                return;
-            }
-
-            if (participantP1 == null
-                || participantP2 == null
-                || participantP1.AttackState == null
-                || participantP2.AttackState == null)
-            {
-                return;
-            }
-
-            DebugFighterAttackState p1 = participantP1.AttackState;
-            if (p1.IsActionPlaying == false || p1.ActionFrame != 0)
-            {
-                return;
-            }
-
-            if (CanStartGroundAttack(participantP2) == false)
-            {
-                return;
-            }
-
-            if (p1.CurrentAttackId == DebugAttackId.JPunch)
-            {
-                participantP2.AttackState.StartJPunch(timeState.CombatFrame);
-                LogAttackStarted(participantP2, JPunchData);
-                Debug.Log("[FightDebug] ClashDebug: forced P2 JPunch with P1");
-            }
-            else if (p1.CurrentAttackId == DebugAttackId.GroundKick)
-            {
-                participantP2.AttackState.StartGroundKick(timeState.CombatFrame);
-                LogAttackStarted(participantP2, KickData);
-                Debug.Log("[FightDebug] ClashDebug: forced P2 GroundKick with P1");
-            }
-        }
-
-        /// <summary>
         /// Participant 単位で ActionFrame を1進めます。
         /// </summary>
         private void AdvanceActionForParticipant(DebugFighterParticipant participant)
@@ -1619,8 +1611,13 @@ namespace FightingGameTrial.Simulation
         }
 
         /// <summary>
-        /// Participant の UsesGameplayInput に応じて入力を選びます。
-        /// P1: CurrentInput / P2: 専用 Neutral（共有・静的・毎tick new しない）。
+        /// Participant へ渡す論理入力を選びます（入力ソースの切り替え点）。
+        ///
+        /// P1: CurrentInput（Gameplay）
+        /// P2 OFF: Neutral（既存挙動。ここを変えない）
+        /// P2 ON: p2MirrorInput（鏡写し変換済み。将来ここを AI 入力へ差し替え可能）
+        ///
+        /// この先の SampleAttack / Jump エッジ / TryStart* / 移動は共通です。
         /// </summary>
         private SimulationInputState ResolveInputForParticipant(DebugFighterParticipant participant)
         {
@@ -1634,7 +1631,81 @@ namespace FightingGameTrial.Simulation
                 return timeState.CurrentInput;
             }
 
+            // Debug 鏡写しは P2（Gameplay 入力を使わない側）だけに適用する。
+            if (debugMirrorP1InputToP2 && p2MirrorInput != null)
+            {
+                return p2MirrorInput;
+            }
+
             return p2NeutralInput;
+        }
+
+        /// <summary>
+        /// Debug 鏡写し ON のとき、P1 の確定済み入力を変換して P2 用 SimulationInputState を埋めます。
+        /// OFF のときは何もしません（P2 は Neutral のまま＝既存挙動）。
+        ///
+        /// ここでやることは「入力ソースを埋める」だけです。
+        /// StartJPunch / StartGroundKick / TryStartJump を直接呼ばず、
+        /// 以降は P2 の通常処理（SampleAttack → TryStart* → 移動）へ乗せます。
+        /// </summary>
+        private void UpdateDebugMirrorP2InputFromP1()
+        {
+            if (debugMirrorP1InputToP2 == false || p2MirrorInput == null)
+            {
+                return;
+            }
+
+            SimulationInputState p1 = null;
+            if (timeState != null)
+            {
+                p1 = timeState.CurrentInput;
+            }
+
+            if (p1 == null)
+            {
+                p2MirrorInput.ClearGameplayHeldButtons();
+                return;
+            }
+
+            // 左右入力をそのままコピーすると、P1とP2が同じワールド方向へ動く。
+            // 対面状態で鏡写しに接近・後退させるため、P2へ渡す左右入力を反転する。
+            // P1 Left → P2 Right / P1 Right → P2 Left
+            // 両方 OFF / 両方 ON はそのまま渡し、同時押しは既存の移動規則に従う。
+            bool mirroredLeft = p1.Right;
+            bool mirroredRight = p1.Left;
+
+            // Jump は Up を通常経路へ渡す（専用 Jump 開始はしない）。
+            bool mirroredUp = p1.Up;
+
+            // Down は現状しゃがみ未実装だが、入力経路を欠けさせないためそのまま渡す。
+            bool mirroredDown = p1.Down;
+
+            // J Punch は地上専用ゲートがあるので Attack はそのまま渡してよい。
+            bool mirroredAttack = p1.Attack;
+
+            // Kick は地上同士のときだけ渡す。
+            // 空中の Kick を載せると通常経路が Air Kick を開始してしまうため（今回は模倣しない）。
+            bool mirroredKick = false;
+            if (p1.Kick
+                && participantP1 != null
+                && participantP1.Motor != null
+                && participantP1.Motor.IsGrounded
+                && participantP2 != null
+                && participantP2.Motor != null
+                && participantP2.Motor.IsGrounded)
+            {
+                mirroredKick = true;
+            }
+
+            p2MirrorInput.CopyFromPhysicalAndCommit(
+                mirroredLeft,
+                mirroredRight,
+                mirroredUp,
+                mirroredDown,
+                mirroredAttack,
+                mirroredKick,
+                p1.SampledAtSimulationTick
+            );
         }
 
         /// <summary>
@@ -1826,8 +1897,20 @@ namespace FightingGameTrial.Simulation
         }
 
         /// <summary>
-        /// 同じ CombatFrame の両方向 Hit 候補を先に集め、
-        /// 片方向だけなら NormalHit、双方なら Ground Clash として解決します。
+        /// 同じ CombatFrame の両方向 Hit 候補を先に集め、分類してから結果を適用します。
+        ///
+        /// 処理順:
+        /// 1. P1→P2 の命中候補を収集
+        /// 2. P2→P1 の命中候補を収集
+        /// 3. この段階では Damage や HitStun を適用しない
+        /// 4. 双方候補の組み合わせを分類
+        /// 5. Ground Clash または片側 Normal Hit として結果を適用
+        ///
+        /// 分類方針（現行）:
+        /// - 片側だけ候補成立 → 通常 Hit
+        /// - 双方候補かつ双方とも地上攻撃 → Ground Clash（技種は問わない）
+        /// - 双方候補だが Air Kick 等を含む → Air Clash 未実装のため結果未適用
+        ///   （推測で片側 Hit / 仮 Air Clash にしない。警告はセッション中1回）
         /// </summary>
         private void CollectAndResolveHitsForCombatFrame()
         {
@@ -1835,13 +1918,25 @@ namespace FightingGameTrial.Simulation
             pendingHitP2ToP1.Clear();
             lastHitResolutionType = DebugHitResolutionType.None;
 
+            // 1. P1→P2 の命中候補を収集
             CollectPendingHit(participantP1, participantP2, pendingHitP1ToP2);
+            // 2. P2→P1 の命中候補を収集
             CollectPendingHit(participantP2, participantP1, pendingHitP2ToP1);
 
+            // 3. ここまでは候補だけ。Damage / HitStun / ClashRecoil / HitStop はまだ適用しない。
+            // 4. 双方候補の組み合わせを分類 → 5. 結果適用
             if (pendingHitP1ToP2.IsValid && pendingHitP2ToP1.IsValid)
             {
-                ApplyGroundClash(pendingHitP1ToP2, pendingHitP2ToP1);
-                lastHitResolutionType = DebugHitResolutionType.Clash;
+                if (IsGroundAttackForClash(pendingHitP1ToP2.AttackId)
+                    && IsGroundAttackForClash(pendingHitP2ToP1.AttackId))
+                {
+                    ApplyGroundClash(pendingHitP1ToP2, pendingHitP2ToP1);
+                    lastHitResolutionType = DebugHitResolutionType.Clash;
+                    return;
+                }
+
+                // Air を含む双方候補: Ground Clash にも通常 Hit にもしない。
+                LogUnsupportedAirMutualHitOnce(pendingHitP1ToP2, pendingHitP2ToP1);
                 return;
             }
 
@@ -1860,7 +1955,44 @@ namespace FightingGameTrial.Simulation
         }
 
         /// <summary>
-        /// 片方向の Hit 候補だけを作ります。ここでは Damage 等をまだ適用しません。
+        /// Ground Clash 対象の地上攻撃かどうか。
+        /// J Punch / Ground Kick（将来のしゃがみ技もここに足す想定）。
+        /// Air Kick は含めない。
+        /// </summary>
+        private static bool IsGroundAttackForClash(DebugAttackId attackId)
+        {
+            return attackId == DebugAttackId.JPunch
+                || attackId == DebugAttackId.GroundKick;
+        }
+
+        /// <summary>
+        /// Air を含む双方命中候補を未対応として記録します。
+        /// 結果は適用せず、警告だけセッション中1回出します。
+        /// </summary>
+        private void LogUnsupportedAirMutualHitOnce(
+            DebugPendingHit p1ToP2,
+            DebugPendingHit p2ToP1)
+        {
+            if (hasLoggedUnsupportedAirMutualHitWarning)
+            {
+                return;
+            }
+
+            hasLoggedUnsupportedAirMutualHitWarning = true;
+
+            Debug.LogWarning(
+                "[FightDebug] Unsupported mutual hit (includes air attack)."
+                + " No NormalHit / GroundClash applied until Air Clash is defined."
+                + " CombatFrame=" + timeState.CombatFrame
+                + " P1Attack=" + p1ToP2.AttackId
+                + " P2Attack=" + p2ToP1.AttackId
+            );
+        }
+
+        /// <summary>
+        /// 片方向の命中候補だけを作ります（処理順の 1 / 2）。
+        /// Damage / HitStun / HitStop / MarkHit はここでは適用しません（処理順の 3）。
+        /// Active・未Hit・HitBox×HurtBox 重なりが揃ったときだけ destination を Valid にします。
         /// </summary>
         private void CollectPendingHit(
             DebugFighterParticipant attacker,
@@ -1932,6 +2064,10 @@ namespace FightingGameTrial.Simulation
             destination.HurtBox = hurtBox;
         }
 
+        /// <summary>
+        /// 片側だけ成立した命中候補を通常 Hit として適用します（処理順の 5）。
+        /// Damage / HitStun / Knockback / HitStop / MarkHit / KO 判定をここで行います。
+        /// </summary>
         private void ApplyNormalHit(DebugPendingHit pendingHit)
         {
             if (pendingHit == null
@@ -1987,6 +2123,11 @@ namespace FightingGameTrial.Simulation
             );
         }
 
+        /// <summary>
+        /// 地上攻撃同士の双方命中を Ground Clash として適用します。
+        /// Damage 0 / 双方 HitStop / 双方 ClashRecoil。通常 HitStun・HitCount には入れません。
+        /// 呼び出し側で双方とも IsGroundAttackForClash であることを保証してください。
+        /// </summary>
         private void ApplyGroundClash(
             DebugPendingHit p1ToP2,
             DebugPendingHit p2ToP1)
@@ -2040,6 +2181,15 @@ namespace FightingGameTrial.Simulation
             );
         }
 
+        /// <summary>
+        /// ノックバック初速の符号付き値を決めます（段階13A）。
+        ///
+        /// 正本は Hit 成立時点の LogicalX 比較（Facing だけを正本にしない）。
+        /// attacker.X &lt; defender.X → 右（+speed）
+        /// attacker.X &gt; defender.X → 左（-speed）
+        /// 同位置 → attacker の Facing を fallback
+        /// 大きさは引数 speed（絶対値）。攻撃データまたは Clash 仮数値を渡します。
+        /// </summary>
         private static float ResolveKnockbackVelocityX(
             DebugFighterParticipant attacker,
             DebugFighterParticipant defender,
@@ -2068,214 +2218,8 @@ namespace FightingGameTrial.Simulation
                 return -speed;
             }
 
-            return attacker.Motor.FacingRight ? speed : -speed;
-        }
-
-        /// <summary>
-        /// attacker → defender の Jパンチ Hit を判定します（段階11B / 13A / 14A / 14B）。
-        ///
-        /// 何をするか:
-        /// - 可視化と同じ EvaluateWorldHitBox / EvaluateWorldHurtBox を取得
-        /// - DebugPunchHitResolver で Active・未Hit・重なりを評価
-        /// - 成立時に ReceiveHit / ApplyDamage /（HP0なら）TryEnterKnockout / MarkHit / HitStop
-        ///
-        /// なぜ距離判定をやめたか:
-        /// 赤い Hit Box と緑の Hurt Box の見た目と結果を一致させるため。
-        ///
-        /// 1攻撃1Hit / 1攻撃1Damage:
-        /// attackState.HasCurrentJPunchHit が正本。MarkHit 後は同じ攻撃で再Hitしない。
-        ///
-        /// KO（段階14B）:
-        /// - すでに KO の defender へは Hit を成立させない（Damage/HitStop 等なし）
-        /// - 最後の一撃は ReceiveHit→ApplyDamage→KO遷移→HitStop の順で、
-        ///   HitStun / Knockback / HitStop を失わない
-        /// </summary>
-        private bool TryResolveJPunchHit(
-            DebugFighterParticipant attacker,
-            DebugFighterParticipant defender)
-        {
-            if (attacker == null || defender == null)
-            {
-                return false;
-            }
-
-            if (attacker == defender)
-            {
-                return false;
-            }
-
-            if (attacker.AttackState == null)
-            {
-                return false;
-            }
-
-            // KO 済み防御者への追加 Hit は成立させない（段階14B）。
-            // Damage / HitCount / HitStop / HitStun / Knockback を増やさない。
-            if (defender.IsKnockedOut)
-            {
-                if (attacker == participantP1 && defender == participantP2)
-                {
-                    lastHitCheckLabel = DebugPunchHitCheckLabels.DefenderKO;
-                    lastBoxOverlap = false;
-                }
-
-                return false;
-            }
-
-            DebugFighterAttackState attackState = attacker.AttackState;
-
-            // 可視化（BoxView）と同じ取得経路。独自の Active 範囲や距離式は持たない。
-            DebugBox2D hitBox = attacker.EvaluateWorldHitBox();
-            DebugBox2D hurtBox = defender.EvaluateWorldHurtBox();
-
-            string checkLabel;
-            bool boxesOverlap;
-            bool isHit = DebugPunchHitResolver.TryResolveHit(
-                attackState.IsJPunchAttack,
-                attackState.HasCurrentJPunchHit,
-                hitBox,
-                hurtBox,
-                out checkLabel,
-                out boxesOverlap
-            );
-
-            // HUD は主に P1→P2 を表示（毎フレーム Miss ログは出さない）
-            if (attacker == participantP1 && defender == participantP2)
-            {
-                lastHitCheckLabel = checkLabel;
-                lastBoxOverlap = boxesOverlap;
-            }
-
-            if (isHit == false)
-            {
-                return false;
-            }
-
-            // ノックバック符号は Facing ではなく Hit 成立時点の LogicalX 比較で決める。
-            // 攻撃者から防御者を遠ざける方向。同位置は attacker Facing を fallback。
-            float knockbackVelocityX = ResolveKnockbackVelocityX(attacker, defender);
-
-            // 被弾記録は defender（Participant）側が所有する。
-            // HitStun / KB 初速の「値」は攻撃データ、適用結果は HitState。
-            // ※ KO へ至る最後の一撃でも、ここで Stun/KB を先にセットする。
-            defender.ReceiveHit(
-                timeState.CombatFrame,
-                JPunchData.HitStunFrames,
-                knockbackVelocityX
-            );
-
-            // Damage は有効 Hit 確定時に1回だけ（段階14A）。値は攻撃データ。
-            int requestedDamage = JPunchData.Damage;
-            int actualDamage = defender.ApplyDamage(requestedDamage);
-
-            // HP 0 なら一度だけ KO（段階14B）。既 KO は上で弾いている。
-            // 最後の一撃の HitStop はこの後で開始するため失わない。
-            bool enteredKnockout = false;
-            if (defender.CurrentHitPoints <= 0)
-            {
-                enteredKnockout = defender.TryEnterKnockout();
-                if (enteredKnockout)
-                {
-                    Debug.Log(
-                        "[FightDebug] Fighter KO"
-                        + " slot=" + defender.SlotId
-                        + " CombatFrame=" + timeState.CombatFrame
-                        + " HP=" + defender.CurrentHitPoints
-                        + "/" + defender.MaxHitPoints
-                    );
-                }
-            }
-
-            RefreshOneFighterVisual(defender, false);
-
-            // 1攻撃1Hit の正本は attacker の AttackState
-            attackState.MarkHit();
-
-            timeState.LastStatusMessage =
-                attacker.SlotId.ToString() + " Punch Hit";
-
-            int koFlag = 0;
-            if (defender.IsKnockedOut)
-            {
-                koFlag = 1;
-            }
-
-            Debug.Log(
-                "[FightDebug] Punch hit"
-                + " attacker=" + attacker.SlotId
-                + " defender=" + defender.SlotId
-                + " CombatFrame=" + timeState.CombatFrame
-                + " Damage=" + requestedDamage
-                + " actual=" + actualDamage
-                + " HP=" + defender.CurrentHitPoints
-                + "/" + defender.MaxHitPoints
-                + " KO=" + koFlag
-                + " KB=" + knockbackVelocityX.ToString("0.000")
-                + " HitBox=[" + hitBox.MinX.ToString("0.00")
-                + ".." + hitBox.MaxX.ToString("0.00")
-                + "," + hitBox.MinY.ToString("0.00")
-                + ".." + hitBox.MaxY.ToString("0.00") + "]"
-                + " HurtBox=[" + hurtBox.MinX.ToString("0.00")
-                + ".." + hurtBox.MaxX.ToString("0.00")
-                + "," + hurtBox.MinY.ToString("0.00")
-                + ".." + hurtBox.MaxY.ToString("0.00") + "]"
-            );
-
-            // 既存 HitStop を開始（同tickでは減らさない）
-            // 両方向 Hit でも同じ攻撃データのため、単純代入でよい。
-            // KO へ至る最後の一撃でも HitStop は通常どおり開始する。
-            timeState.HitStopRemaining = JPunchData.HitStopFrames;
-
-            return true;
-        }
-
-        /// <summary>
-        /// ノックバック初速の符号付き値を決めます（段階13A / 15）。
-        ///
-        /// 正本は Hit 成立時点の LogicalX 比較（Facing だけを正本にしない）。
-        /// attacker.X &lt; defender.X → 右（+初速）
-        /// attacker.X &gt; defender.X → 左（-初速）
-        /// 同位置 → attacker の Facing を fallback（右向きなら +、左向きなら -）
-        /// 大きさは攻撃データ KnockbackInitialVelocityX（絶対値）。
-        /// </summary>
-        private static float ResolveKnockbackVelocityX(
-            DebugFighterParticipant attacker,
-            DebugFighterParticipant defender)
-        {
-            float speed = JPunchData.KnockbackInitialVelocityX;
-            if (speed == 0f)
-            {
-                return 0f;
-            }
-
-            if (attacker == null
-                || defender == null
-                || attacker.Motor == null
-                || defender.Motor == null)
-            {
-                return 0f;
-            }
-
-            float attackerX = attacker.Motor.LogicalX;
-            float defenderX = defender.Motor.LogicalX;
-
-            if (attackerX < defenderX)
-            {
-                return speed;
-            }
-
-            if (attackerX > defenderX)
-            {
-                return -speed;
-            }
-
             // 同位置: Facing を fallback（攻撃者が向いている側へ押し出す）
-            if (attacker.Motor.FacingRight)
-            {
-                return speed;
-            }
-
-            return -speed;
+            return attacker.Motor.FacingRight ? speed : -speed;
         }
 
         private void UpdateStatusMessage()

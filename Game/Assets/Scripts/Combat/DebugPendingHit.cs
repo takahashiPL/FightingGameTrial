@@ -9,7 +9,7 @@ namespace FightingGameTrial.Combat
     /// 同じ CombatFrame で P1→P2 と P2→P1 の両方を見てから結果を決めるためです。
     /// 先に評価した側だけを即適用すると、処理順で有利不利が生まれます。
     ///
-    /// 将来の技相性（開始順・距離・Punch対Kick 等）で使う材料もここに残します。
+    /// 分類は SimulationSession.CollectAndResolveHitsForCombatFrame が行います。
     /// 接触点や先端率は今回持たず、後からフィールド追加しやすい小さな型にします。
     /// </summary>
     public sealed class DebugPendingHit

@@ -3,8 +3,8 @@ namespace FightingGameTrial.Combat
     /// <summary>
     /// 1 CombatFrame の Hit 解決結果です。
     ///
-    /// 今回実装: NormalHit / Clash。
-    /// 将来候補（未実装）: PriorityWin / Guarded / Invulnerable など。
+    /// 現行: NormalHit / Clash（地上攻撃同士の Ground Clash）。
+    /// Air を含む双方候補は未対応のため None のまま（結果未適用）。
     /// </summary>
     public enum DebugHitResolutionType
     {

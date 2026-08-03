@@ -268,7 +268,7 @@ MonoBehaviour:
       SampleSequence: 0
   consoleLogIntervalTicks: 60
   enableJumpDebugLog: 1
-  debugForceP2AttackWithP1ForClashTest: 0
+  debugMirrorP1InputToP2: 0
 --- !u!1 &400000001
 GameObject:
   m_ObjectHideFlags: 0

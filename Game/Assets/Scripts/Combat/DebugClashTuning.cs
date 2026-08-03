@@ -12,7 +12,7 @@ namespace FightingGameTrial.Combat
         /// <summary>互いに離れる方向の横 Knockback 初速（絶対値）。</summary>
         public const float HorizontalKnockback = 0.16f;
 
-        /// <summary>Clash 後の短い行動不能（CombatFrame）。HitStun 経路を流用。</summary>
+        /// <summary>Clash 後の短い行動不能（CombatFrame）。専用 ClashRecoil で適用（通常 HitStun ではない）。</summary>
         public const int ClashStunFrames = 3;
 
         /// <summary>Clash 時の共有 HitStop。</summary>
