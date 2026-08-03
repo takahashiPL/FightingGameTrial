@@ -271,6 +271,8 @@ MonoBehaviour:
   debugMirrorP1InputToP2: 0
   debugP2MirrorAttackMode: 2
   debugP2MirrorAttackDelayFrames: 0
+  debugEnableP2AirKickAssist: 0
+  debugP2AirKickDelayFrames: 0
 --- !u!1 &400000001
 GameObject:
   m_ObjectHideFlags: 0

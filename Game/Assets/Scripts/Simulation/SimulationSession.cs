@@ -154,7 +154,8 @@ namespace FightingGameTrial.Simulation
             + "ON: P1 の確定済み入力を鏡写し変換し、P2 用 SimulationInputState へ渡します。"
             + " その後は P2 の通常経路（移動・Jump・攻撃開始）だけを使います。\n"
             + "左右は反転、Jump / J Punch / Ground Kick は通常開始処理で模倣します。"
-            + " Air Kick は入力へ載せません。\n"
+            + " 地上鏡写しは Air Kick を入力へ載せません"
+            + "（空中双方候補の検証は debugEnableP2AirKickAssist を使う）。\n"
             + "OFF: P2 の既存入力（Neutral）と既存挙動を変更しません。"
             + " 通常プレイでは false のままにしてください。"
         )]
@@ -170,6 +171,7 @@ namespace FightingGameTrial.Simulation
             + "NoAttack: 攻撃は渡さず左右・Jump鏡写しだけ残し、片側Normal Hitを確認。\n"
             + "技を直接開始せず Attack/Kick 入力だけ変換し、P2 の通常開始条件を維持します。"
             + " 双方接地時のみ攻撃変換し、Air Kick を起こしません。"
+            + " Air双方候補の検証では NoAttack + debugEnableP2AirKickAssist を併用します。"
         )]
         [SerializeField]
         private DebugP2MirrorAttackMode debugP2MirrorAttackMode = DebugP2MirrorAttackMode.SameAsP1;
@@ -179,10 +181,34 @@ namespace FightingGameTrial.Simulation
             + "debugMirrorP1InputToP2 が ON のときだけ有効。左右・Up・Down には影響しません。\n"
             + "異技Clash確認例: SwapPunchAndKick + 遅延5 で P1 GroundKick 開始の5CF後に P2 JPunch エッジ。\n"
             + "攻撃データや Clash 条件は変えず、Active 重ねだけを調整します。既定 0。"
+            + " Air Kick アシストの遅延は debugP2AirKickDelayFrames を使います。"
         )]
         [Range(0, 15)]
         [SerializeField]
         private int debugP2MirrorAttackDelayFrames = 0;
+
+        [Header("Debug（Air双方候補検証専用・本番機能ではない）")]
+        [Tooltip(
+            "Airを含む双方命中候補の未適用分岐をPlay確認するための検証専用です"
+            + "（本番のP2操作・AIではない）。\n"
+            + "ON: P1がこのCombatFrameでAirKickを開始するKickエッジをトリガに、"
+            + "P2用SimulationInputStateへKickエッジを1回だけ載せます。"
+            + " StartAirKickやPendingHitの直接注入はしません。\n"
+            + "debugMirrorP1InputToP2 が ON のときだけ有効（P2入力ソースが鏡写しバッファのため）。\n"
+            + "推奨: NoAttack + 本フラグON。既定 false。"
+        )]
+        [SerializeField]
+        private bool debugEnableP2AirKickAssist = false;
+
+        [Tooltip(
+            "P2 Air Kick検証アシストのKickエッジを遅らせるCombatFrame数です（検証専用）。\n"
+            + "debugEnableP2AirKickAssist が ON のときだけ有効。\n"
+            + "0: P1と同じCombatFrameでP2もAirKick開始しやすい。"
+            + " Active重ねの微調整に使います。既定 0。"
+        )]
+        [Range(0, 15)]
+        [SerializeField]
+        private int debugP2AirKickDelayFrames = 0;
 
         /// <summary>
         /// P2 専用の Neutral 入力です。
@@ -215,6 +241,16 @@ namespace FightingGameTrial.Simulation
         private int pendingP2MirrorAttackFireCombatFrame = -1;
 
         private int pendingP2MirrorKickFireCombatFrame = -1;
+
+        /// <summary>
+        /// P2 Air Kick検証アシスト用: P1 Kick の前tick保持（立ち上がり検出）。
+        /// </summary>
+        private bool previousP1KickHeldForAirKickAssist;
+
+        /// <summary>
+        /// P2 Air Kick検証アシスト用: Kickエッジを発火するCombatFrame（未予約は -1）。
+        /// </summary>
+        private int pendingP2AirKickAssistFireCombatFrame = -1;
 
         /// <summary>
         /// 異技Clash検証用: 命中候補ログを攻撃開始単位で1回に抑えるための記録です。
@@ -421,6 +457,9 @@ namespace FightingGameTrial.Simulation
             // P2 鏡写し用バッファ（ON時だけ毎tick更新。OFF時は参照されない）。
             p2MirrorInput = new SimulationInputState();
             p2MirrorInput.ResetToInitialValues();
+
+            ClearDebugMirrorAttackDelayState();
+            ClearDebugP2AirKickAssistState();
 
             timeState.ResetToInitialValues();
             timeState.LastStepResult = "未実行";
@@ -742,6 +781,7 @@ namespace FightingGameTrial.Simulation
             }
 
             ClearDebugMirrorAttackDelayState();
+            ClearDebugP2AirKickAssistState();
             lastLoggedPendingHitStartedCombatFrameP1 = -1;
             lastLoggedPendingHitStartedCombatFrameP2 = -1;
 
@@ -1733,11 +1773,13 @@ namespace FightingGameTrial.Simulation
         /// OFF のときは何もしません（P2 は Neutral のまま＝既存挙動。攻撃変換・遅延も無視）。
         ///
         /// ここでやることは「入力ソースを埋める」だけです。
-        /// StartJPunch / StartGroundKick / TryStartJump を直接呼ばず、
+        /// StartJPunch / StartGroundKick / StartAirKick / TryStartJump を直接呼ばず、
         /// 以降は P2 の通常処理（SampleAttack → TryStart* → 移動）へ乗せます。
         ///
         /// 攻撃ボタンは debugP2MirrorAttackMode で変換し、
         /// debugP2MirrorAttackDelayFrames で押下開始だけ遅らせます（異技ClashのActive重ね用）。
+        /// Air双方候補用に debugEnableP2AirKickAssist が ON なら、
+        /// 別経路で Kick エッジを1回だけ OR します（地上攻撃変換とは独立）。
         /// 将来の本番AI入力とは別の Debug 補助です。
         /// </summary>
         private void UpdateDebugMirrorP2InputFromP1()
@@ -1746,6 +1788,7 @@ namespace FightingGameTrial.Simulation
             {
                 // OFF 中に遅延予約が残ると、再ON時に古いエッジが飛ぶのを防ぐ。
                 ClearDebugMirrorAttackDelayState();
+                ClearDebugP2AirKickAssistState();
                 return;
             }
 
@@ -1759,6 +1802,7 @@ namespace FightingGameTrial.Simulation
             {
                 p2MirrorInput.ClearGameplayHeldButtons();
                 ClearDebugMirrorAttackDelayState();
+                ClearDebugP2AirKickAssistState();
                 return;
             }
 
@@ -1786,6 +1830,13 @@ namespace FightingGameTrial.Simulation
                 out mirroredKick
             );
 
+            // Air Kick検証アシスト: 地上鏡写しのKickとは別にORする。
+            // NoAttackでもAir双方候補を確認できるようにするため、地上モードのクリア後に合成する。
+            if (ResolveDebugP2AirKickAssistKickHeld(p1))
+            {
+                mirroredKick = true;
+            }
+
             p2MirrorInput.CopyFromPhysicalAndCommit(
                 mirroredLeft,
                 mirroredRight,
@@ -1795,6 +1846,93 @@ namespace FightingGameTrial.Simulation
                 mirroredKick,
                 p1.SampledAtSimulationTick
             );
+        }
+
+        /// <summary>
+        /// P1がこのCombatFrameでAirKickを開始するKickエッジをトリガに、
+        /// P2へ載せるKick Heldを1tickだけ返します（検証専用）。
+        ///
+        /// なぜ StartAirKick を直接呼ばないか:
+        /// P2の CanStartAirKick / SampleAttack / TryStartKick をバイパスすると、
+        /// 本番経路とずれた「偽の双方候補」になりやすいためです。
+        ///
+        /// なぜ開始後ではなく入力段階でトリガするか:
+        /// UpdateDebugMirror は TryStartKick より前のため、遅延0で同一CombatFrame開始するには
+        /// 「P1が今フレームAirKickを開始できるKickエッジ」をトリガにする必要があります。
+        /// </summary>
+        private bool ResolveDebugP2AirKickAssistKickHeld(SimulationInputState p1)
+        {
+            if (debugEnableP2AirKickAssist == false || p1 == null)
+            {
+                ClearDebugP2AirKickAssistState();
+                return false;
+            }
+
+            bool p1KickHeld = p1.Kick;
+            bool p1KickEdge = p1KickHeld && previousP1KickHeldForAirKickAssist == false;
+            previousP1KickHeldForAirKickAssist = p1KickHeld;
+
+            int combatFrame = 0;
+            if (timeState != null)
+            {
+                combatFrame = timeState.CombatFrame;
+            }
+
+            int delayFrames = debugP2AirKickDelayFrames;
+            if (delayFrames < 0)
+            {
+                delayFrames = 0;
+            }
+            else if (delayFrames > 15)
+            {
+                delayFrames = 15;
+            }
+
+            // P1が空中でAirKick開始可能なKickエッジ → 予約。
+            // 接地中のKはGroundKickになるため予約しない（誤ってP2へKickを載せない）。
+            if (p1KickEdge && CanStartAirKick(participantP1))
+            {
+                pendingP2AirKickAssistFireCombatFrame = combatFrame + delayFrames;
+                Debug.Log(
+                    "[FightDebug] P2 AirKick assist reserved"
+                    + " CombatFrame=" + combatFrame
+                    + " fireCombatFrame=" + pendingP2AirKickAssistFireCombatFrame
+                    + " delay=" + delayFrames
+                );
+            }
+
+            if (pendingP2AirKickAssistFireCombatFrame < 0
+                || combatFrame < pendingP2AirKickAssistFireCombatFrame)
+            {
+                return false;
+            }
+
+            pendingP2AirKickAssistFireCombatFrame = -1;
+
+            // 発火時にP2がAirKick開始不能ならHeldを立てない。
+            // 接地中にKickを載せるとGroundKickが始まり、検証目的から外れるため。
+            if (CanStartAirKick(participantP2) == false)
+            {
+                Debug.Log(
+                    "[FightDebug] P2 AirKick assist cancelled"
+                    + " CombatFrame=" + combatFrame
+                    + " reason=P2CannotStartAirKick"
+                );
+                return false;
+            }
+
+            Debug.Log(
+                "[FightDebug] P2 AirKick assist fired"
+                + " CombatFrame=" + combatFrame
+                + " (Kick edge on P2 SimulationInputState; StartAirKick is not called directly)"
+            );
+            return true;
+        }
+
+        private void ClearDebugP2AirKickAssistState()
+        {
+            previousP1KickHeldForAirKickAssist = false;
+            pendingP2AirKickAssistFireCombatFrame = -1;
         }
 
         /// <summary>
