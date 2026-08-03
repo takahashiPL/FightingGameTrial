@@ -167,7 +167,7 @@ Participant 共通の **HP / Damage** は**実装済み**である（段階14A�
 最後の一撃の HitStop / HitStun / Knockback は通常どおり成立し、HitStun 終了後も KO は Reset まで維持する。
 KO 中は本人の入力移動と新規攻撃を禁止し、KO 済み防御者への追加 Hit は成立させない。
 表示色の現在仕様は **HitStun 被 Hit 表示 > KO 暗色 > 通常 Tint**（段階15で回帰修正。KO 状態の開始時点は変えない）。
-Reset（R）は練習モードの **Training Reset** である（§15.4）。HP は最大へ全回復し、KO も解除する。加えて P1/P2 の**論理位置 X/Y**とジャンプ状態を Scene 開始時へ戻し、両者の位置復帰後に位置関係から Facing を再計算する（**実装済み・Editor 確認済み**。Transform 直書きではない）。Reset 受理フレームは通常 SimulationTick へ進めない。Reset 後は全ゲーム操作を一度離すまで有効入力を抑制する（R 自体は解除条件に含めない）。Pause 中 R・Development Build は未確認。HP バー・Guard は未実装。Round 終了・勝敗判定は**対戦モード固有・未実装**であり、FightDebugScene（練習）には混在させない。
+Reset（R）は練習モードの **Training Reset** である（§15.4）。HP は最大へ全回復し、KO も解除する。加えて P1/P2 の**論理位置 X/Y**とジャンプ状態を Scene 開始時へ戻し、両者の位置復帰後に位置関係から Facing を再計算する（**実装済み・Editor 確認済み**。Transform 直書きではない）。Reset 受理フレームは通常 SimulationTick へ進めない。Reset 後は全ゲーム操作を一度離すまで有効入力を抑制する（R 自体は解除条件に含めない）。Pause 中 R による Training Reset の受理、主要状態初期化、AirKick Assist 予約破棄、Pause 解除後の Gameplay input 再有効化は Play 確認済み。全戦闘状態・全入力条件・Development Build を含む詳細総合回帰は未確認。HP バー・Guard は未実装。Round 終了・勝敗判定は**対戦モード固有・未実装**であり、FightDebugScene（練習）には混在させない。
 
 Jパンチの **攻撃設定値の正本**は `DebugAttackData.JPunch` である（段階15。ScriptableObject ではない読み取り専用データ）。
 Startup/Active/Recovery・Damage・HitStop・HitStun・Knockback・local Hit Box をここから参照する。
@@ -510,7 +510,7 @@ Unity デバッグ実装の**実際の到達点**（段階1〜15）と次工程�
 
 将来の対戦モードでも、位置・Facing・Jump を含む共通 Reset 処理を再利用しうる。**現在の実装入口は Training Reset（練習モード）**である。
 
-**確認状況**: ジャンプ中 R・壁際・KO 後・HitStop 中 Reset、release gate、解除後の再入力を Editor Play Mode で確認済み。Pause 中 R、Development Build は**未確認**。
+**確認状況**: ジャンプ中 R・壁際・KO 後・HitStop 中 Reset、release gate、解除後の再入力を Editor Play Mode で確認済み。Pause 中 R による Training Reset の受理・主要状態初期化・AirKick Assist 予約破棄・Pause 解除後の Gameplay input 再有効化は Play 確認済み。Pause 中 R の詳細総合回帰、Development Build は**未確認**。
 
 ### 15.5 キャラクター機能と Visual State
 
@@ -663,7 +663,7 @@ P1 CurrentInput
 鏡写しON時だけ、P2へ渡すAttack／Kickの押下開始をCombatFrame数だけ遅らせる検証補助。左右・Up・Downは遅延しない。本番AIの反応時間ではない。攻撃性能やClash条件は変えない。
 
 流れ: 意図作成 → 立ち上がりを予約 → 予約CFでHeldを1回true → 通常SampleAttack／TryStart。OFF／NoAttack／Training Reset等で予約破棄。
-**Mirror OFFおよびTraining Resetによる予約破棄はPlay確認済み**（Swap・Delay15。発火予定CF通過で`Mirror attack delay fired`なし／P2 JPunch開始なし。Reset時は位置・HP・HitCount・攻撃状態も初期化）。AirKick Assistの予約破棄専用Playとは別。
+**Mirror OFFおよびTraining Resetによる地上Delay予約破棄はPlay確認済み**（Swap・Delay15。発火予定CF通過で`Mirror attack delay fired`なし／P2 JPunch開始なし。Reset時は位置・HP・HitCount・攻撃状態も初期化）。Assist Delay（§18.7）とは別系統。
 
 ### 18.3 異技Clash Play実測（Swap・**P1 GroundKick → P2 JPunch**・近距離・push済み）
 
@@ -683,7 +683,7 @@ Attack started（SimulationTick／CombatFrame／mirrorDelay／mode等）、Attac
 
 **確認済み**: 左右／Jump鏡写し、攻撃変換・遅延・検証ログ、NoAttack時Normal Hit、異技Clash **P1 GroundKick → P2 JPunch**（Delay5）、Delay 4/5/6境界、Mirror OFFおよびTraining Resetによる地上Delay予約破棄。
 
-**未確認**: **P1 JPunch → P2 GroundKick** で双方候補が同一CFになる条件でのClash実測。将来のP2 Movement／Stance／Guard Mode。AirKick Assist側の予約破棄専用Playは§18.7で未確認のまま。
+**未確認**: **P1 JPunch → P2 GroundKick** で双方候補が同一CFになる条件でのClash実測。将来のP2 Movement／Stance／Guard Mode。
 
 ### 18.6 将来のP2検証設定案（未実装）
 
@@ -692,9 +692,9 @@ Attack started（SimulationTick／CombatFrame／mirrorDelay／mode等）、Attac
 
 Down入力の扱いはしゃがみ実装時に再検討する。
 
-### 18.7 P2 AirKick検証アシスト（2026-08-03・未コミット・検証専用）
+### 18.7 P2 AirKick検証アシスト（`03bfd72` / Docs `988f36f`・push済み・検証専用）
 
-Air双方候補の未適用分岐と、未対応警告の同一Playセッション中1回制御をPlay確認するためのDebug補助。正式P2操作・本番AI・対戦ルールではない。Inspector上も検証専用。既定OFF。地上攻撃変換とは別責務。確認時は`debugP2MirrorAttackMode=NoAttack`併用を推奨。`debugMirrorP1InputToP2` ON時のみ有効。
+Air双方候補の未適用分岐と、未対応警告の同一Playセッション中1回制御をPlay確認するためのDebug補助。正式P2操作・本番AI・対戦ルールではない。Inspector上も検証専用。既定OFF。地上攻撃変換とは別責務。確認時は`debugP2MirrorAttackMode=NoAttack`併用を推奨。`debugMirrorP1InputToP2` ON時のみ有効。Scene既定はMirror OFF / Assist OFF / Delay 0。Play中Inspector変更はScene既定値変更ではない。
 
 ```text
 P1がAirKick開始可能なKickエッジ
@@ -703,9 +703,9 @@ P1がAirKick開始可能なKickエッジ
 → ResolveInput → SampleAttack → TryStartKick → CanStartAirKick → StartAirKick
 ```
 
-`StartAirKick`直接呼び出し・PendingHit注入なし。Jump／AttackState／Hit・Hurt Box／候補収集→分類→適用を通す。Delay 0では予約と発火が同じ入力段階CFになり得るが、Attack開始は通常処理側の次CombatFrame。発火時にP2が開始不能（接地・KO・CombatReaction・ActionPlaying・AirKickUsedThisJump等）ならKickを載せない（GroundKick化防止）。予約はAwake／Training Reset／Mirror OFF／Assist OFF／発火成功／発火不能破棄でクリア（地上Delay予約とは別状態）。
+`StartAirKick`直接呼び出し・PendingHit注入なし。Jump／AttackState／Hit・Hurt Box／候補収集→分類→適用を通す。Delay 0では予約と発火が同じ入力段階CFになり得るが、Attack開始は通常処理側の次CombatFrame。発火時にP2が開始不能ならKickを載せない（GroundKick化防止）。予約はAwake／Training Reset／Mirror OFF／Assist OFF／発火成功／発火不能破棄でクリア（地上Delay予約とは別状態）。
 
-#### Play実測1回目（Mirror ON・NoAttack・Assist ON・Delay0・近距離Neutral Jump・空中P1 K）
+#### Play実測（Air双方未適用・push済み）
 
 | CF | 内容 |
 |---:|---|
@@ -715,14 +715,21 @@ P1がAirKick開始可能なKickエッジ
 
 警告文: `Unsupported mutual hit (includes air attack). No NormalHit / GroundClash applied until Air Clash is defined.`
 
-結果: Ground Clash／Normal Hitなし。Damage／HitStun／ClashRecoil／HitStop／HitCountなし、HP不変。双方Recovery→自然終了→着地。最終HUDのAttackResultは既存の攻撃終了Miss表示（未適用分類のNormalHit／Clash結果ではない。None維持とは書かない）。
+結果: Ground Clash／Normal Hitなし。HP等不変。自然終了。最終HUD AttackResultは既存Miss表示。同一Playで警告1回（CF387→CF881）。
 
-#### Play実測2回目（同一Playセッション・警告1回）
+#### Assist予約安全確認（2026-08-03・未コミット・Play実測）
 
-- 1回目: CF387で双方Pending＋警告あり
-- 2回目: CF875 reserved/fired → CF876双方開始 → CF881双方Active・双方Pending。Normal Hit／Ground Clashなし、HitCount 0、自然終了。警告は再出力なし
-- Training Resetは警告フラグを戻さない現行仕様。Play停止→再開始で初期値へ戻る想定はコード上確認（再警告のPlay実測は未実施）
+Delay15・NoAttack・初期距離3.0・Neutral Jump。地上Delay（§18.2）とは別系統。
 
-**確認済み（Assist・Air双方）**: SimulationInputState経路、Delay0で開始CF同一、同一CF双方Active／双方Pending、未適用（Clash／NormalHit非適用・HP等非適用）、自然終了、同一Playセッション中警告1回、2回目も未適用継続。
+| 確認 | Play結果 |
+|---|---|
+| Mirror OFF | 予約後Pause中にMirror OFF。発火予定CF通過でも`fired`なし／P2 AirKick・GroundKickなし（例CF670→685）。`reason=MirrorOff`明示ログは未確認 |
+| Assist OFF | Mirror ONのままAssistのみOFF。同様に未発火（例CF938→953）。`reason=AssistOff`明示ログは未確認 |
+| Training Reset | Pause中R。未発火（例CF681→696）。位置0.00/3.00・HitCount0・Idle・Jump解除・HitStop0・HP/KO初期化・Gameplay input再有効化。`reason=Reset`明示ログは未確認 |
+| 接地時破棄 | 発火時P2着地済みで`cancelled ... reason=P2CannotStartAirKick`（CF1367／CF1856・実ログ確認）。GroundKick化なし |
 
-**未確認（Assistまわり・地上Delay破棄Playとは別）**: Airを含む異種双方候補、Assist Delay 1〜15境界、予約後のMirror OFF／Assist OFF／Training Resetの専用Play、着地直前予約でGroundKick化しないこと、KO／CombatReaction／ActionPlaying／UsedThisJump時の破棄専用Play（コード上は破棄処理あり、Play専用確認は未実施）、Play再開始後の再警告Play、正式Air Clash／正式P2操作・AI。
+複合条件: 被弾・CombatReactionを含む条件下でも誤発火しないことを確認（CombatReaction単独の専用Playではない）。
+
+**確認済み（Assist）**: SimulationInputState経路、Air双方未適用＋警告1回、Mirror OFF／Assist OFF／Training Resetによる予約無効化、OFF/Reset後の発火予定CF通過でも古い予約が発火しない、接地時P2CannotStartAirKick、着地後GroundKick化防止、Reset後の主要状態初期化と入力再有効化。
+
+**未確認（Assist）**: KO／HitStun／ClashRecoil等CombatReaction／ActionPlaying／AirKickUsedThisJumpの各単独破棄、Assist Delay 1〜14境界、Play再開始後の警告再出力、異種Air双方、正式Air Clash／正式P2操作・AI。
