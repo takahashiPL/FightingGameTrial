@@ -55,6 +55,26 @@
 - 仕様にないショートカットで片方だけ先に勝たせる
 - コメントなしの短縮名だけのコード
 
+### 3.1 Hit解決とP2入力ソース（現行Unityデバッグの読み方）
+
+Hitの正本は `CollectAndResolveHitsForCombatFrame` である。
+
+1. P1→P2 / P2→P1 の命中候補を収集する
+2. 組み合わせを分類する
+3. Ground Clash または Normal Hit として適用する
+
+候補発見時にDamage / HitStunを即時適用しない。片側だけ先にHitStunへ入れると、同じCombatFrameで成立していたもう片側の攻撃が消え、処理順で結果が変わるためである。
+
+P2鏡写しDebug（`debugMirrorP1InputToP2`）は、戦闘ロジックを分岐させず **入力ソースだけ** を差し替える例である。
+
+```text
+P1 CurrentInput → 鏡写し変換 → p2MirrorInput → ResolveInput(P2) → 通常の移動・Jump・攻撃開始
+```
+
+将来のP2 AIも、同じ「P2用 SimulationInputState を埋める」箇所を差し替えればよく、StartAttackをSessionから直接叩く裏口は避ける。
+
+確認状態の要約: 移動／Jump／Air Kick非模倣は確認済み。新経路での地上攻撃模倣・異技Clash・Air双方未適用・Debug OFF回帰は未確認（詳細は `docs/unity_implementation_status.md`）。
+
 ---
 
 ## 4. エンジン非依存

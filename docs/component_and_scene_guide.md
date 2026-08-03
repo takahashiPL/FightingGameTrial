@@ -5,7 +5,7 @@
 対象コミット（資料作成時点）: **`2341e4c`**（Add component and scene learning guide）
 方針追記時点の HEAD: **`dfcb9e0`**（Reduce status HUD allocations）※コード変更なしの Docs 追記
 対象 Scene: `Game/Assets/Scenes/FightDebugScene.unity`
-実装到達点: **Stage 15完了後 + Ground Kick / 共通Hit解決基盤（`bc80ddb`）+ Ground Clash recoil separation（`78c4e94`）**
+実装到達点: **Stage 15完了後 + Ground Kick / 共通Hit解決基盤（`bc80ddb`）+ Ground Clash recoil separation（`78c4e94`）+ Clash判定整理 / P2鏡写しDebug（2026-08-03・未コミット）**
 Scene の役割: **正式な練習・検証モード**（対戦モードではない。§2・§17）
 
 ---
@@ -462,12 +462,13 @@ Keyboard (J)
 |---|---|
 | Participant は参加枠 | キャラクター種類の選択ではない（`slotId` が P1/P2） |
 | 同一 Component 構成 | DebugPlayer / DebugDummy とも Motor + Visual + Participant + SpriteRenderer |
-| 入力の差だけ | P1: `usesGameplayInput = true`、P2: `false` → Session が Neutral を渡す |
-| Dummy 専用分岐ではない | P2 用の別戦闘ロジッククラスはない |
+| 入力の差だけ | P1: `usesGameplayInput = true`、P2: `false` → 既定は Session が Neutral を渡す |
+| Debug鏡写し | `debugMirrorP1InputToP2` ON 時のみ、P2 へ `p2MirrorInput`（変換済み論理入力）を渡す。OFFは従来どおり Neutral |
+| Dummy 専用分岐ではない | P2 用の別戦闘ロジッククラスはない。移動・Jump・攻撃開始はP1と同じ通常経路 |
 | opponent 相互参照 | Scene で交差接続 |
 | Facing / Push | 両者に同じ Session 経路が適用される |
 
-P2 が動かないのは「Dummy 専用コード」ではなく、**入力が常に false** だからです。
+P2 が動かないのは「Dummy 専用コード」ではなく、**既定入力が常に false（Neutral）** だからです。鏡写しDebugは入力ソース差し替えであり、本番AIではない。
 
 ---
 
@@ -584,7 +585,7 @@ HUD の数字は便利な鏡です。**戦闘データの正本は Session / Par
 | 3 | `Debug/DebugPlaybackInput.cs` | Consume* | `Update` | — |
 | 4 | `Simulation/SimulationTimeState.cs` | Tick/Combat/Pause/HitStop フィールド | Reset | — |
 | 5 | `Simulation/SimulationClockDriver.cs` | SerializeField | `Update`, `AdvanceByAccumulatedTime` | テスト HitStop 細部 |
-| 6 | `Simulation/SimulationSession.cs` | クラス先頭の処理順コメント | `ProcessOneSimulationTick`, `TryResolveJPunchHit` | ログ整形 |
+| 6 | `Simulation/SimulationSession.cs` | クラス先頭の処理順コメント | `ProcessOneSimulationTick`, `CollectAndResolveHitsForCombatFrame`, `UpdateDebugMirrorP2InputFromP1` | ログ整形 |
 | 7 | `Fighter/DebugFighterParticipant.cs` | 所有物（HP/KO/AttackState/HitState） | `EvaluateWorldHitBox`, `ReceiveHit`, `ApplyDisplayColor` | Box 原点計算の細部 |
 | 8 | `Fighter/DebugFighterMotor.cs` | LogicalX, Facing | `SetLogicalX`, `TryMoveLogicalXBy` | — |
 | 9 | `Fighter/DebugFighterHitState.cs` | HitStun / KB 速度 | `BeginHitStun`, Tick* | — |
@@ -612,11 +613,12 @@ HUD の数字は便利な鏡です。**戦闘データの正本は Session / Par
 - HP バー・Guard
 - 攻撃データの ScriptableObject 化 / Inspector 編集
 - 複数攻撃・コンボ・Cancel・Counter Hit
-- 2P 実操作（現在 P2 は Neutral）
+- 2P 実操作（既定 P2 は Neutral。検証用 `debugMirrorP1InputToP2` あり。本番AI未実装）
 - 壁バウンド・壁やられ など
-- Walk 見た目品質改善、Animator、ClashRecoil専用Sprite／演出、Air Hit / Air Knockback（空中被弾）
+- Walk 見た目品質改善、Animator、ClashRecoil専用Sprite／演出、Air Hit / Air Knockback（空中被弾）、Air Clash
 - 正式 Character Data ScriptableObject
 - 将来の空中攻撃（仕様未定・空中パンチは対象外）
+- Counter Hit / Attack Priority
 
 Training Reset の位置・向き・Jump 復帰と共通 release gate は **実装済み**（§17.7）。Visual Sequence / Sprite Sheet は **実装済み**（§17.8・§17.9）。ジャンプ基盤は **実装済み**（§17.9）。
 
@@ -1323,13 +1325,29 @@ P1/P2の `DebugFighterVisual > Kick Sequence`:
 - Loop: OFF
 - Hold Last Frame: ON
 
-`SimulationSession.debugForceP2AttackWithP1ForClashTest` は通常 **OFF**。Ground Clash専用検証時だけONにする。2026-07-30にJPunch同士／Ground Kick同士でEditor実測済み。検証後はOFFへ戻し、Scene保存済み。
+`SimulationSession.debugMirrorP1InputToP2`（旧名 `debugForceP2AttackWithP1ForClashTest`）は通常 **OFF**。Clash / 左右対称の検証時だけPlay中にONにする。Scene既定はOFF。本番AIではない。
+
+入力経路:
+
+```text
+P1 CurrentInput
+→ UpdateDebugMirrorP2InputFromP1
+→ p2MirrorInput
+→ ResolveInputForParticipant(P2)
+→ P2の通常の移動・Jump・攻撃開始
+```
+
+左右反転、Upそのまま、Attackそのまま、Kickは双方接地時のみ（Air Kick非模倣）。Transform / 状態の直接コピーなし。
+
+**確認済み**（通常入力経路統一後・ユーザー操作とログ）: 左右鏡写し移動、Neutral Jump同時開始・同時着地、Forward Jump鏡写し、P1のみAir Kick・P2非模倣、P1 Air Kick→P2 Normal Hit、コンパイル／Play Mode動作。
+
+**未確認**: 新経路でのJPunch／Ground Kick模倣、異技Clash、Air双方候補の未適用と警告1回、Debug OFF回帰。
 
 ### 18.2 Ground Kickの確認値
 
-現在の未コミット暫定値は`DebugAttackData.GroundKick`: S/A/R 9/4/13、Damage 14、HitStop 7、HitStun 14、Horizontal KB 0.24、Hit Box center `(0.95,0.55)` / half `(0.60,0.25)`。コミット`bc80ddb`時点の履歴値は8/3/4。
+現行暫定値（push済み）は`DebugAttackData.GroundKick`: S/A/R 9/4/13、Damage 14、HitStop 7、HitStun 14、Horizontal KB 0.24、Hit Box center `(0.95,0.55)` / half `(0.60,0.25)`。コミット`bc80ddb`時点の履歴値は8/3/4。
 
-### 18.3 Play Mode確認済み
+### 18.3 Play Mode確認済み（Ground Kick）
 
 1. 地上でK → Kick開始
 2. AF 10〜13で赤Hit Box。AF14〜19は振り切りVisualだけを残し、Hit Boxは無効
@@ -1338,16 +1356,23 @@ P1/P2の `DebugFighterVisual > Kick Sequence`:
 5. 空中で新しくKを押すとAir Kick。地上K保持を空中へ予約しない
 6. Punch/Kick中の相互切替なし。近いJ+K入力はJ Punch優先
 
-### 18.3 Ground ClashのEditor実測結果
+### 18.4 Ground ClashのEditor実測結果（同技・2026-07-30）
 
-P1をP2へPush Box最小距離まで近づけ、`debugForceP2AttackWithP1ForClashTest`を一時的にONとして確認した。
+P1をP2へPush Box最小距離まで近づけ、旧フラグ `debugForceP2AttackWithP1ForClashTest` を一時的にONとして確認した。
 
 - JPunch同士: `Ground Clash`成立、Damage 0、HitStop、双方反動、攻撃終了、Idle復帰
 - Ground Kick同士: 同じ結果を確認
 - Clash後の位置は双方が離れる方向へ更新される
 - コミット`78c4e94`で通常Hitから専用`ClashRecoil`状態へ分離。黄色系専用色を表示し、HUD状態名も`ClashRecoil`となる
 - Clashでは通常HitCountを増やさず、JPunch同士／Ground Kick同士とも`P2HitCount=0`を確認
-- 専用Sprite Sequenceは未設定で、Idle Sequenceへfallbackする。Scene差分は持たずコード初期値で動作確認済み
+- 専用Sprite Sequenceは未設定で、Idle Sequenceへfallbackする
+
+### 18.5 Clash判定整理と確認状態（2026-08-03・未コミット）
+
+現行コードの正本は `CollectAndResolveHitsForCombatFrame`（候補収集 → 分類 → 適用）。Ground Clashは双方地上攻撃なら技種不問。Airを含む双方候補はコード上結果未適用（正式Air Clashではない）。
+
+- **確認済み**: 同技Ground Clash（旧検証フラグ時代）。鏡写しの移動／Jump／Air Kick非模倣／Air Kick→Normal Hit（上記18.1）
+- **未確認**: 異技Clash（JPunch対GroundKick／逆）、新経路での地上攻撃模倣、Air双方候補の未適用と警告1回、Debug OFF回帰
 
 通常作業では検証フラグをOFFのまま使う。
 

@@ -1,16 +1,30 @@
 # CHANGELOG
 
-## 未コミット: Fighter Sprite Sheet再構築版の正式採用（2026-07-31）
+## 未コミット: Clash判定整理 + P2鏡写しDebug入力経路（2026-08-03）
+
+- Hit解決の正本を `CollectAndResolveHitsForCombatFrame` に明確化。候補収集 → 分類 → 適用の3段階。候補発見時にDamage / HitStunを即時適用しない
+- 旧即時Hit経路 `TryResolveJPunchHit` と専用2引数 `ResolveKnockbackVelocityX` を参照0確認のうえ削除
+- Ground Clashは双方候補かつ双方とも地上攻撃（現行: JPunch / GroundKick）のとき。技種一致は条件にしない（異技同士もコード上Clash対象）
+- Air Kickを含む双方候補はGround Clashへ分類せず、結果未適用・仮Air Clashなし・片側Normal Hitへ落とさない。警告はセッション中1回
+- 旧 `debugForceP2AttackWithP1ForClashTest` を `debugMirrorP1InputToP2` へ置換。Scene既定OFF
+- 鏡写しは `P1 CurrentInput → UpdateDebugMirrorP2InputFromP1 → p2MirrorInput → ResolveInput(P2) → 通常の移動・Jump・攻撃開始`。攻撃開始の直接呼び出しは使わない
+- 左右反転、Upはそのまま、Attackはそのまま、Kickは双方接地時のみ（Air Kick模倣なし）。OFF時はP2 Neutralの既存挙動
+- 本番AIではない。将来のP2 AIは入力ソース差し替えで接続する入口
+- **確認済み**: 左右鏡写し移動、Neutral/Forward Jump鏡写し、P1のみAir Kick・P2非模倣、P1 Air Kick→P2 Normal Hit、コンパイル／Play Mode動作
+- **未確認**: 新経路でのJPunch／Ground Kick模倣、異技Clash、Air双方候補の未適用と警告1回、Debug OFF回帰
+- 今回の未コミット範囲は本Clash整理・P2鏡写しDebug・関連Docsのみ（Sprite／Air Kick／Font Atlasはpush済み）
+
+## Fighter Sprite Sheet再構築版の正式採用（`5bcc3fa` / Docs `d98a99d`・push済み）
 
 - PixelLab由来の再構築版を正式な`Game/Assets/Art/Characters/Fighter_SpriteSheet.png`へ整理。GUID `42345be00e0994144ba94bc5f1362757`と41 SpriteのinternalIDを維持
 - 192×192固定セル＋Center Pivotは透明余白中心が基準となり表示が上へずれたため不採用。各セル内の実画素Trim Rect＋Center Pivotを正式方式とした
 - 旧GUID `dcb7851d129f2305be49fac973bf47b4`のGame/Assets参照を0件にして削除し、旧PNG/metaはAssets外へバックアップ
 - P1/P2のSpriteRenderer初期表示とIdle／Walk／Jump／Punch／Ground Kickを正式GUIDへ統一。Scene内正式GUID参照76件、不明internalID 0件
 - `DebugFighterVisual.airKickSequence`を追加し、`FighterRebuilt_AirKick_00`〜`05`を1CF/枚、Loop OFF、Hold Last Frame ONで接続。RecoveryはJumpFallを維持
-- Unity Import、コンパイル、Missing Sprite／参照例外なしを確認。IdleとAir Kick専用Flying Kick表示を確認済み。総合操作回帰は未確認として残す
+- Unity Import、コンパイル、Missing Sprite／参照例外なしを確認。IdleとAir Kick専用Flying Kick表示を確認済み
 - Hurt／Push BoxはCenterX 0、HalfWidth 0.75の左右対称暫定値。Facing対応と前後非対称化はPush Resolverを含む後工程へ保留
 
-## 未コミット: Air Kick最小検証版・通常技暫定調整
+## Air Kick最小検証版・通常技暫定調整（`f19cc22` 系〜専用Sequence `5bcc3fa`・push済み）
 
 - `AirKick`をGround Kickとは別の`DebugAttackId` / `DebugAttackData` / `FighterVisualState`として追加
 - K入力を接地状態で一括分岐。接地中はGround Kick、すでに空中ならAir Kick。地上Up+KはGround Kick、J+KはJ Punch優先、空中Jは攻撃なし
@@ -20,6 +34,10 @@
 - Play確認: J Punchは軽い技として見やすく、Air Kickは立ち相手へ以前より当てやすい。Ground Kickの見た目改善は限定的で、脚の伸び・シルエットを改善したSprite再制作後に再調整する
 - Air Hit / Air Knockback / 縦Knockback / Air Clash / 正式Tradeは未実装。Air KickをAir Hit基盤完成とは扱わない
 
+## Debug HUD font glyph atlas（`1b47fc6`・push済み）
+
+- debug HUD用フォントglyph atlas更新。現在のpush済みHEAD
+
 ## Ground Clash recoil separation（`78c4e94`）
 
 - 2026-07-30、`unity` / `origin/unity` へ push 済み
@@ -28,7 +46,7 @@
 - Clash時は通常HitCountへ加算しない。JPunch同士／Ground Kick同士で`P2HitCount=0`をEditor確認
 - Clash専用色を黄色系として追加。専用Sprite Sequence未設定時はIdleへfallback
 - Scene差分なし。コード側の初期値で同動作を再確認
-- `debugForceP2AttackWithP1ForClashTest`は通常OFF。検証時のみPlay中にON
+- 当時の検証フラグ `debugForceP2AttackWithP1ForClashTest` は通常OFF（後に `debugMirrorP1InputToP2` へ置換）
 
 ## Ground Kick + shared hit resolution groundwork（`bc80ddb`）
 

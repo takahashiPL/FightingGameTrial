@@ -1,17 +1,22 @@
 # Unity 実装状況・次工程（段階1〜15到達後）
 
-最終更新: 2026-07-31
+最終更新: 2026-08-03
 対象ブランチ: `unity`
-内容反映済み基準コミット: **`69c9385`**（Document clash recoil state separation）。作業開始時の参照HEADは`cd17c83`で、以下には未コミットC# / Docs変更を含む
+内容反映済み基準コミット（push済みHEAD）: **`1b47fc6`**（Update debug HUD font glyph atlas）
+push済み到達点の例: `5bcc3fa`（Sprite再構築採用＋Air Kick Sequence）、`d98a99d`（同Docs）、`1b47fc6`（HUD font atlas）
+過去履歴の例（現在の基準ではない）: `69c9385`（Document clash recoil state separation）
 段階14全体（14A+14B）・段階15（攻撃データ化）: **完了・push 済み**
 GC-1 / GC-2（補助改善・正式 Stage ではない）: **完了・push 済み**
 Training Reset 位置・向き復帰: **実装・Editor 確認済み**（正式 Stage 番号なし）
-Visual Sequence + Sprite Sheet 移行: **実装・Editor 確認済み**（正式 Stage 番号なし）
+Visual Sequence + Sprite Sheet 移行: **実装・Editor 確認済み・push済み**（正式 Stage 番号なし）
+PixelLab再構築版Sprite Sheet正式採用: **実装・Editor確認済み・push済み**（`5bcc3fa` / Docs `d98a99d`）
 ジャンプ基盤・Jump Visual・計測ログ: **実装・Editor 確認済み**（正式 Stage 番号なし）
 Training Reset 共通 release gate: **実装・Editor 確認済み**（正式 Stage 番号なし）
 Ground Kick + shared hit resolution groundwork: **実装・Editor確認済み・push済み**（正式 Stage 番号なし）
 Ground Clash recoil separation: **実装・Editor確認済み・push済み**（`ClashRecoil`専用状態・黄色系表示・通常HitCount非加算。正式 Stage 番号なし）
-Air Kick最小検証版・攻撃フレーム調整: **実装済み・Play確認済み・未コミット・暫定**（Scene / Prefab変更なし）
+Air Kick最小検証版・攻撃フレーム調整・専用Sequence: **実装済み・Play確認済み・push済み・暫定**（`f19cc22` 系〜 `5bcc3fa`）
+Debug HUD font glyph atlas: **push済み**（`1b47fc6`）
+**今回の未コミット範囲のみ**: Clash判定整理、P2鏡写しDebug入力経路（`debugMirrorP1InputToP2`）、および今回の関連Docs更新
 正式な次工程番号: **未定義**（新 Stage 番号は作らない）
 
 このファイルは、Unity 側の**実装済み / 暫定 / 未実装 / 次回候補 / 正式方針**を混同せずに追うための正本です。
@@ -308,7 +313,7 @@ KO 後もその最後の一撃の Knockback / HitStun は処理される。HitSt
 **KO 中の制御**（戦闘処理は段階15で変更なし）:
 - 入力移動禁止: `ProcessOneFighterMovement` 先頭（Knockback は別経路で継続）
 - 新規攻撃禁止: `TryStartJPunchForParticipant` 先頭
-- KO 済み防御者への追加 Hit 拒否: `TryResolveJPunchHit` 冒頭
+- KO 済み防御者への追加 Hit 拒否: `CollectPendingHit` 内（旧 `TryResolveJPunchHit` は削除済み）
   → Damage / HitCount / HitStop / HitStun / Knockback 再設定なし
   → 攻撃側 Action は開始・終了し結果は Miss。HUD ラベル `DefenderKO`
 
@@ -450,17 +455,20 @@ ScriptableObject 化、Inspector 編集、Character 別攻撃データ、複数�
 - 攻撃データの ScriptableObject 化 / Inspector 編集 / JSON・CSV
 - 複数攻撃、弱/中/強、技コマンド、コンボ、Cancel、Counter Hit
 - 自然な歩行素材の再制作（現状 Walk 8 コマは動作確認済み）
-- **ClashRecoil専用Sprite／演出の追加**（状態・専用色・通常HitCount非加算は実装済み。P2同時攻撃デバッグ経路の通常保存値はOFF）
+- **ClashRecoil専用Sprite／演出の追加**（状態・専用色・通常HitCount非加算は実装済み。`debugMirrorP1InputToP2` のScene保存値はOFF）
 - Punch 3 枚以上への素材改善
 - Character Data ScriptableObject（ジャンプ設定の正式データ化含む）
 - Jump 数値調整、Development Build Profiler
+- 本番P2 AI（現在は鏡写しDebug入力ソースのみ。差し替え入口は用意）
 - 練習用将来候補: ダミー回復、自動回復、ガード設定、行動記録、判定表示、フレーム表示など
 
 （Training Reset・release gate・ジャンプ基盤・Visual Sequence / Sprite Sheet は **§1.1・§1.2 で実装済み**。未実装候補からは外す。）
 
 ### 2.10 相打ち・キャラ差し替え
 
-- 相打ち: 両方向判定の土台のみ。P2 Neutral のため実動作確認は未実施
+- Ground Clash: 双方候補かつ双方地上攻撃なら成立（技種不問）。同技は旧検証フラグでEditor実測済み。異技はコード上対象、Editor確認は未確認
+- Airを含む双方候補: コード上は結果未適用（正式Air Clashではない。実測未確認）
+- P2: 既定はNeutral。検証時のみ `debugMirrorP1InputToP2` で鏡写し入力を通常経路へ渡す（移動／Jump確認済み。地上攻撃模倣は未確認）
 - キャラ差し替え・複数 Hurt/Hit Box: 未実装
 
 ---
@@ -599,8 +607,9 @@ Round / Guard / 複数攻撃などの**機能 Stage とは別枠**。番号「GC
 
 ### 共通 Hit 解決基盤
 
-`DebugAttackId`、`DebugAttackPhase`、`DebugPendingHit`、`DebugHitResolutionType`、`DebugClashTuning` を追加。各方向のHit候補を同一 CombatFrame で収集後に解決する構造へ移行した。`debugForceP2AttackWithP1ForClashTest`を一時的にONとして、JPunch同士／Ground Kick同士のGround ClashをEditor実測済み。Damage 0、HitStop、双方反動、攻撃終了、Idle復帰を確認した。コミット`78c4e94`で通常Hitから専用`ClashRecoil`状態へ分離し、黄色系表示と通常HitCount非加算を確認。検証後のScene保存値はOFF。
+`DebugAttackId`、`DebugAttackPhase`、`DebugPendingHit`、`DebugHitResolutionType`、`DebugClashTuning` を追加。各方向のHit候補を同一 CombatFrame で収集後に解決する構造へ移行した。正本メソッドは `CollectAndResolveHitsForCombatFrame`。旧即時経路 `TryResolveJPunchHit` は削除済み。
 
+旧検証フラグ `debugForceP2AttackWithP1ForClashTest` を一時的にONとして、JPunch同士／Ground Kick同士のGround ClashをEditor実測済み（Damage 0、HitStop、双方反動、攻撃終了、Idle復帰）。コミット`78c4e94`で通常Hitから専用`ClashRecoil`状態へ分離し、黄色系表示と通常HitCount非加算を確認。検証後のScene保存値はOFF。フラグは後に `debugMirrorP1InputToP2` へ置換。
 
 ### Ground Clash専用実測（2026-07-30）
 
@@ -610,9 +619,43 @@ Round / Guard / 複数攻撃などの**機能 Stage とは別枠**。番号「GC
 - `ClashRecoil`専用状態と黄色系専用色を表示し、HUD状態名も`ClashRecoil`となる
 - Clashでは通常HitCountを増やさず、JPunch同士／Ground Kick同士とも`P2HitCount=0`を確認
 - 専用Sprite Sequence未設定時はIdleへfallback。Scene差分なし、コード側初期値で同動作を再確認
-- `debugForceP2AttackWithP1ForClashTest`は通常OFF。検証時のみPlay中にON
+- 当時の検証フラグは通常OFF。現行は `debugMirrorP1InputToP2`（既定OFF）
 
-## 7. Air Kick最小検証版・通常技暫定調整（2026-07-31・未コミット）
+### Clash判定整理（2026-08-03・未コミット）
+
+- 正本フロー: (1) P1→P2 / P2→P1 候補収集 (2) 組み合わせ分類 (3) Ground Clash または Normal Hit 適用
+- Ground Clash対象の地上攻撃: `JPunch` / `GroundKick`。技種一致は不要（異技同士もコード上Clash）
+- Air Kickを含む双方候補: コード上は結果未適用、仮Air Clashなし、片側Normal Hitへ落とさない、警告はセッション中1回（実測は未確認）
+- Counter Hit / Attack Priority / 技の固定重みは導入しない
+- 同技Ground Clashは確認済み。異技Clash（JPunch対GroundKick／逆）は未確認
+
+### P2鏡写しDebug（2026-08-03・未コミット）
+
+- 設定名: `debugMirrorP1InputToP2`（旧名置換）。Scene既定OFF。本番AIではない
+- 経路: P1 CurrentInput → `UpdateDebugMirrorP2InputFromP1` → `p2MirrorInput` → `ResolveInputForParticipant(P2)` → 通常の移動・Jump・攻撃開始
+- 左右反転、Upそのまま、Attackそのまま、Kickは双方接地時のみ（Air Kick非模倣）
+- Transform / 戦闘状態の直接コピーなし。攻撃開始の直接呼び出しなし
+- OFF時は従来どおり P2 Neutral
+
+**確認済み**（通常入力経路統一後・ユーザー操作とログ）:
+
+- 左右鏡写し移動
+- Neutral Jump の P1/P2 同時開始・同時着地
+- Forward Jump の P1/P2 鏡写し
+- P1 だけ Air Kick を開始し、P2 は Air Kick を模倣しない
+- P1 Air Kick から P2 への Normal Hit
+- Unity コンパイルと Play Mode 動作
+
+**未確認**:
+
+- 新しい通常入力経路での JPunch 模倣
+- 新しい通常入力経路での Ground Kick 模倣
+- JPunch対GroundKick／GroundKick対JPunch の異技Clash
+- Air を含む双方候補の結果未適用
+- Air 未対応警告がセッション中1回だけか
+- Debug モード OFF 時の一連の回帰
+
+## 7. Air Kick最小検証版・通常技暫定調整（push済み・暫定）
 
 ### 2026-07-31 Sprite Sheet正式採用後の状態
 
@@ -629,15 +672,16 @@ Round / Guard / 複数攻撃などの**機能 Stage とは別枠**。番号「GC
 
 - **実装済み・Play確認済み**: Air Kick開始、1ジャンプ1回、着地即終了、既存Hit判定への接続、Visual分岐
 - **暫定**: 全フレーム値、Recovery Visual境界、Ground Kick画像流用、空中被弾時の既存HitStun＋横KB流用
-- **未実装**: Air Hit、Air Knockback、縦KB、Air Clash、正式Trade、Air Kick専用Sprite
+- **未実装**: Air Hit、Air Knockback、縦KB、Air Clash、正式Trade
+- **表示**: Air Kick専用`airKickSequence`は `5bcc3fa` で接続済み（push済み）
 
-### 変更C#ファイル
+### 変更C#ファイル（履歴。現在HEADの未コミット範囲ではない）
 
 - `Combat/DebugAttackId.cs`: `AirKick`を既存値を変えず末尾追加
 - `Combat/DebugAttackData.cs`: Air Kick専用データ、J Punch / Ground Kick暫定フレーム値
 - `Fighter/DebugFighterAttackState.cs`: Air Kick状態と1ジャンプ1回制限
 - `Fighter/FighterVisualState.cs`: `AirKick`を末尾追加
-- `Fighter/DebugFighterVisual.cs`: AirKickから既存`kickSequence`を流用
+- `Fighter/DebugFighterVisual.cs`: 専用`airKickSequence`（`5bcc3fa`）
 - `Simulation/SimulationSession.cs`: K入力分岐、着地終了、Phase別Visual、HUD / Console識別
 
 ### 現行暫定値

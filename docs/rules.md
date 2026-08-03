@@ -608,7 +608,13 @@ Session が状態を決定し、`DebugFighterVisual` が `FighterSpriteSequence`
 - Ground Kickは Startup 9 / Active 4 / Recovery 13、Damage 14、HitStop 7、HitStun 14、横KB 0.24
 - local Hit Boxは Facing Right基準 center `(0.95, 0.55)`、half `(0.60, 0.25)`。Facing LeftではParticipantが反転する
 - 1攻撃1Hit。Active中の複数CombatFrameで重なっても追加Damageしない
-- 同一CombatFrameの両方向Hit候補を収集してから解決する。Ground ClashはJPunch同士／Ground Kick同士でEditor実測済み（Damage 0、HitStop、双方反動、攻撃終了）
+- 同一CombatFrameの両方向Hit候補を収集してから解決する（正本: `CollectAndResolveHitsForCombatFrame`）
+- 候補発見時点ではDamage / HitStunを即時適用しない。先に片側だけ適用すると処理順で結果が変わるため
+- Ground Clash: 双方候補かつ双方とも地上攻撃（現行: JPunch / GroundKick）。技種一致は条件にしない
+- Ground Clash結果: Damage 0、双方HitStop、双方ClashRecoil、通常HitStunへ入れない、通常HitCount非加算、攻撃をClash終了
+- 同技Clash（JPunch同士／Ground Kick同士）は旧検証フラグでEditor実測済み。異技ClashのEditor確認は未確認
+- Counter Hit専用補正、Attack Priority、技の固定重み、先出し／後出し勝敗は導入しない
+- Air Kickを含む双方候補はGround Clashへ分類しない。結果未適用・仮Air Clashなし・片側Normal Hitへ落とさない（正式Air Clashではない）
 
 ## 17. Air Kick最小検証版と攻撃Visualの暫定仕様
 
@@ -627,3 +633,29 @@ BoxはP1/P2ともHurt／Push CenterX `0`、HalfWidth `0.75`の左右対称暫定
 - Air Hit / Air Knockback / 縦KB / Air Clash / 正式Tradeは未実装。Air KickをAir Hit基盤完成とは扱わない
 - 全フレーム値・Visual境界・Hit Boxは専用モーション完成後に再調整する暫定仕様
 - Clashは通常Hitとは別の`ClashRecoil`状態で表示する。Damage 0、通常HitCount非加算、黄色系専用色、専用Sprite未設定時Idle fallbackをEditor確認済み
+
+## 18. P2鏡写しDebug入力経路（Unityデバッグ・本番AIではない）
+
+旧 `debugForceP2AttackWithP1ForClashTest` を `debugMirrorP1InputToP2` へ置換済み。Scene既定はOFF。OFF時はP2 Neutralの既存挙動を変えない。
+
+目的: Clash確認、左右対称動作確認、将来のP2 AI入力ソース差し替え入口の確認。
+
+```text
+P1 CurrentInput
+→ UpdateDebugMirrorP2InputFromP1
+→ p2MirrorInput
+→ ResolveInputForParticipant(P2)
+→ P2の通常の移動・Jump・攻撃開始処理
+```
+
+- 左右は反転（対面で接近／後退が揃うようにする）
+- Upはそのまま（JumpはP2の通常開始条件を通る）
+- Attackはそのまま（J Punchは既存の地上ゲート）
+- Kickは双方接地のときだけ渡す（Air Kickは模倣しない）
+- Transformや戦闘状態の直接コピーはしない
+- 攻撃開始をSessionから直接叩く裏口は使わない
+- 本番AIは未実装。将来はP2入力ソース差し替えで接続する
+
+**確認済み**（通常入力経路統一後・ユーザー操作とログ）: 左右鏡写し移動、Neutral Jump同時開始・同時着地、Forward Jump鏡写し、P1のみAir Kick・P2非模倣、P1 Air Kick→P2 Normal Hit、コンパイル／Play Mode動作。
+
+**未確認**: 新経路でのJPunch／Ground Kick模倣、異技Clash、Air双方候補の未適用と警告1回、Debug OFF回帰。

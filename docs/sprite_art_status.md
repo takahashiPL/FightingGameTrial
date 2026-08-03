@@ -119,7 +119,7 @@
 - 現行暫定値ではGround Kick ActiveはAF10〜13。AF14〜19は振り切り表示だけを残し、Hit Boxは無効。AF20〜26はIdle表示
 - 本番清書ではなく、現素材を使った学習・判定確認用の暫定品質
 
-## Air Kick専用素材接続（2026-07-31・未コミット）
+## Air Kick専用素材接続（`5bcc3fa`・push済み）
 
 - `FighterRebuilt_AirKick_00`〜`05`を`DebugFighterVisual.airKickSequence`へ接続済み
 - 6枚、1 CombatFrame/枚、Loop OFF、Hold Last Frame ON。Startup＋Active 10Fのうち6F表示後は最終コマを保持し、RecoveryでJumpFallへ戻る
@@ -135,4 +135,6 @@
 
 ## Ground Clash表示（2026-07-30）
 
-Ground ClashはJPunch同士／Ground Kick同士でEditor確認済み。コミット`78c4e94`で通常Hitから専用`ClashRecoil`状態へ分離し、黄色系の専用色、Damage 0、通常HitCount非加算を確認した。専用Sprite Sequenceは未設定でIdleへfallbackする。今後はClashRecoil専用Spriteや短い白／黄フラッシュなど、演出品質の改善が候補。
+Ground Clashの同技（JPunch同士／Ground Kick同士）はEditor確認済み。コミット`78c4e94`で通常Hitから専用`ClashRecoil`状態へ分離し、黄色系の専用色、Damage 0、通常HitCount非加算を確認した。専用Sprite Sequenceは未設定でIdleへfallbackする。今後はClashRecoil専用Spriteや短い白／黄フラッシュなど、演出品質の改善が候補。
+
+現行コードでは地上攻撃同士なら技種不問でGround Clash対象だが、異技ClashのEditor確認は未確認。
