@@ -162,6 +162,28 @@ namespace FightingGameTrial.Simulation
         [SerializeField]
         private bool debugMirrorP1InputToP2 = false;
 
+        [Tooltip(
+            "異技Ground Clash再現用の検証専用設定です（本番AIではない）。\n"
+            + "debugMirrorP1InputToP2 が ON のときだけ効きます。OFF 時は無視し、P2 は Neutral のままです。\n"
+            + "SameAsP1: 同技Clash確認（P1 J→P2 J、P1 K→P2 K）。\n"
+            + "SwapPunchAndKick: 異技Clash確認（P1 J→P2 K、P1 K→P2 J）。\n"
+            + "NoAttack: 攻撃は渡さず左右・Jump鏡写しだけ残し、片側Normal Hitを確認。\n"
+            + "技を直接開始せず Attack/Kick 入力だけ変換し、P2 の通常開始条件を維持します。"
+            + " 双方接地時のみ攻撃変換し、Air Kick を起こしません。"
+        )]
+        [SerializeField]
+        private DebugP2MirrorAttackMode debugP2MirrorAttackMode = DebugP2MirrorAttackMode.SameAsP1;
+
+        [Tooltip(
+            "P2へ渡す Attack／Kick の押下開始を遅らせる CombatFrame 数です（検証専用）。\n"
+            + "debugMirrorP1InputToP2 が ON のときだけ有効。左右・Up・Down には影響しません。\n"
+            + "異技Clash確認例: SwapPunchAndKick + 遅延5 で P1 GroundKick 開始の5CF後に P2 JPunch エッジ。\n"
+            + "攻撃データや Clash 条件は変えず、Active 重ねだけを調整します。既定 0。"
+        )]
+        [Range(0, 15)]
+        [SerializeField]
+        private int debugP2MirrorAttackDelayFrames = 0;
+
         /// <summary>
         /// P2 専用の Neutral 入力です。
         /// P1 の CurrentInput とは別インスタンスで、毎tick new しません。
@@ -178,6 +200,28 @@ namespace FightingGameTrial.Simulation
         /// 攻撃開始を Session から直接叩く裏口は使いません。
         /// </summary>
         private SimulationInputState p2MirrorInput;
+
+        /// <summary>
+        /// 変換後の Attack／Kick 意図の前tick保持（遅延キュー用の立ち上がり検出）。
+        /// </summary>
+        private bool previousMirrorAttackIntent;
+
+        private bool previousMirrorKickIntent;
+
+        /// <summary>
+        /// P2 Attack／Kick を発火する CombatFrame（未予約は -1）。
+        /// HitStop中は CombatFrame が進まないため、遅延も Combat 進行に同期します。
+        /// </summary>
+        private int pendingP2MirrorAttackFireCombatFrame = -1;
+
+        private int pendingP2MirrorKickFireCombatFrame = -1;
+
+        /// <summary>
+        /// 異技Clash検証用: 命中候補ログを攻撃開始単位で1回に抑えるための記録です。
+        /// </summary>
+        private int lastLoggedPendingHitStartedCombatFrameP1 = -1;
+
+        private int lastLoggedPendingHitStartedCombatFrameP2 = -1;
 
         /// <summary>
         /// 両方向 Hit 候補の再利用バッファ（毎 Frame new しない）。
@@ -697,6 +741,10 @@ namespace FightingGameTrial.Simulation
                 p2MirrorInput.ResetToInitialValues();
             }
 
+            ClearDebugMirrorAttackDelayState();
+            lastLoggedPendingHitStartedCombatFrameP1 = -1;
+            lastLoggedPendingHitStartedCombatFrameP2 = -1;
+
             // 有効入力はニュートラル前提なので、エッジ用 previous も false に揃える。
             // （個別の Up/Attack 押しっぱなし抑制は共通 gate に一本化した）
             ResyncGameplayInputEdgePreviousAfterReleaseGate();
@@ -1152,16 +1200,29 @@ namespace FightingGameTrial.Simulation
             return true;
         }
 
-        private static void LogAttackStarted(
+        private void LogAttackStarted(
             DebugFighterParticipant participant,
             DebugAttackData attackData)
         {
+            int simulationTick = 0;
+            int combatFrame = 0;
+            if (timeState != null)
+            {
+                simulationTick = timeState.SimulationTick;
+                combatFrame = timeState.CombatFrame;
+            }
+
             Debug.Log(
-                "[FightDebug] Attack started slot=" + participant.SlotId
+                "[FightDebug] Attack started"
+                + " SimulationTick=" + simulationTick
+                + " CombatFrame=" + combatFrame
+                + " slot=" + participant.SlotId
                 + " attack=" + attackData.AttackId
                 + " S/A/R=" + attackData.StartupFrames
                 + "/" + attackData.ActiveFrames
                 + "/" + attackData.RecoveryFrames
+                + " mirrorDelay=" + debugP2MirrorAttackDelayFrames
+                + " mirrorAttackMode=" + debugP2MirrorAttackMode
                 + " Damage=" + attackData.Damage
                 + " HitStop=" + attackData.HitStopFrames
                 + " HitStun=" + attackData.HitStunFrames
@@ -1171,6 +1232,7 @@ namespace FightingGameTrial.Simulation
 
         /// <summary>
         /// Participant 単位で ActionFrame を1進めます。
+        /// Startup→Active / Active→Recovery の瞬間だけ異技Clash検証用ログを出します。
         /// </summary>
         private void AdvanceActionForParticipant(DebugFighterParticipant participant)
         {
@@ -1179,7 +1241,33 @@ namespace FightingGameTrial.Simulation
                 return;
             }
 
-            participant.AttackState.AdvanceActionFrame();
+            DebugFighterAttackState attackState = participant.AttackState;
+            DebugAttackPhase phaseBefore = attackState.CurrentPhase;
+            attackState.AdvanceActionFrame();
+            DebugAttackPhase phaseAfter = attackState.CurrentPhase;
+
+            if (phaseBefore != DebugAttackPhase.Active
+                && phaseAfter == DebugAttackPhase.Active)
+            {
+                Debug.Log(
+                    "[FightDebug] Attack active started"
+                    + " CombatFrame=" + timeState.CombatFrame
+                    + " slot=" + participant.SlotId
+                    + " attack=" + attackState.CurrentAttackId
+                    + " ActionFrame=" + attackState.ActionFrame
+                );
+            }
+            else if (phaseBefore != DebugAttackPhase.Recovery
+                && phaseAfter == DebugAttackPhase.Recovery)
+            {
+                Debug.Log(
+                    "[FightDebug] Attack recovery started"
+                    + " CombatFrame=" + timeState.CombatFrame
+                    + " slot=" + participant.SlotId
+                    + " attack=" + attackState.CurrentAttackId
+                    + " ActionFrame=" + attackState.ActionFrame
+                );
+            }
         }
 
         /// <summary>
@@ -1642,16 +1730,22 @@ namespace FightingGameTrial.Simulation
 
         /// <summary>
         /// Debug 鏡写し ON のとき、P1 の確定済み入力を変換して P2 用 SimulationInputState を埋めます。
-        /// OFF のときは何もしません（P2 は Neutral のまま＝既存挙動）。
+        /// OFF のときは何もしません（P2 は Neutral のまま＝既存挙動。攻撃変換・遅延も無視）。
         ///
         /// ここでやることは「入力ソースを埋める」だけです。
         /// StartJPunch / StartGroundKick / TryStartJump を直接呼ばず、
         /// 以降は P2 の通常処理（SampleAttack → TryStart* → 移動）へ乗せます。
+        ///
+        /// 攻撃ボタンは debugP2MirrorAttackMode で変換し、
+        /// debugP2MirrorAttackDelayFrames で押下開始だけ遅らせます（異技ClashのActive重ね用）。
+        /// 将来の本番AI入力とは別の Debug 補助です。
         /// </summary>
         private void UpdateDebugMirrorP2InputFromP1()
         {
             if (debugMirrorP1InputToP2 == false || p2MirrorInput == null)
             {
+                // OFF 中に遅延予約が残ると、再ON時に古いエッジが飛ぶのを防ぐ。
+                ClearDebugMirrorAttackDelayState();
                 return;
             }
 
@@ -1664,6 +1758,7 @@ namespace FightingGameTrial.Simulation
             if (p1 == null)
             {
                 p2MirrorInput.ClearGameplayHeldButtons();
+                ClearDebugMirrorAttackDelayState();
                 return;
             }
 
@@ -1680,22 +1775,16 @@ namespace FightingGameTrial.Simulation
             // Down は現状しゃがみ未実装だが、入力経路を欠けさせないためそのまま渡す。
             bool mirroredDown = p1.Down;
 
-            // J Punch は地上専用ゲートがあるので Attack はそのまま渡してよい。
-            bool mirroredAttack = p1.Attack;
-
-            // Kick は地上同士のときだけ渡す。
-            // 空中の Kick を載せると通常経路が Air Kick を開始してしまうため（今回は模倣しない）。
-            bool mirroredKick = false;
-            if (p1.Kick
-                && participantP1 != null
-                && participantP1.Motor != null
-                && participantP1.Motor.IsGrounded
-                && participantP2 != null
-                && participantP2.Motor != null
-                && participantP2.Motor.IsGrounded)
-            {
-                mirroredKick = true;
-            }
+            // 攻撃: モード変換 →（必要なら）CombatFrame遅延 → 1tickのHeldでエッジを起こす。
+            // 左右・Jumpには遅延を掛けない。
+            bool mirroredAttack;
+            bool mirroredKick;
+            ResolveDebugMirrorAttackButtonsWithDelay(
+                p1.Attack,
+                p1.Kick,
+                out mirroredAttack,
+                out mirroredKick
+            );
 
             p2MirrorInput.CopyFromPhysicalAndCommit(
                 mirroredLeft,
@@ -1706,6 +1795,167 @@ namespace FightingGameTrial.Simulation
                 mirroredKick,
                 p1.SampledAtSimulationTick
             );
+        }
+
+        /// <summary>
+        /// 変換後の Attack／Kick 意図を取り、必要なら CombatFrame 遅延してから
+        /// P2 入力用 Held を1回だけ立てます（SampleAttack がエッジ化する）。
+        /// </summary>
+        private void ResolveDebugMirrorAttackButtonsWithDelay(
+            bool p1AttackHeld,
+            bool p1KickHeld,
+            out bool p2AttackHeld,
+            out bool p2KickHeld)
+        {
+            p2AttackHeld = false;
+            p2KickHeld = false;
+
+            // NoAttack: 攻撃は渡さない。遅延キューも作らない／残さない。
+            if (debugP2MirrorAttackMode == DebugP2MirrorAttackMode.NoAttack)
+            {
+                ClearDebugMirrorAttackDelayState();
+                return;
+            }
+
+            bool intentAttack;
+            bool intentKick;
+            ResolveDebugMirrorAttackIntent(
+                p1AttackHeld,
+                p1KickHeld,
+                out intentAttack,
+                out intentKick
+            );
+
+            bool attackIntentEdge = intentAttack && previousMirrorAttackIntent == false;
+            bool kickIntentEdge = intentKick && previousMirrorKickIntent == false;
+            previousMirrorAttackIntent = intentAttack;
+            previousMirrorKickIntent = intentKick;
+
+            int combatFrame = 0;
+            if (timeState != null)
+            {
+                combatFrame = timeState.CombatFrame;
+            }
+
+            int delayFrames = debugP2MirrorAttackDelayFrames;
+            if (delayFrames < 0)
+            {
+                delayFrames = 0;
+            }
+            else if (delayFrames > 15)
+            {
+                delayFrames = 15;
+            }
+
+            // 立ち上がりを予約。発火 CombatFrame = 現在CF + 遅延。
+            // 遅延0なら同一tickで発火し、従来どおり同時開始に近い。
+            // UpdateDebugMirror は CombatFrame++ より前なので、
+            // 遅延5なら「P1開始CFをNとして P2開始が N+5」になる。
+            if (attackIntentEdge)
+            {
+                pendingP2MirrorAttackFireCombatFrame = combatFrame + delayFrames;
+                Debug.Log(
+                    "[FightDebug] Mirror attack delay reserved"
+                    + " CombatFrame=" + combatFrame
+                    + " fireCombatFrame=" + pendingP2MirrorAttackFireCombatFrame
+                    + " button=Attack"
+                    + " delay=" + delayFrames
+                    + " mode=" + debugP2MirrorAttackMode
+                );
+            }
+
+            if (kickIntentEdge)
+            {
+                pendingP2MirrorKickFireCombatFrame = combatFrame + delayFrames;
+                Debug.Log(
+                    "[FightDebug] Mirror attack delay reserved"
+                    + " CombatFrame=" + combatFrame
+                    + " fireCombatFrame=" + pendingP2MirrorKickFireCombatFrame
+                    + " button=Kick"
+                    + " delay=" + delayFrames
+                    + " mode=" + debugP2MirrorAttackMode
+                );
+            }
+
+            // 予約到達tickだけ Held=true（1回の正しい入力エッジ）。押しっぱなし複製ではない。
+            if (pendingP2MirrorAttackFireCombatFrame >= 0
+                && combatFrame >= pendingP2MirrorAttackFireCombatFrame)
+            {
+                p2AttackHeld = true;
+                pendingP2MirrorAttackFireCombatFrame = -1;
+                Debug.Log(
+                    "[FightDebug] Mirror attack delay fired"
+                    + " CombatFrame=" + combatFrame
+                    + " button=Attack"
+                );
+            }
+
+            if (pendingP2MirrorKickFireCombatFrame >= 0
+                && combatFrame >= pendingP2MirrorKickFireCombatFrame)
+            {
+                p2KickHeld = true;
+                pendingP2MirrorKickFireCombatFrame = -1;
+                Debug.Log(
+                    "[FightDebug] Mirror attack delay fired"
+                    + " CombatFrame=" + combatFrame
+                    + " button=Kick"
+                );
+            }
+        }
+
+        /// <summary>
+        /// P2鏡写し用の Attack / Kick「意図」を決めます（まだ遅延・発火前）。
+        ///
+        /// なぜ入力だけ変換するか:
+        /// StartJPunch / StartGroundKick を直接叩くと、P2の接地・同時押し優先・1攻撃1開始などの
+        /// 通常開始条件をバイパスし、将来AI差し替え時の経路ともずれるためです。
+        ///
+        /// なぜ双方接地のときだけ攻撃変換するか:
+        /// 空中の J/K を Swap すると P2 が Kick を受け取り Air Kick を開始し得るため。
+        /// 今回の対象は地上 JPunch / GroundKick の異技Clash検証だけです。
+        /// </summary>
+        private void ResolveDebugMirrorAttackIntent(
+            bool p1AttackHeld,
+            bool p1KickHeld,
+            out bool intentAttack,
+            out bool intentKick)
+        {
+            intentAttack = false;
+            intentKick = false;
+
+            // Air Kick除外: 双方接地時だけ攻撃意図を立てる。
+            bool bothGrounded =
+                participantP1 != null
+                && participantP1.Motor != null
+                && participantP1.Motor.IsGrounded
+                && participantP2 != null
+                && participantP2.Motor != null
+                && participantP2.Motor.IsGrounded;
+
+            if (bothGrounded == false)
+            {
+                return;
+            }
+
+            if (debugP2MirrorAttackMode == DebugP2MirrorAttackMode.SwapPunchAndKick)
+            {
+                // 異技Clash確認: P1 J → P2 K、P1 K → P2 J
+                intentAttack = p1KickHeld;
+                intentKick = p1AttackHeld;
+                return;
+            }
+
+            // SameAsP1（既定）: 同技Clash確認
+            intentAttack = p1AttackHeld;
+            intentKick = p1KickHeld;
+        }
+
+        private void ClearDebugMirrorAttackDelayState()
+        {
+            previousMirrorAttackIntent = false;
+            previousMirrorKickIntent = false;
+            pendingP2MirrorAttackFireCombatFrame = -1;
+            pendingP2MirrorKickFireCombatFrame = -1;
         }
 
         /// <summary>
@@ -2062,6 +2312,57 @@ namespace FightingGameTrial.Simulation
 
             destination.HitBox = hitBox;
             destination.HurtBox = hurtBox;
+
+            // 異技Clash検証用: 同一攻撃開始につき候補成立ログは1回だけ。
+            LogPendingHitCandidateOnce(attacker, attackState, destination.DistanceX);
+        }
+
+        /// <summary>
+        /// 命中候補が初めて Valid になったときだけログします（毎フレーム出さない）。
+        /// </summary>
+        private void LogPendingHitCandidateOnce(
+            DebugFighterParticipant attacker,
+            DebugFighterAttackState attackState,
+            float distanceX)
+        {
+            if (attacker == null || attackState == null || timeState == null)
+            {
+                return;
+            }
+
+            int startedCf = attackState.AttackStartedCombatFrame;
+            if (attacker == participantP1)
+            {
+                if (lastLoggedPendingHitStartedCombatFrameP1 == startedCf)
+                {
+                    return;
+                }
+
+                lastLoggedPendingHitStartedCombatFrameP1 = startedCf;
+            }
+            else if (attacker == participantP2)
+            {
+                if (lastLoggedPendingHitStartedCombatFrameP2 == startedCf)
+                {
+                    return;
+                }
+
+                lastLoggedPendingHitStartedCombatFrameP2 = startedCf;
+            }
+            else
+            {
+                return;
+            }
+
+            Debug.Log(
+                "[FightDebug] Pending hit candidate"
+                + " CombatFrame=" + timeState.CombatFrame
+                + " attacker=" + attacker.SlotId
+                + " defender=" + (attacker == participantP1 ? "P2" : "P1")
+                + " attack=" + attackState.CurrentAttackId
+                + " ActionFrame=" + attackState.ActionFrame
+                + " distanceX=" + distanceX.ToString("0.00")
+            );
         }
 
         /// <summary>

@@ -269,6 +269,8 @@ MonoBehaviour:
   consoleLogIntervalTicks: 60
   enableJumpDebugLog: 1
   debugMirrorP1InputToP2: 0
+  debugP2MirrorAttackMode: 2
+  debugP2MirrorAttackDelayFrames: 0
 --- !u!1 &400000001
 GameObject:
   m_ObjectHideFlags: 0
@@ -1174,6 +1176,11 @@ MonoBehaviour:
     framesPerSprite: 1
     loop: 0
     holdLastFrame: 1
+  clashRecoilSequence:
+    sprites: []
+    framesPerSprite: 6
+    loop: 1
+    holdLastFrame: 1
   hitStunSequence:
     sprites: []
     framesPerSprite: 6
@@ -1207,6 +1214,7 @@ MonoBehaviour:
   opponent: {fileID: 700000027}
   displayTint: {r: 1, g: 1, b: 1, a: 1}
   hitStunDisplayColor: {r: 1, g: 0.35, b: 0.35, a: 1}
+  clashRecoilDisplayColor: {r: 1, g: 0.85, b: 0.2, a: 1}
   knockoutDisplayColor: {r: 0.35, g: 0.35, b: 0.35, a: 1}
   usesGameplayInput: 1
   hitStunFrames: 12
@@ -1219,7 +1227,7 @@ MonoBehaviour:
   pushBoxLocal:
     CenterX: 0
     CenterY: 1
-    HalfWidth: 0.5
+    HalfWidth: 0.75
     HalfHeight: 1
     IsActive: 1
   hurtBoxLocal:
@@ -1472,6 +1480,11 @@ MonoBehaviour:
     framesPerSprite: 1
     loop: 0
     holdLastFrame: 1
+  clashRecoilSequence:
+    sprites: []
+    framesPerSprite: 6
+    loop: 1
+    holdLastFrame: 1
   hitStunSequence:
     sprites: []
     framesPerSprite: 6
@@ -1505,6 +1518,7 @@ MonoBehaviour:
   opponent: {fileID: 700000016}
   displayTint: {r: 0.65, g: 0.78, b: 0.95, a: 1}
   hitStunDisplayColor: {r: 1, g: 0.35, b: 0.35, a: 1}
+  clashRecoilDisplayColor: {r: 1, g: 0.85, b: 0.2, a: 1}
   knockoutDisplayColor: {r: 0.35, g: 0.35, b: 0.35, a: 1}
   usesGameplayInput: 0
   hitStunFrames: 12
@@ -1517,7 +1531,7 @@ MonoBehaviour:
   pushBoxLocal:
     CenterX: 0
     CenterY: 1
-    HalfWidth: 0.5
+    HalfWidth: 0.75
     HalfHeight: 1
     IsActive: 1
   hurtBoxLocal:
