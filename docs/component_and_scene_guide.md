@@ -1541,6 +1541,37 @@ Inspector設定例（Scene保存不要）:
 - Push前 Facing／Hit後 Facing の1CF差を将来変更するか
 - 正式値での Guard／Clash／KB中Push 等の追加回帰
 
+## 18.11 P2 TEST MODE UI（Build向け・未コミット）
+
+`DebugCanvas` 上の `DebugP2TestModeView` が Awake で `P2TestControlPanel` を実行時生成する（Sceneに子を手置きしない）。既存 EventSystem／InputSystemUIInputModule を再利用。
+
+### 実行時 Hierarchy（概略）
+
+```
+DebugCanvas
+└─ P2TestControlPanel
+   ├─ TitleText … "P2 TEST MODE"
+   ├─ P2TestModeDropdown（CaptionText／ArrowText「▼」／Template…）
+   └─ DelayBlock（必要モードのみ）… "DELAY : n CF" + Slider
+```
+
+### Dropdown
+
+| index | 表示 | 内部 |
+|---|---|---|
+| 0〜5 | NO ACTION … STAND GUARD | `DebugP2TestMode` → `ApplyP2TestMode` |
+| 6 | RESET | 一時コマンド。`ResetTrainingFromUI` 後に表示を直前モードへ戻す（enum非追加） |
+
+### Delay
+
+| モード | 表示 | Range | 正本 |
+|---|---|---|---|
+| Mirror J／Ground Kick | する（共有） | 0〜120 | `debugP2MirrorAttackDelayFrames` |
+| P2 Air Kick | する | 0〜15 | `debugP2AirKickDelayFrames` |
+| その他 | しない | — | — |
+
+検証時は右上UIでも切替可能。InspectorのDebug項目も従来どおり有効（UI専用の別戦闘処理はない）。旧「Inspectorでのみ切替」は現状に合わない。
+
 ## 19. Air Kick最小検証版とRecovery Visual
 
 ### 19.1 Scene / Prefab

@@ -3,7 +3,7 @@
 最終更新: 2026-08-04
 対象ブランチ: `unity`
 内容反映済み基準コミット（コードpush済みHEAD）: **`ab6b938`**（Add cross-move ground clash debug assist）
-今回の未コミット範囲: Hurt／Push Box Facing対応・Push World中心化（C# 3ファイル）と、FightDebugScene 正式 Box 値（CenterX=`0.10`／HalfWidth=`0.60`）の本Docs反映
+今回の未コミット範囲: Hurt／Push Facing・World中心・Scene正式値 `0.10`/`0.60`、**P2 TEST MODE UI**（Build向け検証入口）と本Docs反映
 push済み到達点の例: `ab6b938`（異種Clash Assist）、`0a4886e`（P1 Back／JPunchAfterDelay）、`446f053`（P2 Debug StandGuard）、`f9e56d3`（Assist予約安全Docs）、`03bfd72` / `988f36f`（AirKick Assist・Air双方未適用）、`96f8148` / `6be8bb4`（地上攻撃変換・Delay・異技Clash）、`5bd3627` / `6bc5f03`（Clash整理＋基本P2鏡写し）
 過去履歴の例（現在の基準ではない）: `1b47fc6`（HUD font atlas）、`69c9385`（Document clash recoil state separation）
 段階14全体（14A+14B）・段階15（攻撃データ化）: **完了・push 済み**
@@ -24,7 +24,8 @@ P2 AirKick Assist予約安全確認: **Play実測・Docs反映済み・push済�
 P2 Debug 最小立ちガード: **実装・Play実測・Docs反映済み・push済み**（`446f053`）
 P1 Gameplay Back／JPunchAfterDelay: **実装・Play実測・Docs反映済み・push済み**（`0a4886e`）
 Hurt／Push CenterX Facing反転＋Push World中心化: **実装・Play確認済み・未コミットC#**
-Hurt／Push Scene正式値 CenterX=`0.10`／HalfWidth=`0.60`: **FightDebugScene保存済み・本Docs反映中**（P1/P2同値）
+Hurt／Push Scene正式値 CenterX=`0.10`／HalfWidth=`0.60`: **FightDebugScene保存済み**（P1/P2同値）
+P2 TEST MODE UI: **実装・Editor Play確認済み・未コミット**（Windows Build実機は未確認。本番AIではない）
 Debug HUD font glyph atlas: **push済み・過去履歴**（`1b47fc6`。現在の基準ではない）
 正式な次工程番号: **未定義**（新 Stage 番号は作らない）
 
@@ -481,7 +482,7 @@ ScriptableObject 化、Inspector 編集、Character 別攻撃データ、複数�
 - 発生差により片側Normal Hitになる場合あり（Delay4/6で実測）。Counter Hit／Attack Priorityなし
 - Airを含む双方候補: 結果未適用（正式Air Clashではない）。双方AirKick同士はPlay実測済み。異種Air双方は未確認
 - 片側候補: P1 Back または P2 Debug StandGuard成立時は Guard。それ以外は Normal Hit
-- P2: 既定はNeutral。基本鏡写し・攻撃変換／地上Delay・AirKick Assist／Assist予約安全・P2 Debug StandGuard・JPunchAfterDelay・`P1JPunchP2GroundKickClash`はpush済みの検証専用補助
+- P2: 既定はNeutral。基本鏡写し・攻撃変換／地上Delay・AirKick Assist／Assist予約安全・P2 Debug StandGuard・JPunchAfterDelay・`P1JPunchP2GroundKickClash`はpush済みの検証専用補助。**P2 TEST MODE UI**でBuild／Game画面からも切替可能（未コミット・本番AIではない）
 - キャラ差し替え・複数 Hurt/Hit Box: 未実装
 
 ---
@@ -501,6 +502,15 @@ Facing 分離・壁際 Push 再配分は実装済み。Push は HP / KO / KB 速
 | **未確定／未確認** | Push前 Facing／Hit後 Facing の1CF差を将来変更するか（現状は順序変更なし＝既知制約）。正式値 `0.10`/`0.60` での Guard／Ground Clash／KB中・HitStun中密着Push／Air skipログ／入れ替わり厳密1CFの追加回帰 |
 
 **既知制約（実装順・変更なし）**: 入力移動 → Knockback → **Push** → **Facing更新** → Action → **Hit** → Visual。Push は前 CF 末 Facing、Hit は当 CF 更新後 Facing。左右入れ替わり CF では1CFずれる可能性あり。Facing を Push 前へ移す変更は未実施。
+
+### 3.2 P2 TEST MODE UI（2026-08-04・未コミット）
+
+| 区分 | 内容 |
+|---|---|
+| **実装済み** | `DebugP2TestMode`／`DebugP2TestModeView`／`ApplyP2TestMode`／`ResetTrainingFromUI`／Delay Getter・Setter。実行時UI生成。既存EventSystem再利用。UIMask等Built-in Skin依存なし |
+| **Play確認済み（Editor）** | 右上表示、全Dropdown、▼常時、各モード、Delay切替、Inspector同期、RESET一時コマンド（直前モード復帰・Delay維持）、Error/Warning 0 |
+| **未確認** | Windows Build実機操作 |
+| **補足** | JP vs GK Clashは距離不足でMissし得る。本番AIではない。旧「Inspectorでのみ切替」は、UI追加により**Inspectorも引き続き有効だが必須ではない**へ更新 |
 
 ---
 

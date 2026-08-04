@@ -651,6 +651,7 @@ Boxの**Scene正式値**はP1/P2ともHurt／Push CenterX `0.10`、HalfWidth `0.
 旧 `debugForceP2AttackWithP1ForClashTest` を `debugMirrorP1InputToP2` へ置換済み。Scene既定はOFF。OFF時はP2 Neutralの既存挙動を変えない。
 
 目的: 同技／異技Clash確認、左右対称動作確認、将来のP2 AI入力ソース差し替え入口の確認。本番AIではない。
+画面右上の **P2 TEST MODE** UIは、これらの検証設定をBuild／Game画面から切替えるための補助入口であり、正式ゲームルールや本番AIではない（詳細は実装Docs）。
 
 ```text
 P1 CurrentInput

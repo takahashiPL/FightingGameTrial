@@ -230,6 +230,12 @@ namespace FightingGameTrial.Simulation
         private DebugP2StanceGuardMode debugP2StanceGuardMode = DebugP2StanceGuardMode.Normal;
 
         /// <summary>
+        /// 画面 UI（DebugP2TestModeView）が最後に適用した検証モード。
+        /// Inspector 個別フィールドとズレないよう ApplyP2TestMode が更新する。
+        /// </summary>
+        private DebugP2TestMode activeP2TestMode = DebugP2TestMode.NoAction;
+
+        /// <summary>
         /// P2 専用の Neutral 入力です。
         /// P1 の CurrentInput とは別インスタンスで、毎tick new しません。
         /// 静的共有値にもしません（誤って書き換えられるのを防ぐため）。
@@ -543,6 +549,9 @@ namespace FightingGameTrial.Simulation
             ClearDebugP2SoloJPunchAssistState(allowRestartOnNextResolve: true);
             ClearDebugP1JPunchP2GroundKickClashAssistState(allowRestartOnNextResolve: true);
             ClearDebugP2AirKickAssistState();
+
+            // Scene 保存値（既定: Mirror OFF / NoAttack）に合わせて UI 用モードを初期化する。
+            activeP2TestMode = InferP2TestModeFromDebugFields();
 
             timeState.ResetToInitialValues();
             timeState.LastStepResult = "未実行";
@@ -888,6 +897,248 @@ namespace FightingGameTrial.Simulation
                 "[FightDebug] Training reset"
                 + " (Attack/HitStun/Knockback/HitStop/HP/KO/LogicalX/LogicalY/Jump/Facing)"
             );
+        }
+
+        /// <summary>
+        /// 画面右上 UI 用: 現在の P2 検証モード（ApplyP2TestMode の結果）。
+        /// </summary>
+        public DebugP2TestMode ActiveP2TestMode
+        {
+            get { return activeP2TestMode; }
+        }
+
+        /// <summary>
+        /// Build／画面 UI から P2 検証モードを適用します（本番 AI ではない）。
+        ///
+        /// なぜ個別 Debug フィールドを UI から直接書き換えないか:
+        /// Mirror / AttackMode / Delay / AirKick / StandGuard は組み合わせ依存で、
+        /// 片方だけ残ると前モードの Assist 予約や意図しない攻撃が残るため。
+        /// いったん安全な初期状態へ戻してから、必要な項目だけを有効化する。
+        /// </summary>
+        public void ApplyP2TestMode(DebugP2TestMode mode)
+        {
+            ClearAllP2VerificationSettingsToSafeDefaults();
+
+            switch (mode)
+            {
+                case DebugP2TestMode.NoAction:
+                    // 解除のみ（ClearAll 済み）。
+                    break;
+
+                case DebugP2TestMode.MirrorJPunch:
+                    // P1 J → P2 JPunch（SameAsP1）。K も同技鏡写しされる既存仕様。
+                    // Delay は UI／Inspector の現在値を維持する（ここでは触らない）。
+                    debugMirrorP1InputToP2 = true;
+                    debugP2MirrorAttackMode = DebugP2MirrorAttackMode.SameAsP1;
+                    break;
+
+                case DebugP2TestMode.MirrorGroundKick:
+                    // P1 K → P2 GroundKick（SameAsP1）。内部は MirrorJPunch と同じ設定。
+                    // Mirror Delay は MirrorJPunch と共有するため、ここでも値を消さない。
+                    debugMirrorP1InputToP2 = true;
+                    debugP2MirrorAttackMode = DebugP2MirrorAttackMode.SameAsP1;
+                    break;
+
+                case DebugP2TestMode.JPunchVsGroundKick:
+                    debugMirrorP1InputToP2 = true;
+                    debugP2MirrorAttackMode =
+                        DebugP2MirrorAttackMode.P1JPunchP2GroundKickClash;
+                    break;
+
+                case DebugP2TestMode.P2AirKick:
+                    // 推奨組み合わせ: Mirror ON + NoAttack + AirKick Assist。
+                    // Air Kick Delay は UI／Inspector の現在値を維持する。
+                    debugMirrorP1InputToP2 = true;
+                    debugP2MirrorAttackMode = DebugP2MirrorAttackMode.NoAttack;
+                    debugEnableP2AirKickAssist = true;
+                    break;
+
+                case DebugP2TestMode.StandGuard:
+                    // 推奨組み合わせ: Mirror ON + NoAttack + StandGuard。
+                    debugMirrorP1InputToP2 = true;
+                    debugP2MirrorAttackMode = DebugP2MirrorAttackMode.NoAttack;
+                    debugP2StanceGuardMode = DebugP2StanceGuardMode.StandGuard;
+                    break;
+
+                default:
+                    mode = DebugP2TestMode.NoAction;
+                    break;
+            }
+
+            activeP2TestMode = mode;
+
+            // previousDebugP2MirrorAttackMode はここでは合わせない。
+            // 次の ResolveDebugMirrorAttackButtonsWithDelay で Mode 入場検出
+            // （Clash / JPunchAfterDelay の開始ログと内部クリア）が走るようにする。
+
+            Debug.Log("[FightDebug] P2 TEST MODE applied mode=" + mode);
+        }
+
+        /// <summary>
+        /// 画面 UI の RESET から既存 Training Reset を呼びます。
+        /// 新規の戦闘ロジックは持たず、ResetTestActionForP1（R キーと同じ）を再利用します。
+        /// P2 TEST MODE／Delay 値は変更しません（呼び出し側で Dropdown を元モードへ戻す）。
+        /// </summary>
+        public void ResetTrainingFromUI()
+        {
+            ResetTestActionForP1();
+        }
+
+        /// <summary>
+        /// UI 用: Mirror Attack Delay（Inspector `debugP2MirrorAttackDelayFrames` が正本）。
+        /// Range は既存どおり 0〜120 CombatFrame。
+        /// </summary>
+        public int GetP2MirrorAttackDelayFrames()
+        {
+            return ClampMirrorAttackDelayFrames(debugP2MirrorAttackDelayFrames);
+        }
+
+        /// <summary>
+        /// UI 用: Mirror Attack Delay を設定する。正本は `debugP2MirrorAttackDelayFrames`。
+        /// </summary>
+        public void SetP2MirrorAttackDelayFrames(int frames)
+        {
+            debugP2MirrorAttackDelayFrames = ClampMirrorAttackDelayFrames(frames);
+        }
+
+        /// <summary>
+        /// UI 用: Air Kick Delay（Inspector `debugP2AirKickDelayFrames` が正本）。
+        /// Range は既存どおり 0〜15 CombatFrame。
+        /// </summary>
+        public int GetP2AirKickDelayFrames()
+        {
+            return ClampAirKickDelayFrames(debugP2AirKickDelayFrames);
+        }
+
+        /// <summary>
+        /// UI 用: Air Kick Delay を設定する。正本は `debugP2AirKickDelayFrames`。
+        /// </summary>
+        public void SetP2AirKickDelayFrames(int frames)
+        {
+            debugP2AirKickDelayFrames = ClampAirKickDelayFrames(frames);
+        }
+
+        /// <summary>Mirror Attack Delay の最小値（Inspector Range と同じ）。</summary>
+        public static int P2MirrorAttackDelayMinFrames
+        {
+            get { return 0; }
+        }
+
+        /// <summary>Mirror Attack Delay の最大値（Inspector Range と同じ）。</summary>
+        public static int P2MirrorAttackDelayMaxFrames
+        {
+            get { return 120; }
+        }
+
+        /// <summary>Air Kick Delay の最小値（Inspector Range と同じ）。</summary>
+        public static int P2AirKickDelayMinFrames
+        {
+            get { return 0; }
+        }
+
+        /// <summary>Air Kick Delay の最大値（Inspector Range と同じ）。</summary>
+        public static int P2AirKickDelayMaxFrames
+        {
+            get { return 15; }
+        }
+
+        private static int ClampMirrorAttackDelayFrames(int frames)
+        {
+            if (frames < P2MirrorAttackDelayMinFrames)
+            {
+                return P2MirrorAttackDelayMinFrames;
+            }
+
+            if (frames > P2MirrorAttackDelayMaxFrames)
+            {
+                return P2MirrorAttackDelayMaxFrames;
+            }
+
+            return frames;
+        }
+
+        private static int ClampAirKickDelayFrames(int frames)
+        {
+            if (frames < P2AirKickDelayMinFrames)
+            {
+                return P2AirKickDelayMinFrames;
+            }
+
+            if (frames > P2AirKickDelayMaxFrames)
+            {
+                return P2AirKickDelayMaxFrames;
+            }
+
+            return frames;
+        }
+
+        /// <summary>
+        /// Mirror／AttackMode／AirKick／StandGuard と Assist 予約を安全な初期状態へ戻します。
+        /// Delay 値（Mirror／AirKick）は UI が保持・再利用するため、ここでは消さない。
+        /// Scene 既定の Mirror OFF / NoAttack / Stance Normal / Assist OFF に相当します。
+        /// </summary>
+        private void ClearAllP2VerificationSettingsToSafeDefaults()
+        {
+            debugMirrorP1InputToP2 = false;
+            debugP2MirrorAttackMode = DebugP2MirrorAttackMode.NoAttack;
+            debugEnableP2AirKickAssist = false;
+            debugP2StanceGuardMode = DebugP2StanceGuardMode.Normal;
+
+            ClearDebugMirrorAttackDelayState();
+            ClearDebugP2SoloJPunchAssistState(allowRestartOnNextResolve: true);
+            ClearDebugP1JPunchP2GroundKickClashAssistState(allowRestartOnNextResolve: true);
+            ClearDebugP2AirKickAssistState();
+
+            if (p2MirrorInput != null)
+            {
+                p2MirrorInput.ResetToInitialValues();
+            }
+        }
+
+        /// <summary>
+        /// Inspector／Scene 保存値から UI 用モードを推定します。
+        /// Mirror OFF なら NoAction。ON 時は既存 Assist の組み合わせを優先します。
+        /// SameAsP1 は MirrorJPunch として扱い（MirrorGroundKick と内部同一）。
+        /// </summary>
+        private DebugP2TestMode InferP2TestModeFromDebugFields()
+        {
+            if (debugMirrorP1InputToP2 == false)
+            {
+                return DebugP2TestMode.NoAction;
+            }
+
+            if (debugP2StanceGuardMode == DebugP2StanceGuardMode.StandGuard)
+            {
+                return DebugP2TestMode.StandGuard;
+            }
+
+            if (debugEnableP2AirKickAssist)
+            {
+                return DebugP2TestMode.P2AirKick;
+            }
+
+            if (debugP2MirrorAttackMode
+                == DebugP2MirrorAttackMode.P1JPunchP2GroundKickClash)
+            {
+                return DebugP2TestMode.JPunchVsGroundKick;
+            }
+
+            if (debugP2MirrorAttackMode == DebugP2MirrorAttackMode.SameAsP1
+                || debugP2MirrorAttackMode == DebugP2MirrorAttackMode.SwapPunchAndKick)
+            {
+                return DebugP2TestMode.MirrorJPunch;
+            }
+
+            // NoAttack / JPunchAfterDelay 等で Mirror だけ ON の場合は、
+            // UI 上は「自動検証なし」に近い NoAction 表示へ寄せないため、
+            // StandGuard／Air 以外は NoAction 相当として扱わず MirrorJPunch にしない。
+            // Scene 既定は Mirror OFF なので通常ここへ来ない。
+            if (debugP2MirrorAttackMode == DebugP2MirrorAttackMode.NoAttack)
+            {
+                return DebugP2TestMode.NoAction;
+            }
+
+            return DebugP2TestMode.NoAction;
         }
 
         private static void ResetFighterVisualToIdle(DebugFighterParticipant participant)

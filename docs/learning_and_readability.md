@@ -102,6 +102,22 @@ GuardStunの自然終了は減算で0到達すれば状態が外れる。終了�
 
 ---
 
+## 3.3 P2 TEST MODE UI（Build向け検証入口・2026-08-04）
+
+右上UIは本番AIではなく、既存の検証用 Debug 設定を **Session API 経由でまとめて切替える入口**である。
+
+- UIから個別の private Debug field を直接触らない。正本は Session の SerializeField と `ApplyP2TestMode`／Delay Getter・Setter。UIは表示とコマンド発行だけにする
+- モード切替時は関連設定を一度解除してから必要項目だけONする。部分更新だと Mirror／Stance／AirKick Assist の組み合わせが残り、意図しない複合状態になる
+- RESETは `DebugP2TestMode` enum に入れない。選択状態として残る「モード」ではなく、Dropdown index=6の一時コマンドとして `ResetTrainingFromUI` を呼び、表示を直前モードへ戻す
+- Unity 6では Built-in `UI/Skin/*.psd`（UIMask等）が無く、`TMP_DefaultControls`や `Resources.GetBuiltinResource` 依存は実行時エラーになる。手動構築＋`RectMask2D`／`Image.sprite=null`／明示色が安全
+- Captionと矢印「▼」を同一TMPに混ぜると、選択文言の長さで矢印位置が動く。ArrowTextを右端固定し、Captionに右パディングを取る
+- Delayが意味を持たないモードでは Delay UIを隠す。Mirror Delay（0〜120・共有）と Air Kick Delay（0〜15）を同じSliderに載せ替えない（正本フィールドが別）
+- 既存 EventSystem を再利用する。UI操作用に別 EventSystem を増やすと入力が二重化する
+
+詳細は `docs/Unity_FightingGameTrial_技術解説.md` §19 と `docs/component_and_scene_guide.md` §18.11。
+
+---
+
 ## 4. エンジン非依存
 
 - 論理ボタンは A / B / X / 方向として扱う

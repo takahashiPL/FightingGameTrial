@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## 未コミット: P2 TEST MODE UI（Build向け検証入口・2026-08-04）
+
+前提: Hurt／Push Facing・World中心・Scene正式値 `0.10`/`0.60` を含む現行作業ツリー。
+
+### 実装
+- **Added** 画面右上 `P2 TEST MODE` UI（`DebugP2TestModeView`）。既存 `DebugCanvas`＋EventSystemを再利用。実行時生成
+- **Added** `DebugP2TestMode` enum と `SimulationSession.ApplyP2TestMode`／`ResetTrainingFromUI`／Delay Getter・Setter（Session側Clamp）
+- Dropdown: NO ACTION／MIRROR J PUNCH／MIRROR GROUND KICK／J PUNCH vs GROUND KICK／P2 AIR KICK／STAND GUARD／**RESET（一時コマンド・enum外 index=6）**
+- Delay Slider: Mirror系 0〜120 CF共有／Air Kick 0〜15 CF。NoAction・Clash・StandGuardでは非表示
+- UIからprivate Debug fieldを直接触らない。モード切替時は関連設定を一度解除してから必要項目だけON
+- **Removed** Unity 6で存在しない `UI/Skin/*.psd`（UIMask等）依存。`TMP_DefaultControls`不使用。`RectMask2D`／`Image.sprite=null`／明示色。CaptionとArrowText分離・「▼」右端固定
+
+### Play確認（Editor）
+- 右上表示、全項目、▼常時、各モード、Delay切替、Inspector Delay同期、RESET後に直前モードへ戻りDelay維持、Error／Warning 0件
+- Clash Assistは距離不足でMissし得る（接触距離が必要）
+- **未確認**: Windows Build実機操作
+
 ## 未コミット: Hurt／Push Box Facing対応・World中心化・Scene正式値（2026-08-04）
 
 前提（push済み）: 異種Clash Assist `ab6b938` / P1 Back・JPunchAfterDelay `0a4886e` / P2 Debug StandGuard `446f053`。
