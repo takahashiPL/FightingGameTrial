@@ -28,6 +28,13 @@ namespace FightingGameTrial.Simulation
         /// P1 Guard検証用。P1攻撃を鏡写しせず、P2だけが Delay 間隔で JPunch を繰り返す。
         /// 方向は Neutral 固定。Inspector 往復なしで Back／Neutral などを比較できる。
         /// </summary>
-        JPunchAfterDelay = 3
+        JPunchAfterDelay = 3,
+
+        /// <summary>
+        /// 異種地上技Clash検証用（単発）。P2 GroundKick を先に、5CF後に P1 JPunch を
+        /// SimulationInputState 経由で発火し、最初の Active／候補 CF を揃える。
+        /// Mirror Replayではない。方向は P2 Neutral 固定。
+        /// </summary>
+        P1JPunchP2GroundKickClash = 4
     }
 }

@@ -170,6 +170,7 @@ namespace FightingGameTrial.Simulation
             + "SwapPunchAndKick: 異技Clash確認（P1 J→P2 K、P1 K→P2 J）。\n"
             + "NoAttack: 攻撃は渡さず左右・Jump鏡写しだけ残し、片側Normal Hitを確認。\n"
             + "JPunchAfterDelay: P1攻撃なしでP2がDelay間隔でJPunchを繰り返す（P1 Back Guard検証用）。\n"
+            + "P1JPunchP2GroundKickClash: 単発でP2 GroundKick→5CF後P1 JPunch（異種Clash検証用）。\n"
             + "技を直接開始せず Attack/Kick 入力だけ変換し、P2 の通常開始条件を維持します。"
             + " 双方接地時のみ攻撃変換し、Air Kick を起こしません。"
             + " Air双方候補の検証では NoAttack + debugEnableP2AirKickAssist を併用します。"
@@ -287,10 +288,38 @@ namespace FightingGameTrial.Simulation
         private bool p2SoloJPunchLoggedWaitingForEnd;
 
         /// <summary>
-        /// 前tickの MirrorAttackMode（JPunchAfterDelay への切替検出用）。
+        /// 前tickの MirrorAttackMode（JPunchAfterDelay／CrossMoveClash への切替検出用）。
         /// </summary>
         private DebugP2MirrorAttackMode previousDebugP2MirrorAttackMode =
             DebugP2MirrorAttackMode.SameAsP1;
+
+        /// <summary>
+        /// P1JPunchP2GroundKickClash 用: P2 Kick 発火予定 CombatFrame（未予約は -1）。
+        /// UpdateDebugMirror 時点の CombatFrame（++前）を基準にする。
+        /// </summary>
+        private int pendingCrossMoveClashP2KickFireCombatFrame = -1;
+
+        /// <summary>
+        /// P1JPunchP2GroundKickClash 用: P1 Attack 発火予定 CombatFrame（未予約は -1）。
+        /// P2 Kick 発火基準から Startup 差（既定5）だけ遅らせ、Attack started 差を5にする。
+        /// </summary>
+        private int pendingCrossMoveClashP1PunchFireCombatFrame = -1;
+
+        /// <summary>
+        /// P1JPunchP2GroundKickClash 用: 期待する最初の双方候補 CombatFrame（ログ用）。
+        /// </summary>
+        private int expectedCrossMoveClashCandidateCombatFrame = -1;
+
+        /// <summary>
+        /// P1JPunchP2GroundKickClash 用: この Mode 入場中に試行を完了したか（単発）。
+        /// P2発火後の P1 成功／失敗で true。P2発火不能の再予約では false のまま。
+        /// </summary>
+        private bool crossMoveClashAssistHasRun;
+
+        /// <summary>
+        /// P1JPunchP2GroundKickClash 用: 今の試行で P2 Kick を発火済みか。
+        /// </summary>
+        private bool crossMoveClashAssistP2KickFired;
 
         /// <summary>
         /// P2 Air Kick検証アシスト用: P1 Kick の前tick保持（立ち上がり検出）。
@@ -510,6 +539,7 @@ namespace FightingGameTrial.Simulation
 
             ClearDebugMirrorAttackDelayState();
             ClearDebugP2SoloJPunchAssistState(allowRestartOnNextResolve: true);
+            ClearDebugP1JPunchP2GroundKickClashAssistState(allowRestartOnNextResolve: true);
             ClearDebugP2AirKickAssistState();
 
             timeState.ResetToInitialValues();
@@ -833,6 +863,7 @@ namespace FightingGameTrial.Simulation
 
             ClearDebugMirrorAttackDelayState();
             ClearDebugP2SoloJPunchAssistState(allowRestartOnNextResolve: true);
+            ClearDebugP1JPunchP2GroundKickClashAssistState(allowRestartOnNextResolve: true);
             ClearDebugP2AirKickAssistState();
             lastLoggedPendingHitStartedCombatFrameP1 = -1;
             lastLoggedPendingHitStartedCombatFrameP2 = -1;
@@ -1855,6 +1886,7 @@ namespace FightingGameTrial.Simulation
                 // OFF 中に遅延予約が残ると、再ON時に古いエッジが飛ぶのを防ぐ。
                 ClearDebugMirrorAttackDelayState();
                 ClearDebugP2SoloJPunchAssistState(allowRestartOnNextResolve: true);
+                ClearDebugP1JPunchP2GroundKickClashAssistState(allowRestartOnNextResolve: true);
                 ClearDebugP2AirKickAssistState();
                 return;
             }
@@ -1870,6 +1902,7 @@ namespace FightingGameTrial.Simulation
                 p2MirrorInput.ClearGameplayHeldButtons();
                 ClearDebugMirrorAttackDelayState();
                 ClearDebugP2SoloJPunchAssistState(allowRestartOnNextResolve: true);
+                ClearDebugP1JPunchP2GroundKickClashAssistState(allowRestartOnNextResolve: true);
                 ClearDebugP2AirKickAssistState();
                 return;
             }
@@ -1898,9 +1931,8 @@ namespace FightingGameTrial.Simulation
                 out mirroredKick
             );
 
-            // P1 Back Guard検証用: 方向MirrorだとP1後退＋P2前進で距離が変わる。
-            // JPunchAfterDelay のときだけ方向・KickをNeutral固定し、Attackの1tick発火だけ残す。
-            // Attack は上の ResolveDebugMirrorAttackButtonsWithDelay 内で既に solo 解決済み（二重発火しない）。
+            // P1 Back Guard／異種Clash検証用: 方向Mirrorだと距離が変わるため Neutral 固定。
+            // JPunchAfterDelay: Attackの1tickだけ。P1JPunchP2GroundKickClash: Kickの1tickだけ。
             if (debugP2MirrorAttackMode == DebugP2MirrorAttackMode.JPunchAfterDelay)
             {
                 mirroredLeft = false;
@@ -1908,6 +1940,15 @@ namespace FightingGameTrial.Simulation
                 mirroredUp = false;
                 mirroredDown = false;
                 mirroredKick = false;
+            }
+            else if (debugP2MirrorAttackMode
+                == DebugP2MirrorAttackMode.P1JPunchP2GroundKickClash)
+            {
+                mirroredLeft = false;
+                mirroredRight = false;
+                mirroredUp = false;
+                mirroredDown = false;
+                mirroredAttack = false;
             }
             else if (ResolveDebugP2AirKickAssistKickHeld(p1))
             {
@@ -2029,7 +2070,7 @@ namespace FightingGameTrial.Simulation
 
             DebugP2MirrorAttackMode mode = debugP2MirrorAttackMode;
 
-            // Mode 切替検出（JPunchAfterDelay ループ開始／離脱クリア）
+            // Mode 切替検出（JPunchAfterDelay／P1JPunchP2GroundKickClash）
             if (mode == DebugP2MirrorAttackMode.JPunchAfterDelay
                 && previousDebugP2MirrorAttackMode != DebugP2MirrorAttackMode.JPunchAfterDelay)
             {
@@ -2054,7 +2095,35 @@ namespace FightingGameTrial.Simulation
                 ClearDebugP2SoloJPunchAssistState(allowRestartOnNextResolve: false);
             }
 
+            if (mode == DebugP2MirrorAttackMode.P1JPunchP2GroundKickClash
+                && previousDebugP2MirrorAttackMode
+                    != DebugP2MirrorAttackMode.P1JPunchP2GroundKickClash)
+            {
+                ClearDebugP1JPunchP2GroundKickClashAssistState(
+                    allowRestartOnNextResolve: false
+                );
+                Debug.Log(
+                    "[FightDebug] P1 JPunch / P2 GroundKick clash assist started"
+                );
+            }
+            else if (mode != DebugP2MirrorAttackMode.P1JPunchP2GroundKickClash
+                && previousDebugP2MirrorAttackMode
+                    == DebugP2MirrorAttackMode.P1JPunchP2GroundKickClash)
+            {
+                ClearDebugP1JPunchP2GroundKickClashAssistState(
+                    allowRestartOnNextResolve: false
+                );
+            }
+
             previousDebugP2MirrorAttackMode = mode;
+
+            // 異種地上Clash単発: P1攻撃を鏡写しせず、P2 Kick→遅延P1 Attack だけを発火する。
+            if (mode == DebugP2MirrorAttackMode.P1JPunchP2GroundKickClash)
+            {
+                ClearDebugMirrorAttackDelayState();
+                p2KickHeld = ResolveDebugP1JPunchP2GroundKickClashAssistKickHeld();
+                return;
+            }
 
             // P1 Guard検証: P1攻撃を鏡写しせず、P2単独JPunchを Delay 間隔で繰り返す。
             if (mode == DebugP2MirrorAttackMode.JPunchAfterDelay)
@@ -2390,6 +2459,188 @@ namespace FightingGameTrial.Simulation
             {
                 previousDebugP2MirrorAttackMode = DebugP2MirrorAttackMode.NoAttack;
             }
+        }
+
+        /// <summary>
+        /// P1 JPunch / P2 GroundKick 異種Clash単発 Assist の内部状態をクリアします。
+        /// allowRestartOnNextResolve=true のとき previousMode をずらし、Mirror 再ONで再入場検出する。
+        /// </summary>
+        private void ClearDebugP1JPunchP2GroundKickClashAssistState(
+            bool allowRestartOnNextResolve)
+        {
+            pendingCrossMoveClashP2KickFireCombatFrame = -1;
+            pendingCrossMoveClashP1PunchFireCombatFrame = -1;
+            expectedCrossMoveClashCandidateCombatFrame = -1;
+            crossMoveClashAssistHasRun = false;
+            crossMoveClashAssistP2KickFired = false;
+
+            if (allowRestartOnNextResolve)
+            {
+                previousDebugP2MirrorAttackMode = DebugP2MirrorAttackMode.NoAttack;
+            }
+        }
+
+        /// <summary>
+        /// GroundKick.Startup − JPunch.Startup。
+        /// UpdateDebugMirror（CombatFrame++前）でこの差だけ P1 Attack を遅らせると、
+        /// Attack started CF 差がちょうどこの値になる（既存 Mirror Delay と同じ関係）。
+        /// </summary>
+        private static int ResolveCrossMoveClashP1AttackLeadFrames()
+        {
+            int lead =
+                DebugAttackData.Kick.StartupFrames
+                - DebugAttackData.JPunch.StartupFrames;
+            if (lead < 0)
+            {
+                lead = 0;
+            }
+
+            return lead;
+        }
+
+        /// <summary>
+        /// P1JPunchP2GroundKickClash: P2へ Kick Held を1tick返す（検証専用・単発）。
+        /// 必要なら同メソッド内で P1 CurrentInput.Attack を1tick OR する。
+        /// StartGroundKick / StartJPunch は直接呼ばない。
+        /// </summary>
+        private bool ResolveDebugP1JPunchP2GroundKickClashAssistKickHeld()
+        {
+            int combatFrame = 0;
+            if (timeState != null)
+            {
+                combatFrame = timeState.CombatFrame;
+            }
+
+            int p1LeadFrames = ResolveCrossMoveClashP1AttackLeadFrames();
+
+            // 単発完了後は再発火しない（Mode再入場／Resetでクリア）。
+            if (crossMoveClashAssistHasRun)
+            {
+                return false;
+            }
+
+            // --- P1 Attack 発火待ち（P2 Kick 発火後）---
+            if (crossMoveClashAssistP2KickFired
+                && pendingCrossMoveClashP1PunchFireCombatFrame >= 0)
+            {
+                if (combatFrame < pendingCrossMoveClashP1PunchFireCombatFrame)
+                {
+                    return false;
+                }
+
+                pendingCrossMoveClashP1PunchFireCombatFrame = -1;
+
+                if (CanStartGroundAttack(participantP1) == false)
+                {
+                    crossMoveClashAssistHasRun = true;
+                    Debug.Log(
+                        "[FightDebug] P1 JPunch / P2 GroundKick clash assist"
+                        + " P1 Attack fire skipped"
+                        + " CombatFrame=" + combatFrame
+                        + " reason=P1CannotStartGroundAttack"
+                        + " (assist ended; no auto retry)"
+                    );
+                    return false;
+                }
+
+                OrP1AttackHeldForCrossMoveClashAssist();
+                crossMoveClashAssistHasRun = true;
+                Debug.Log(
+                    "[FightDebug] P1 JPunch / P2 GroundKick clash assist"
+                    + " P1 Attack fired"
+                    + " CombatFrame=" + combatFrame
+                    + " expectedCandidateCombatFrame="
+                    + expectedCrossMoveClashCandidateCombatFrame
+                    + " (Attack OR on P1 CurrentInput; StartJPunch is not called directly)"
+                );
+                return false;
+            }
+
+            // --- P2 Kick 予約待ち ---
+            if (pendingCrossMoveClashP2KickFireCombatFrame >= 0)
+            {
+                if (combatFrame < pendingCrossMoveClashP2KickFireCombatFrame)
+                {
+                    return false;
+                }
+
+                return TryFireCrossMoveClashP2Kick(combatFrame);
+            }
+
+            // --- 未予約: 双方開始可能になるまで待つ ---
+            if (CanStartGroundAttack(participantP1) == false
+                || CanStartGroundAttack(participantP2) == false)
+            {
+                return false;
+            }
+
+            pendingCrossMoveClashP2KickFireCombatFrame = combatFrame;
+            pendingCrossMoveClashP1PunchFireCombatFrame = combatFrame + p1LeadFrames;
+            // 入力注入CFの次が Attack started CF。最初の Active = started + GroundKick.Startup。
+            expectedCrossMoveClashCandidateCombatFrame =
+                combatFrame + 1 + DebugAttackData.Kick.StartupFrames;
+
+            Debug.Log(
+                "[FightDebug] P1 JPunch / P2 GroundKick clash assist reserved"
+                + " CombatFrame=" + combatFrame
+                + " p2KickFireCombatFrame="
+                + pendingCrossMoveClashP2KickFireCombatFrame
+                + " p1PunchFireCombatFrame="
+                + pendingCrossMoveClashP1PunchFireCombatFrame
+                + " expectedCandidateCombatFrame="
+                + expectedCrossMoveClashCandidateCombatFrame
+                + " p1LeadFrames=" + p1LeadFrames
+            );
+
+            return TryFireCrossMoveClashP2Kick(combatFrame);
+        }
+
+        /// <summary>
+        /// 予約済み P2 Kick 発火。開始不能なら予約を破棄して再待機可能にする。
+        /// </summary>
+        private bool TryFireCrossMoveClashP2Kick(int combatFrame)
+        {
+            pendingCrossMoveClashP2KickFireCombatFrame = -1;
+
+            if (CanStartGroundAttack(participantP2) == false)
+            {
+                pendingCrossMoveClashP1PunchFireCombatFrame = -1;
+                expectedCrossMoveClashCandidateCombatFrame = -1;
+                crossMoveClashAssistP2KickFired = false;
+                Debug.Log(
+                    "[FightDebug] P1 JPunch / P2 GroundKick clash assist"
+                    + " P2 Kick fire skipped"
+                    + " CombatFrame=" + combatFrame
+                    + " reason=P2CannotStartGroundAttack"
+                    + " (will re-reserve when both can start)"
+                );
+                return false;
+            }
+
+            crossMoveClashAssistP2KickFired = true;
+            Debug.Log(
+                "[FightDebug] P1 JPunch / P2 GroundKick clash assist"
+                + " P2 Kick fired"
+                + " CombatFrame=" + combatFrame
+                + " expectedCandidateCombatFrame="
+                + expectedCrossMoveClashCandidateCombatFrame
+                + " (Kick edge on P2 SimulationInputState; StartGroundKick is not called directly)"
+            );
+            return true;
+        }
+
+        /// <summary>
+        /// P1 CurrentInput の Attack だけを true にする（方向・Kickは触らない）。
+        /// SampleAttack 前の UpdateDebugMirror から呼ばれ、通常エッジ経路へ載せる。
+        /// </summary>
+        private void OrP1AttackHeldForCrossMoveClashAssist()
+        {
+            if (timeState == null || timeState.CurrentInput == null)
+            {
+                return;
+            }
+
+            timeState.CurrentInput.Attack = true;
         }
 
         /// <summary>
