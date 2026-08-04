@@ -1218,6 +1218,7 @@ MonoBehaviour:
   displayTint: {r: 1, g: 1, b: 1, a: 1}
   hitStunDisplayColor: {r: 1, g: 0.35, b: 0.35, a: 1}
   clashRecoilDisplayColor: {r: 1, g: 0.85, b: 0.2, a: 1}
+  guardStunDisplayColor: {r: 0.45, g: 0.7, b: 0.95, a: 1}
   knockoutDisplayColor: {r: 0.35, g: 0.35, b: 0.35, a: 1}
   usesGameplayInput: 1
   hitStunFrames: 12
@@ -1522,6 +1523,7 @@ MonoBehaviour:
   displayTint: {r: 0.65, g: 0.78, b: 0.95, a: 1}
   hitStunDisplayColor: {r: 1, g: 0.35, b: 0.35, a: 1}
   clashRecoilDisplayColor: {r: 1, g: 0.85, b: 0.2, a: 1}
+  guardStunDisplayColor: {r: 0.45, g: 0.7, b: 0.95, a: 1}
   knockoutDisplayColor: {r: 0.35, g: 0.35, b: 0.35, a: 1}
   usesGameplayInput: 0
   hitStunFrames: 12

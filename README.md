@@ -36,10 +36,10 @@ GC-2（Editor）: `DebugHudView.Update` 約17.2 KB → 約3.2 KB / frame。Devel
 ## Unity 実装の到達点（要約）
 
 ブランチ `unity` 上で、**段階1〜15まで完了**しています。
-内容反映済み基準コミット（push済みHEAD）: **`f9e56d3`**（Document air kick assist safety validation）。
-過去履歴の例: `988f36f` / `03bfd72`（AirKick Assist・Air双方未適用）、`6be8bb4` / `96f8148`（地上攻撃変換・Delay・異技Clash）、`6bc5f03` / `5bd3627`（Clash整理＋基本P2鏡写し）。
-今回の未コミット範囲: P2 Debug 最小立ちガード（`DebugP2StanceGuardMode`／専用GuardStun／片側Guard分岐）、GuardStun終了ログ、GuardStun値7/9、Play実測、および上記のDocs反映。
-（Assist実装・Air双方未適用・Assist予約安全・地上Delay破棄Playは push済みで、今回の未コミットには含めない。）
+内容反映済み基準コミット（コードpush済みHEAD）: **`446f053`**（Add minimal P2 stand guard debug flow）。
+過去履歴の例: `f9e56d3`（Assist予約安全Docs）、`988f36f` / `03bfd72`（AirKick Assist・Air双方未適用）、`6be8bb4` / `96f8148`（地上攻撃変換・Delay・異技Clash）、`6bc5f03` / `5bd3627`（Clash整理＋基本P2鏡写し）。
+今回の未コミット範囲: P1 Gameplay Back 最小立ちガード、`JPunchAfterDelay`（P2 solo JPunch繰り返し Guard 検証 Assist）、地上Mirror Delay 0〜120、および本Docs反映。
+（P2 Debug StandGuard・Assist実装・Air双方未適用・Assist予約安全は push済みで、今回の未コミットには含めない。）
 段階14全体（14A+14B）・段階15（J Punch 攻撃データ化）: **完了・push 済み**（SO 化は見送り）。
 GC-1 / GC-2（補助改善・正式 Stage ではない）: **完了・push 済み**。
 Training Reset 位置・向き復帰: **実装・Editor 確認済み**（正式 Stage 番号なし）。
@@ -51,9 +51,9 @@ Training Reset 共通 release gate（全操作 release まで入力抑制）: **
 
 | 区分 | 内容 |
 |---|---|
-| **実装済み** | 60Hz SimulationTick、Pause/Step、HUD、HitStop、入力、左右移動、Facing、Participant / AttackState / HitState、Push Box、Box可視化、Hit×Hurt判定、J Punch、Ground Kick、**Air Kick最小検証版**、1攻撃1Hit、横ノックバック、HP/Damage、KO、Training Reset、Visual Sequence、ジャンプ基盤、**Hit候補収集→分類→適用**、**Ground Clash（同技・異技とも技種不問）**、**P2鏡写しDebug**（`debugMirrorP1InputToP2` / `DebugP2MirrorAttackMode` / `debugP2MirrorAttackDelayFrames`）、**P2 AirKick検証アシスト**（`debugEnableP2AirKickAssist`／Delay、既定OFF・検証専用） |
-| **暫定** | J Punch `4/3/8`、Ground Kick `9/4/13`、Air Kick `5/5/10`。Active中だけHit Boxを出す。J PunchはAF8〜10、Ground KickはAF14〜19まで振り切りVisualを残し、後半はIdleへ戻すが内部Recoveryは継続。Air Kickは空中K・1ジャンプ1回・着地即終了。Startup／Activeは専用Flying Kick、RecoveryはJumpFall表示。Hurt／Push BoxはCenterX `0`、HalfWidth `0.75`の左右対称暫定値。Airを含む双方候補は結果未適用（正式Air Clashではない。Play実測済み）。**P2 Debug StandGuard**（未コミット・既定Normal。正式後ろ入力Guardではない） |
-| **未実装（方針確定含む）** | 対戦モード進行、HPバー、**正式後ろ入力Guard／しゃがみ／Just Guard**、Animator、正式Character Data SO、複数Hit/Hurt Box、コンボ・Cancel、Counter Hit、Attack Priority、**Air Hit / Air Knockback・縦Knockback・Air Clash・正式Trade**、本番P2 AI。Air Kickは空中攻撃の最小検証であり、Air Hit基盤完成ではない |
+| **実装済み** | 60Hz SimulationTick、Pause/Step、HUD、HitStop、入力、左右移動、Facing、Participant / AttackState / HitState、Push Box、Box可視化、Hit×Hurt判定、J Punch、Ground Kick、**Air Kick最小検証版**、1攻撃1Hit、横ノックバック、HP/Damage、KO、Training Reset、Visual Sequence、ジャンプ基盤、**Hit候補収集→分類→適用**、**Ground Clash（同技・異技とも技種不問）**、**P2鏡写しDebug**（`debugMirrorP1InputToP2` / `DebugP2MirrorAttackMode` / `debugP2MirrorAttackDelayFrames`）、**P2 AirKick検証アシスト**（`debugEnableP2AirKickAssist`／Delay、既定OFF・検証専用）、**P2 Debug StandGuard**（`446f053`・既定Normal・検証専用） |
+| **暫定** | J Punch `4/3/8`、Ground Kick `9/4/13`、Air Kick `5/5/10`。Active中だけHit Boxを出す。J PunchはAF8〜10、Ground KickはAF14〜19まで振り切りVisualを残し、後半はIdleへ戻すが内部Recoveryは継続。Air Kickは空中K・1ジャンプ1回・着地即終了。Startup／Activeは専用Flying Kick、RecoveryはJumpFall表示。Hurt／Push BoxはCenterX `0`、HalfWidth `0.75`の左右対称暫定値。Airを含む双方候補は結果未適用（正式Air Clashではない。Play実測済み）。**P1 Gameplay Back 最小立ちガード**（未コミット・Chip0／JPunch GuardStun7／GroundKick9。しゃがみ・Just Guardではない）。**JPunchAfterDelay**（未コミット・P2 solo JPunch繰り返し・検証専用） |
+| **未実装（方針確定含む）** | 対戦モード進行、HPバー、**しゃがみガード／Just Guard／正式Chip Damage／正式な空中攻撃ガード**、Animator、正式Character Data SO、複数Hit/Hurt Box、コンボ・Cancel、Counter Hit、Attack Priority、**Air Hit / Air Knockback・縦Knockback・Air Clash・正式Trade**、本番P2 AI。Air Kickは空中攻撃の最小検証であり、Air Hit基盤完成ではない |
 
 詳細・次工程は **`docs/unity_implementation_status.md`** を正とする。
 ジャンプ・Visual・Reset gate は同ファイル §1.1・§1.2 および教材 §17.7〜§17.9。
@@ -213,13 +213,31 @@ Unity_FightingGameTrial
 
 上記`8/3/4`はコミット`bc80ddb`時点の履歴値。現行暫定値（push済み）は、J Punch `4/3/8`、Ground Kick `9/4/13`、Air Kick `5/5/10`。
 
-## P2 Debug 最小立ちガード（2026-08-03・未コミット）
+## P1 Back StandGuard と P2 solo JPunch 繰り返し（2026-08-04・未コミット）
 
-検証専用。正式な後ろ入力Guard／AIではない。Scene既定は`debugP2StanceGuardMode=Normal`（Play中Inspector変更はScene保存ではない）。推奨: Mirror ON + NoAttack + StandGuard。
+### P1 Gameplay Back 最小立ちガード（正式入力経路・暫定）
 
-- **仕様**: 片側候補のみGuard分岐。双方地上Clash／Air未適用は維持。専用GuardStun（JPunch 7／GroundKick 9）・Chip0・HitCount非加算・小Pushback・HitStop・AttackResult=Guard。AirKickは`CanStandGuard=false`（StandGuard有効中もNormal Hit。正式な空中攻撃ガード仕様は未決定）
-- **確認済み（Play）**: JPunch／GroundKickのStand guard成立、Idle復帰、Training Resetクリア。修正後JPunch（CF798・7）／GroundKick（CF1450・9）で`GuardStun ended`。**Mode=Normalで従来Normal Hitへ復帰**。**StandGuard有効中でもAirKickはNormal Hit**
-- **未確認**: P1ガード、正式な後ろ入力Guard、しゃがみGuard、Just Guard、正式Chip Damage仕様、正式な空中攻撃ガード仕様、正式P2操作／AI、Development Build
+P1が接地で Back のみ保持しているとき、立ちガード可能な技の片側候補を Guard として解決する（接触CF・Facing基準。入力履歴・猶予なし）。
+
+- **Back**: 右向きなら Leftのみ／左向きなら Rightのみ。Down+Back・Left+Right・Forward／Neutralは立ちガードにしない
+- **結果**: Chip0・HitCount非加算・JPunch GuardStun=7・GroundKick GuardStun=9・ログ `via=Back`／`GuardStun ended slot=P1`
+- **Play確認**: Back肯定（左右Facing）。Neutral／Forward／Left+Right／Down+Backは Normal Hit
+- **未実装**: しゃがみガード・Just Guard・正式Chip・正式な空中攻撃ガード。AirKickは立ちガード不可のまま
+
+### P2 solo JPunch 繰り返し Assist（`JPunchAfterDelay`・検証専用）
+
+InspectorとGameビュー往復を検証成立条件にしないための補助。Mirror Replayではない。Scene既定ModeはNoAttackのまま。
+
+- Mirror ON + `JPunchAfterDelay`: P2方向 Neutral 固定。Attackのみ Delay後1tick。P1攻撃は鏡写ししない。`StartJPunch`直接呼び出しなし
+- 攻撃終了後から次Delay（0〜120CF）。Mode中は繰り返し。Mirror OFF／Mode離脱／Resetで停止
+- **Play確認**: Delay=60／90で繰り返し。攻撃重複なし。P1自動攻撃なし。Console赤エラーなし
+
+### P2 Debug 最小立ちガード（push済み `446f053`）
+
+検証専用。正式な後ろ入力Guard／AIではない。Scene既定は`debugP2StanceGuardMode=Normal`。推奨: Mirror ON + NoAttack + StandGuard。ログ `via=DebugStandGuard`。
+
+- **仕様**: 片側候補のみGuard分岐。専用GuardStun（JPunch 7／GroundKick 9）・Chip0・HitCount非加算。AirKickは`CanStandGuard=false`
+- **確認済み（Play）**: JPunch／GroundKickのStand guard成立、`GuardStun ended slot=P2`、Mode=Normal回帰、StandGuard中AirKickは Normal Hit
 
 ## P2 AirKick Assist予約安全確認（Docs push済み `f9e56d3`）
 

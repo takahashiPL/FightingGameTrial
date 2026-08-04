@@ -71,15 +71,15 @@ P2鏡写しDebug（`debugMirrorP1InputToP2`）は、戦闘ロジックを分岐�
 P1 CurrentInput → 鏡写し／地上攻撃変換／地上Delay／任意でAirKick Assist → p2MirrorInput → ResolveInput(P2) → 通常の移動・Jump・攻撃開始
 ```
 
-`DebugP2MirrorAttackMode` と `debugP2MirrorAttackDelayFrames` は地上Clash検証用。`debugEnableP2AirKickAssist` はAir双方未適用分岐のPlay確認用で、いずれも入力埋めの段階だけを触る。StartJPunch／StartGroundKick／StartAirKickを直接呼ばない。正式P2操作や本番AIではない。
+`DebugP2MirrorAttackMode` と `debugP2MirrorAttackDelayFrames`（0〜120）は地上Clash／Guard検証用。`JPunchAfterDelay`はP1攻撃を鏡写しせずP2 solo JPunchを繰り返すGuard検証補助（方向Neutral・Attack 1tick。Mirror Replayではない）。`debugEnableP2AirKickAssist` はAir双方未適用分岐のPlay確認用で、いずれも入力埋めの段階だけを触る。StartJPunch／StartGroundKick／StartAirKickを直接呼ばない。正式P2操作や本番AIではない。
 
-`debugP2StanceGuardMode`（Normal／StandGuard）は**結果分類側**の検証補助である。入力ソースではなく、片側候補を Guard にするかどうかを切り替える。正式後ろ入力ガードではない。既定Normalなら通常のNormal Hit経路のまま。
+`debugP2StanceGuardMode`（Normal／StandGuard）は**結果分類側**の検証補助である。入力ソースではなく、片側候補を Guard にするかどうかを切り替える（P2・`via=DebugStandGuard`）。P1の最小立ちガードは**正式Gameplay Back入力**（`via=Back`）で、希望条件を分離し身体条件は共通。既定NormalならP2側は通常のNormal Hit経路のまま。
 
-学習上の教訓: 予約入力は「発火予定CFまで残る」前提で考えると危険である。Mirror OFF／Assist OFF／Training Resetで予約を捨て、発火時に接地ならKickを載せない（GroundKick化防止）ことを両系統でPlay確認した。地上DelayとAssist Delayは別状態として扱う。OFF/Resetでは`reason=*`明示キャンセルログが出ない場合があり、**発火予定CFを通過しても未発火**という結果で確認する。
+学習上の教訓: 予約入力は「発火予定CFまで残る」前提で考えると危険である。Mirror OFF／Assist OFF／Training Resetで予約を捨て、発火時に接地ならKickを載せない（GroundKick化防止）ことを両系統でPlay確認した。地上DelayとAssist Delayは別状態として扱う。OFF/Resetでは`reason=*`明示キャンセルログが出ない場合があり、**発火予定CFを通過しても未発火**という結果で確認する。JPunchAfterDelayも同様にOFF／Mode離脱／Resetで内部予約を消す。
 
-GuardStunの自然終了は減算で0到達すれば状態が外れる。終了ログが無いだけでは状態残留とは限らない。修正後のPlayではJPunch（CF798・GuardStun=7）とGroundKick（CF1450・GuardStun=9）の双方で`[FightDebug] GuardStun ended slot=P2`を確認した。
+GuardStunの自然終了は減算で0到達すれば状態が外れる。終了ログが無いだけでは状態残留とは限らない。修正後のPlayではJPunch（CF798・GuardStun=7）とGroundKick（CF1450・GuardStun=9）の双方で`[FightDebug] GuardStun ended slot=P2`を確認した。P1 Back検証では`GuardStun ended slot=P1`もPlay確認済み。
 
-異技ClashのPlay実測（Swap・**P1 GroundKick → P2 JPunch**・Delay5）では、処理順の有利ではなく **同一CombatFrameに双方候補があるか** でClash／先勝ちが分かれた。Air双方（双方AirKick）ではGround ClashにもNormal Hitにもならず結果未適用になることと、警告が同一Playセッション中1回だけであることもPlay実測済み。**P1 JPunch → P2 GroundKick** の双方候補同一CF実測は未確認のまま。候補収集→分類→適用の理解に、検証用ログ（Attack started／Pending hit candidate／delay・Assist reserved/fired/cancelled／Stand guard／GuardStun ended）を使う（本番恒常ログではない）。
+異技ClashのPlay実測（Swap・**P1 GroundKick → P2 JPunch**・Delay5）では、処理順の有利ではなく **同一CombatFrameに双方候補があるか** でClash／先勝ちが分かれた。Air双方（双方AirKick）ではGround ClashにもNormal Hitにもならず結果未適用になることと、警告が同一Playセッション中1回だけであることもPlay実測済み。**P1 JPunch → P2 GroundKick** の双方候補同一CF実測は未確認のまま。候補収集→分類→適用の理解に、検証用ログ（Attack started／Pending hit candidate／delay・Assist reserved/fired/cancelled／Stand guard／GuardStun ended／solo JPunch loop）を使う（本番恒常ログではない）。
 
 将来のP2 AIも、同じ「P2用 SimulationInputState を埋める」箇所を差し替えればよい。詳細と未確認事項は `docs/unity_implementation_status.md`。
 

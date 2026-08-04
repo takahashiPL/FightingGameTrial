@@ -1,17 +1,31 @@
 # CHANGELOG
 
-## 未コミット: P2 Debug 最小立ちガード（2026-08-03）
+## 未コミット: P1 Back StandGuard と P2 solo JPunch 繰り返し Assist（2026-08-04）
 
-前提（push済み・今回の未コミットではない）: Assist実装 `03bfd72` / Air双方Docs `988f36f` / Assist予約安全Docs `f9e56d3`。
+前提（push済み・今回の未コミットではない）: P2 Debug StandGuard `446f053` / Assist予約安全Docs `f9e56d3` / Assist実装 `03bfd72` / Air双方Docs `988f36f`。
 
-- `DebugP2StanceGuardMode`（Normal／StandGuard・Scene既定Normal）: P2専用の立ちガード検証補助。正式後ろ入力・AIではない
+- **Added** P1 Gameplay Back 保持による最小立ちガード（Facing基準・接触CF・入力履歴なし）。ログ `via=Back`
+- **Excluded** Down+Back・Left+Right同時・Forward／Neutral を立ちガードから除外（しゃがみガード自体は未実装。Down+Back除外は将来のしゃがみガード候補を守るため）
+- **Added** `DebugP2MirrorAttackMode.JPunchAfterDelay`: P1攻撃を鏡写しせず、P2だけが Delay 間隔で JPunch を繰り返す Guard 検証専用 Assist（Mirror Replayではない）
+- JPunchAfterDelay中のP2入力: 方向・Kickは Neutral 固定。Attack のみ発火CFの1tick。`StartJPunch`直接呼び出しなし
+- 繰り返し: 攻撃可能→Delay→Attack 1tick→通常経路でJPunch→終了待ち→終了後から次Delay。攻撃中は次Attackを重ねない。開始不能時は可能になってからDelay数え直し
+- Mirror OFF／Mode離脱／Training Reset／Awake で Assist 内部状態をクリア
+- **Expanded** `debugP2MirrorAttackDelayFrames` を 0〜120 CombatFrame（60Hzで60CF≒1秒・120CF≒2秒）。SameAsP1／Swapの選択範囲のみ拡張（処理内容は変更なし）。AirKick Assist Delayは従来どおり 0〜15
+- **Play確認**: P2がDelayごと繰り返しJPunch（Delay=60／90）。攻撃重複なし・方向移動なし・P1自動攻撃なし。P1 Backのみで `via=Back`・GuardStun=7・Chip0・`GuardStun ended slot=P1`。右向き／左向きの Facing 切替確認。Neutral／Forward／Left+Right／Down+Backは Normal Hit。Console赤エラーなし
+- 注: Play中にInspectorスライダーをドラッグすると中間値で1サイクル予約されることがある（異常ではない。通常はPlay前にDelay設定）
+- **未確認**: しゃがみガード／Just Guard／正式Chip Damage／正式な空中攻撃ガード仕様／正式P2操作・AI／Development Build。P2 Debug StandGuard自体の再回帰は今回対象外（`446f053`で確認済み）
+
+## P2 Debug 最小立ちガード（push済み `446f053`）
+
+前提（push済み）: Assist実装 `03bfd72` / Air双方Docs `988f36f` / Assist予約安全Docs `f9e56d3`。
+
+- `DebugP2StanceGuardMode`（Normal／StandGuard・Scene既定Normal）: P2専用の立ちガード検証補助。正式後ろ入力・AIではない。ログ `via=DebugStandGuard`
 - 分類: 双方地上Clash／Air未適用は維持。片側候補のみ `TryApplyStandGuard` → Guard、失敗時 Normal Hit
 - 専用`GuardStun`（HitStun非流用）・Chip0・HitCount非加算・小Pushback・共有HitStop・`MarkGuarded`（AttackResult=Guard）
 - GuardStunFrames: JPunch **7**／GroundKick **9**（初回実装の8／10は指定ずれのため修正。修正後JPunch=7／GroundKick=9をPlay再確認）
 - 終了ログ: SessionがTick前後比較で`[FightDebug] GuardStun ended slot=`（**JPunch CF798／GroundKick CF1450でPlay確認済み**）
-- AirKick: `CanStandGuard=false`。StandGuard有効中もNormal Hit（Play確認済み）。正式な空中攻撃ガード仕様は未決定
-- **Play確認**: 修正前JPunch（CF1478・当時8）／GroundKick（CF3114・当時10）で成立・Idle復帰。Training ResetでGuardStun／HitStopクリアと状態初期化。修正後JPunch（CF798・7）／GroundKick（CF1450・9）で`GuardStun ended slot=P2`（各1回）。**Mode=Normalで`Normal hit attack=JPunch`・Damage=10・HitCount=1**。**StandGuard中AirKickはNormal Hit・Damage=14・HitCount=1（Stand guardログなし）**
-- **未確認**: P1ガード、正式な後ろ入力Guard、しゃがみGuard、Just Guard、正式Chip Damage仕様、正式な空中攻撃ガード仕様、正式P2操作／AI、Development Build
+- AirKick: `CanStandGuard=false`。StandGuard有効中も Normal Hit（Play確認済み）。正式な空中攻撃ガード仕様は未決定
+- **Play確認**: 修正前JPunch（CF1478・当時8）／GroundKick（CF3114・当時10）で成立・Idle復帰。Training ResetでGuardStun／HitStopクリアと状態初期化。修正後JPunch（CF798・7）／GroundKick（CF1450・9）で`GuardStun ended slot=P2`（各1回）。**Mode=Normalで`Normal hit attack=JPunch`・Damage=10・HitCount=1**。**StandGuard中AirKickは Normal Hit・Damage=14・HitCount=1（Stand guardログなし）**
 
 ## P2 AirKick Assist予約安全確認（Docs push済み `f9e56d3`）
 
@@ -33,12 +47,12 @@
 
 ## P2鏡写し攻撃変換・CombatFrame遅延・異技Clash実測（`96f8148` / Docs `6be8bb4`・push済み）
 
-- `DebugP2MirrorAttackMode`: SameAsP1 / SwapPunchAndKick / NoAttack。双方接地時のみ攻撃入力変換。Air Kick非対象。Start技の直接呼び出しなし
-- `debugP2MirrorAttackDelayFrames`（0〜15、既定0）: P2 Attack/Kick押下開始だけをCombatFrame予約／発火。検証専用（本番AI反応時間ではない）
+- `DebugP2MirrorAttackMode`: SameAsP1 / SwapPunchAndKick / NoAttack（当時。後に `JPunchAfterDelay` を追加・未コミットDocs）。双方接地時のみ攻撃入力変換。Air Kick非対象。Start技の直接呼び出しなし
+- `debugP2MirrorAttackDelayFrames`（当時0〜15、既定0。後に0〜120へ拡張・未コミット）: P2 Attack/Kick押下開始だけをCombatFrame予約／発火。検証専用（本番AI反応時間ではない）
 - **Play実測（SwapPunchAndKick・P1 K・近距離）**: Delay4=P2 JPunch先勝ち、Delay5=異技Ground Clash（**P1 GroundKick → P2 JPunch** / Damage0）、Delay6=P1 GroundKick先勝ち
 - **確認済み**: 攻撃変換モード、CombatFrame遅延、検証ログ、**P1 GroundKick → P2 JPunch**（Delay5）、Delay 4/5/6境界、NoAttack時Normal Hit、**Mirror OFFおよびTraining Resetによる地上Delay予約破棄**（Delay15・Swap・発火予定CF通過でfiredなし／P2 JPunch開始なし）
 - **未確認（継続）**: **P1 JPunch → P2 GroundKick** で双方候補が同一CFになる条件でのClash実測
-- 注: Assist Delay（`debugP2AirKickDelayFrames`）の安全確認は上記「未コミット」節。地上Delayと混同しない
+- 注: Assist Delay（`debugP2AirKickDelayFrames`）は別系統。地上Delayと混同しない
 
 ## Fighter Sprite Sheet再構築版の正式採用（`5bcc3fa` / Docs `d98a99d`・push済み）
 

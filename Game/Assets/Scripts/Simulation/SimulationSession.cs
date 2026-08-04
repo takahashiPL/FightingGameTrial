@@ -164,11 +164,12 @@ namespace FightingGameTrial.Simulation
         private bool debugMirrorP1InputToP2 = false;
 
         [Tooltip(
-            "異技Ground Clash再現用の検証専用設定です（本番AIではない）。\n"
+            "異技Ground Clash／P1 Guard再現用の検証専用設定です（本番AIではない）。\n"
             + "debugMirrorP1InputToP2 が ON のときだけ効きます。OFF 時は無視し、P2 は Neutral のままです。\n"
             + "SameAsP1: 同技Clash確認（P1 J→P2 J、P1 K→P2 K）。\n"
             + "SwapPunchAndKick: 異技Clash確認（P1 J→P2 K、P1 K→P2 J）。\n"
             + "NoAttack: 攻撃は渡さず左右・Jump鏡写しだけ残し、片側Normal Hitを確認。\n"
+            + "JPunchAfterDelay: P1攻撃なしでP2がDelay間隔でJPunchを繰り返す（P1 Back Guard検証用）。\n"
             + "技を直接開始せず Attack/Kick 入力だけ変換し、P2 の通常開始条件を維持します。"
             + " 双方接地時のみ攻撃変換し、Air Kick を起こしません。"
             + " Air双方候補の検証では NoAttack + debugEnableP2AirKickAssist を併用します。"
@@ -180,10 +181,12 @@ namespace FightingGameTrial.Simulation
             "P2へ渡す Attack／Kick の押下開始を遅らせる CombatFrame 数です（検証専用）。\n"
             + "debugMirrorP1InputToP2 が ON のときだけ有効。左右・Up・Down には影響しません。\n"
             + "異技Clash確認例: SwapPunchAndKick + 遅延5 で P1 GroundKick 開始の5CF後に P2 JPunch エッジ。\n"
-            + "攻撃データや Clash 条件は変えず、Active 重ねだけを調整します。既定 0。"
+            + "JPunchAfterDelay: P2単独JPunchの繰り返し間隔。"
+            + " 攻撃終了（または再攻撃可能）後から数え、60Hzで 60CF≈1秒・120CF≈2秒。\n"
+            + "攻撃データや Clash 条件は変えず、Active 重ね／Guard検証間隔だけを調整します。既定 0。"
             + " Air Kick アシストの遅延は debugP2AirKickDelayFrames を使います。"
         )]
-        [Range(0, 15)]
+        [Range(0, 120)]
         [SerializeField]
         private int debugP2MirrorAttackDelayFrames = 0;
 
@@ -217,7 +220,8 @@ namespace FightingGameTrial.Simulation
             + "StandGuard: P2が接地・非攻撃・非CombatReaction・相手向きのとき、"
             + "立ちガード可能な技（JPunch / GroundKick）の片側候補を Guard として解決。\n"
             + "AirKick・しゃがみ・後ろ入力・Just Guard は対象外。既定 Normal。\n"
-            + "推奨: Mirror ON + NoAttack + StandGuard。"
+            + "推奨: Mirror ON + JPunchAfterDelay + Delay（P1 Back Guard検証）。"
+            + " P2自身のDebug StandGuard検証時は Mirror ON + NoAttack + StandGuard。"
         )]
         [SerializeField]
         private DebugP2StanceGuardMode debugP2StanceGuardMode = DebugP2StanceGuardMode.Normal;
@@ -253,6 +257,40 @@ namespace FightingGameTrial.Simulation
         private int pendingP2MirrorAttackFireCombatFrame = -1;
 
         private int pendingP2MirrorKickFireCombatFrame = -1;
+
+        /// <summary>
+        /// JPunchAfterDelay 用: P2 JPunch を発火する CombatFrame（未予約は -1）。
+        /// 攻撃終了後から Delay を数え直す。P1攻撃鏡写しの Delay 予約とは別状態。
+        /// </summary>
+        private int pendingP2SoloJPunchFireCombatFrame = -1;
+
+        /// <summary>
+        /// JPunchAfterDelay 用: Attack 1tick 発火後、P2 の攻撃 Action 終了を待っている。
+        /// 終了（または再攻撃可能）になるまで次の予約をしない。
+        /// </summary>
+        private bool p2SoloJPunchWaitingForAttackEnd;
+
+        /// <summary>
+        /// JPunchAfterDelay 用: 発火後に一度でも IsActionPlaying を見たか。
+        /// 発火同一tickではまだ開始前なので、終了判定を誤らないために使う。
+        /// </summary>
+        private bool p2SoloJPunchSawAttackPlaying;
+
+        /// <summary>
+        /// JPunchAfterDelay 用: 繰り返し回数（ログ用。1始まりで発火時に加算）。
+        /// </summary>
+        private int p2SoloJPunchCycleIndex;
+
+        /// <summary>
+        /// JPunchAfterDelay 用: waiting ログをサイクルあたり1回に抑える。
+        /// </summary>
+        private bool p2SoloJPunchLoggedWaitingForEnd;
+
+        /// <summary>
+        /// 前tickの MirrorAttackMode（JPunchAfterDelay への切替検出用）。
+        /// </summary>
+        private DebugP2MirrorAttackMode previousDebugP2MirrorAttackMode =
+            DebugP2MirrorAttackMode.SameAsP1;
 
         /// <summary>
         /// P2 Air Kick検証アシスト用: P1 Kick の前tick保持（立ち上がり検出）。
@@ -471,6 +509,7 @@ namespace FightingGameTrial.Simulation
             p2MirrorInput.ResetToInitialValues();
 
             ClearDebugMirrorAttackDelayState();
+            ClearDebugP2SoloJPunchAssistState(allowRestartOnNextResolve: true);
             ClearDebugP2AirKickAssistState();
 
             timeState.ResetToInitialValues();
@@ -793,6 +832,7 @@ namespace FightingGameTrial.Simulation
             }
 
             ClearDebugMirrorAttackDelayState();
+            ClearDebugP2SoloJPunchAssistState(allowRestartOnNextResolve: true);
             ClearDebugP2AirKickAssistState();
             lastLoggedPendingHitStartedCombatFrameP1 = -1;
             lastLoggedPendingHitStartedCombatFrameP2 = -1;
@@ -1814,6 +1854,7 @@ namespace FightingGameTrial.Simulation
             {
                 // OFF 中に遅延予約が残ると、再ON時に古いエッジが飛ぶのを防ぐ。
                 ClearDebugMirrorAttackDelayState();
+                ClearDebugP2SoloJPunchAssistState(allowRestartOnNextResolve: true);
                 ClearDebugP2AirKickAssistState();
                 return;
             }
@@ -1828,6 +1869,7 @@ namespace FightingGameTrial.Simulation
             {
                 p2MirrorInput.ClearGameplayHeldButtons();
                 ClearDebugMirrorAttackDelayState();
+                ClearDebugP2SoloJPunchAssistState(allowRestartOnNextResolve: true);
                 ClearDebugP2AirKickAssistState();
                 return;
             }
@@ -1846,7 +1888,7 @@ namespace FightingGameTrial.Simulation
             bool mirroredDown = p1.Down;
 
             // 攻撃: モード変換 →（必要なら）CombatFrame遅延 → 1tickのHeldでエッジを起こす。
-            // 左右・Jumpには遅延を掛けない。
+            // 左右・Jumpには遅延を掛けない（SameAsP1 / Swap / NoAttack）。
             bool mirroredAttack;
             bool mirroredKick;
             ResolveDebugMirrorAttackButtonsWithDelay(
@@ -1856,10 +1898,21 @@ namespace FightingGameTrial.Simulation
                 out mirroredKick
             );
 
-            // Air Kick検証アシスト: 地上鏡写しのKickとは別にORする。
-            // NoAttackでもAir双方候補を確認できるようにするため、地上モードのクリア後に合成する。
-            if (ResolveDebugP2AirKickAssistKickHeld(p1))
+            // P1 Back Guard検証用: 方向MirrorだとP1後退＋P2前進で距離が変わる。
+            // JPunchAfterDelay のときだけ方向・KickをNeutral固定し、Attackの1tick発火だけ残す。
+            // Attack は上の ResolveDebugMirrorAttackButtonsWithDelay 内で既に solo 解決済み（二重発火しない）。
+            if (debugP2MirrorAttackMode == DebugP2MirrorAttackMode.JPunchAfterDelay)
             {
+                mirroredLeft = false;
+                mirroredRight = false;
+                mirroredUp = false;
+                mirroredDown = false;
+                mirroredKick = false;
+            }
+            else if (ResolveDebugP2AirKickAssistKickHeld(p1))
+            {
+                // Air Kick検証アシスト: 地上鏡写しのKickとは別にORする。
+                // NoAttackでもAir双方候補を確認できるようにするため、地上モードのクリア後に合成する。
                 mirroredKick = true;
             }
 
@@ -1974,8 +2027,45 @@ namespace FightingGameTrial.Simulation
             p2AttackHeld = false;
             p2KickHeld = false;
 
+            DebugP2MirrorAttackMode mode = debugP2MirrorAttackMode;
+
+            // Mode 切替検出（JPunchAfterDelay ループ開始／離脱クリア）
+            if (mode == DebugP2MirrorAttackMode.JPunchAfterDelay
+                && previousDebugP2MirrorAttackMode != DebugP2MirrorAttackMode.JPunchAfterDelay)
+            {
+                ClearDebugP2SoloJPunchAssistState(allowRestartOnNextResolve: false);
+                int enterDelay = debugP2MirrorAttackDelayFrames;
+                if (enterDelay < 0)
+                {
+                    enterDelay = 0;
+                }
+                else if (enterDelay > 120)
+                {
+                    enterDelay = 120;
+                }
+
+                Debug.Log(
+                    "[FightDebug] P2 solo JPunch loop started delay=" + enterDelay
+                );
+            }
+            else if (mode != DebugP2MirrorAttackMode.JPunchAfterDelay
+                && previousDebugP2MirrorAttackMode == DebugP2MirrorAttackMode.JPunchAfterDelay)
+            {
+                ClearDebugP2SoloJPunchAssistState(allowRestartOnNextResolve: false);
+            }
+
+            previousDebugP2MirrorAttackMode = mode;
+
+            // P1 Guard検証: P1攻撃を鏡写しせず、P2単独JPunchを Delay 間隔で繰り返す。
+            if (mode == DebugP2MirrorAttackMode.JPunchAfterDelay)
+            {
+                ClearDebugMirrorAttackDelayState();
+                p2AttackHeld = ResolveDebugP2SoloJPunchAssistAttackHeld();
+                return;
+            }
+
             // NoAttack: 攻撃は渡さない。遅延キューも作らない／残さない。
-            if (debugP2MirrorAttackMode == DebugP2MirrorAttackMode.NoAttack)
+            if (mode == DebugP2MirrorAttackMode.NoAttack)
             {
                 ClearDebugMirrorAttackDelayState();
                 return;
@@ -2006,9 +2096,9 @@ namespace FightingGameTrial.Simulation
             {
                 delayFrames = 0;
             }
-            else if (delayFrames > 15)
+            else if (delayFrames > 120)
             {
-                delayFrames = 15;
+                delayFrames = 120;
             }
 
             // 立ち上がりを予約。発火 CombatFrame = 現在CF + 遅延。
@@ -2068,6 +2158,163 @@ namespace FightingGameTrial.Simulation
         }
 
         /// <summary>
+        /// P1攻撃なしで、P2へ JPunch 用 Attack Held を1tickだけ返します（検証専用・繰り返し）。
+        /// StartJPunch は直接呼ばず、通常の SampleAttack / TryStartJPunch へ載せます。
+        ///
+        /// なぜ繰り返すか:
+        /// Inspector で Mode を外して戻すたびに Game ビューへフォーカスし直し、
+        /// Back を保持し直す操作は Guard 検証の条件に含めたくないため。
+        /// Guard 入力を押したまま複数回の命中結果を比較できるようにする。
+        ///
+        /// なぜ前回攻撃終了後から Delay を数えるか:
+        /// 開始CF基準だと攻撃中に次予約が重なり、Attack を複数tick保持する事故や
+        /// 攻撃中の再発火につながる。終了（再攻撃可能）後から数えると間隔が安定する。
+        ///
+        /// なぜ開始不能時に即攻撃せず Delay を数え直すか:
+        /// HitStun / Action / 空中など CanStartGroundAttack=false の瞬間に発火しても
+        /// 別技へ変換せず失敗するだけなので、可能になるまで待ち、そこから Delay する。
+        ///
+        /// なぜ Attack を1tickだけ通常経路へ通すか:
+        /// StartJPunch 直呼びは接地・同時押し・1攻撃1開始などの通常条件をバイパスするため。
+        ///
+        /// なぜ P2 方向を Neutral 固定するか:
+        /// P1 Back を鏡写しすると P2 が前進し距離が変わり、Guard 検証が汚れるため。
+        /// </summary>
+        private bool ResolveDebugP2SoloJPunchAssistAttackHeld()
+        {
+            int combatFrame = 0;
+            if (timeState != null)
+            {
+                combatFrame = timeState.CombatFrame;
+            }
+
+            int delayFrames = debugP2MirrorAttackDelayFrames;
+            if (delayFrames < 0)
+            {
+                delayFrames = 0;
+            }
+            else if (delayFrames > 120)
+            {
+                delayFrames = 120;
+            }
+
+            bool p2ActionPlaying =
+                participantP2 != null
+                && participantP2.AttackState != null
+                && participantP2.AttackState.IsActionPlaying;
+
+            // --- 攻撃終了待ち（発火後）---
+            if (p2SoloJPunchWaitingForAttackEnd)
+            {
+                if (p2ActionPlaying)
+                {
+                    p2SoloJPunchSawAttackPlaying = true;
+                    if (p2SoloJPunchLoggedWaitingForEnd == false)
+                    {
+                        p2SoloJPunchLoggedWaitingForEnd = true;
+                        Debug.Log(
+                            "[FightDebug] P2 solo JPunch waiting for attack end"
+                        );
+                    }
+
+                    return false;
+                }
+
+                if (p2SoloJPunchSawAttackPlaying)
+                {
+                    // 前回 JPunch が終了した。次回 Delay はここから（可能なら即予約）。
+                    p2SoloJPunchWaitingForAttackEnd = false;
+                    p2SoloJPunchSawAttackPlaying = false;
+                    p2SoloJPunchLoggedWaitingForEnd = false;
+                }
+                else if (CanStartGroundAttack(participantP2))
+                {
+                    // 発火したが Action が始まらなかった（HitStop中の開始スキップ等）。
+                    // 攻撃可能になった時点から Delay を数え直す。
+                    p2SoloJPunchWaitingForAttackEnd = false;
+                    p2SoloJPunchLoggedWaitingForEnd = false;
+                }
+                else
+                {
+                    // まだ開始不能（HitStun 等）。可能になるまで待つ。
+                    return false;
+                }
+            }
+
+            // --- 予約到達: 1tick だけ Attack=true ---
+            if (pendingP2SoloJPunchFireCombatFrame >= 0
+                && combatFrame >= pendingP2SoloJPunchFireCombatFrame)
+            {
+                pendingP2SoloJPunchFireCombatFrame = -1;
+
+                if (CanStartGroundAttack(participantP2) == false)
+                {
+                    // 別技へ変換せず発火しない。可能になってから Delay を数え直す。
+                    Debug.Log(
+                        "[FightDebug] P2 solo JPunch fire skipped"
+                        + " CombatFrame=" + combatFrame
+                        + " reason=P2CannotStartGroundAttack"
+                        + " (will re-reserve after CanStart)"
+                    );
+                    return false;
+                }
+
+                p2SoloJPunchCycleIndex = p2SoloJPunchCycleIndex + 1;
+                p2SoloJPunchWaitingForAttackEnd = true;
+                p2SoloJPunchSawAttackPlaying = false;
+                p2SoloJPunchLoggedWaitingForEnd = false;
+
+                Debug.Log(
+                    "[FightDebug] P2 solo JPunch fired"
+                    + " CombatFrame=" + combatFrame
+                    + " cycle=" + p2SoloJPunchCycleIndex
+                );
+                return true;
+            }
+
+            // 予約待ち（発火CF未達）
+            if (pendingP2SoloJPunchFireCombatFrame >= 0)
+            {
+                return false;
+            }
+
+            // 攻撃終了待ちの途中でここに来ることはない（上で return 済み）。
+            if (p2SoloJPunchWaitingForAttackEnd)
+            {
+                return false;
+            }
+
+            // --- 待機なし: 攻撃可能になった時点から Delay を予約 ---
+            if (CanStartGroundAttack(participantP2) == false)
+            {
+                return false;
+            }
+
+            pendingP2SoloJPunchFireCombatFrame = combatFrame + delayFrames;
+            if (p2SoloJPunchCycleIndex <= 0)
+            {
+                Debug.Log(
+                    "[FightDebug] P2 solo JPunch reserved"
+                    + " CombatFrame=" + combatFrame
+                    + " fireCombatFrame=" + pendingP2SoloJPunchFireCombatFrame
+                    + " delay=" + delayFrames
+                );
+            }
+            else
+            {
+                Debug.Log(
+                    "[FightDebug] P2 solo JPunch next cycle reserved"
+                    + " CombatFrame=" + combatFrame
+                    + " fireCombatFrame=" + pendingP2SoloJPunchFireCombatFrame
+                    + " delay=" + delayFrames
+                    + " cycle=" + p2SoloJPunchCycleIndex
+                );
+            }
+
+            return false;
+        }
+
+        /// <summary>
         /// P2鏡写し用の Attack / Kick「意図」を決めます（まだ遅延・発火前）。
         ///
         /// なぜ入力だけ変換するか:
@@ -2110,6 +2357,7 @@ namespace FightingGameTrial.Simulation
             }
 
             // SameAsP1（既定）: 同技Clash確認
+            // JPunchAfterDelay / NoAttack は呼び出し側で分岐済み。
             intentAttack = p1AttackHeld;
             intentKick = p1KickHeld;
         }
@@ -2120,6 +2368,28 @@ namespace FightingGameTrial.Simulation
             previousMirrorKickIntent = false;
             pendingP2MirrorAttackFireCombatFrame = -1;
             pendingP2MirrorKickFireCombatFrame = -1;
+        }
+
+        /// <summary>
+        /// P2単独JPunch Assist の予約・発火待ち・攻撃終了待ちをすべてクリアします。
+        ///
+        /// OFF／Mode離脱／Training Reset／Awake で内部予約を消す理由:
+        /// 古い fireCombatFrame や終了待ちが残ると、再ON直後に意図しない Attack エッジが飛ぶため。
+        /// allowRestartOnNextResolve=true のときは Mode 再入場検出用に previousMode をずらす
+        /// （Mirror OFF→ON で Mode が JPunchAfterDelay のままでも新しいサイクルを開始する）。
+        /// </summary>
+        private void ClearDebugP2SoloJPunchAssistState(bool allowRestartOnNextResolve)
+        {
+            pendingP2SoloJPunchFireCombatFrame = -1;
+            p2SoloJPunchWaitingForAttackEnd = false;
+            p2SoloJPunchSawAttackPlaying = false;
+            p2SoloJPunchCycleIndex = 0;
+            p2SoloJPunchLoggedWaitingForEnd = false;
+
+            if (allowRestartOnNextResolve)
+            {
+                previousDebugP2MirrorAttackMode = DebugP2MirrorAttackMode.NoAttack;
+            }
         }
 
         /// <summary>
@@ -2324,6 +2594,7 @@ namespace FightingGameTrial.Simulation
         /// - 双方候補かつ双方とも地上攻撃 → Ground Clash（技種は問わない・Guardより先）
         /// - 双方候補だが Air Kick 等を含む → Air Clash 未実装のため結果未適用
         /// - 片側だけ候補成立 → Defender が立ちガード成立なら Guard、それ以外は Normal Hit
+        ///   （P1: Back保持 / P2: DebugStandGuard Mode。共通の身体・技条件あり）
         /// </summary>
         private void CollectAndResolveHitsForCombatFrame()
         {
@@ -2602,26 +2873,14 @@ namespace FightingGameTrial.Simulation
         /// <summary>
         /// 片側候補を立ちガードとして適用できるなら適用し true を返します。
         ///
-        /// 最小実装の条件:
-        /// - Defender が P2
-        /// - debugP2StanceGuardMode == StandGuard
-        /// - 技が CanStandGuard（JPunch / GroundKick。AirKick は不可）
-        /// - 接地・非KO・非CombatReaction・非攻撃Action・相手向き
+        /// 入力元（Wants）と身体・技条件（Can）を分けます。
+        /// - P1: Gameplay 入力の Back 保持（正式入力経路。ガードシステム全体の完成ではない）
+        /// - P2: debugP2StanceGuardMode == StandGuard（既存 Debug）
+        /// 共通: CanStandGuard 技・接地・非KO・非CombatReaction・非攻撃Action・相手向き
         ///
         /// ChipDamage なし / HitCount 非加算 / HitStun 非流用。
         /// </summary>
         private bool TryApplyStandGuard(DebugPendingHit pendingHit)
-        {
-            if (CanDefendWithStandGuard(pendingHit) == false)
-            {
-                return false;
-            }
-
-            ApplyStandGuard(pendingHit);
-            return true;
-        }
-
-        private bool CanDefendWithStandGuard(DebugPendingHit pendingHit)
         {
             if (pendingHit == null
                 || pendingHit.IsValid == false
@@ -2632,13 +2891,95 @@ namespace FightingGameTrial.Simulation
                 return false;
             }
 
-            // 初回は P2 Debug StandGuard のみ（正式後ろ入力・P1ガードは後工程）。
-            if (debugP2StanceGuardMode != DebugP2StanceGuardMode.StandGuard)
+            if (WantsStandGuard(pendingHit.Defender) == false)
             {
                 return false;
             }
 
-            if (pendingHit.Defender != participantP2)
+            if (CanStandGuardBody(pendingHit) == false)
+            {
+                return false;
+            }
+
+            ApplyStandGuard(pendingHit);
+            return true;
+        }
+
+        /// <summary>
+        /// この Defender が「立ちガードしたい」入力元か。
+        /// Facing 更新後・Hit 解決時に呼ぶ（Back は接触解決時点の Facing を使う）。
+        /// </summary>
+        private bool WantsStandGuard(DebugFighterParticipant defender)
+        {
+            if (defender == null)
+            {
+                return false;
+            }
+
+            // P2 Debug StandGuard（既存。正式後ろ入力ではない）
+            if (defender == participantP2
+                && debugP2StanceGuardMode == DebugP2StanceGuardMode.StandGuard)
+            {
+                return true;
+            }
+
+            // P1 正式入力経路: 接触 CF で Back 保持のみ（猶予・履歴なし）
+            if (defender == participantP1 && defender.UsesGameplayInput)
+            {
+                SimulationInputState input = ResolveInputForParticipant(defender);
+                return IsBackHeld(defender, input);
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// 相手と反対方向の単一方向保持か。
+        /// FacingRight + Left（Rightなし）／FacingLeft + Right（Leftなし）。
+        /// 左右同時・Neutral は false。
+        /// </summary>
+        private static bool IsBackHeld(
+            DebugFighterParticipant participant,
+            SimulationInputState input)
+        {
+            if (participant == null
+                || participant.Motor == null
+                || input == null)
+            {
+                return false;
+            }
+
+            // Down + Back は将来のしゃがみガード候補。
+            // 今回の最小立ちガードには流さない。
+            if (input.Down)
+            {
+                return false;
+            }
+
+            bool facingRight = participant.Motor.FacingRight;
+            if (facingRight && input.Left && input.Right == false)
+            {
+                return true;
+            }
+
+            if (facingRight == false && input.Right && input.Left == false)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// 立ちガードの身体・技条件（入力元は見ない）。
+        /// </summary>
+        private bool CanStandGuardBody(DebugPendingHit pendingHit)
+        {
+            if (pendingHit == null
+                || pendingHit.IsValid == false
+                || pendingHit.Attacker == null
+                || pendingHit.Defender == null
+                || pendingHit.AttackData == null)
             {
                 return false;
             }
@@ -2733,11 +3074,23 @@ namespace FightingGameTrial.Simulation
             timeState.LastStatusMessage =
                 attacker.SlotId + " " + attackData.AttackId + " Guarded";
 
+            // via: Play で P1 Back と P2 Debug Mode を区別する（本番恒常ログではない）
+            string viaLabel = "Unknown";
+            if (defender == participantP1)
+            {
+                viaLabel = "Back";
+            }
+            else if (defender == participantP2)
+            {
+                viaLabel = "DebugStandGuard";
+            }
+
             Debug.Log(
                 "[FightDebug] Stand guard"
                 + " attack=" + attackData.AttackId
                 + " attacker=" + attacker.SlotId
                 + " defender=" + defender.SlotId
+                + " via=" + viaLabel
                 + " CombatFrame=" + timeState.CombatFrame
                 + " GuardStun=" + attackData.GuardStunFrames
                 + " ChipDamage=0"
