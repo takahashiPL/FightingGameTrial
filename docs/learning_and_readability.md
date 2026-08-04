@@ -96,7 +96,8 @@ GuardStunの自然終了は減算で0到達すれば状態が外れる。終了�
 - Stage 端 Clamp で片方が動けない分は、反対側へ再配分する（必要距離を可能な範囲で確保するため）
 - HUD／ログの Push 距離は **World Push 中心距離**と LogicalX 距離を混同しない（現行 HUD は World 中心）
 - CenterX=`0` のときは Facing 反転や World／Logical の差が見えず、不具合が潜伏する
-- 非0値は Play 中だけ Inspector で入れ、Scene を保存しない検証が安全（案A: Hurt `+0.10`／Push `+0.05`・HalfWidth `0.65`）。飛び越し後の Facing 反転も確認する
+- 非0値の採用前は Play 中だけ Inspector で試し、Scene を保存しない検証が安全だった（検証候補例: Push `+0.05`/`0.65`、Hurt `+0.10`/`0.75`）。飛び越し後の Facing 反転も確認する
+- FightDebugScene の**正式採用値**は CenterX=`0.10`／HalfWidth=`0.60`（Push／Hurtとも・保存済み）。正面端 `+0.70` を維持し背面だけ内側へ寄せた結果である。HalfWidth 正本は `Push Box Half Width`
 - 現行処理順では Push は Facing 更新前、Hit は Facing 更新後（1CF差の既知制約）。順序変更は挙動影響が大きいため別タスクに分離した
 
 ---

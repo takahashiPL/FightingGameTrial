@@ -1225,19 +1225,19 @@ MonoBehaviour:
   knockbackInitialSpeed: 0.18
   knockbackDeceleration: 0.015
   maxHitPoints: 100
-  pushBoxHalfWidth: 0.75
+  pushBoxHalfWidth: 0.6
   boxOriginLocalY: 0
   deriveBoxOriginLocalYFromSprite: 1
   pushBoxLocal:
-    CenterX: 0
+    CenterX: 0.1
     CenterY: 1
-    HalfWidth: 0.75
+    HalfWidth: 0.6
     HalfHeight: 1
     IsActive: 1
   hurtBoxLocal:
-    CenterX: 0
+    CenterX: 0.1
     CenterY: 1
-    HalfWidth: 0.75
+    HalfWidth: 0.6
     HalfHeight: 1
     IsActive: 1
   jPunchHitBoxLocal:
@@ -1530,19 +1530,19 @@ MonoBehaviour:
   knockbackInitialSpeed: 0.18
   knockbackDeceleration: 0.015
   maxHitPoints: 100
-  pushBoxHalfWidth: 0.75
+  pushBoxHalfWidth: 0.6
   boxOriginLocalY: 0
   deriveBoxOriginLocalYFromSprite: 1
   pushBoxLocal:
-    CenterX: 0
+    CenterX: 0.1
     CenterY: 1
-    HalfWidth: 0.75
+    HalfWidth: 0.6
     HalfHeight: 1
     IsActive: 1
   hurtBoxLocal:
-    CenterX: 0
+    CenterX: 0.1
     CenterY: 1
-    HalfWidth: 0.75
+    HalfWidth: 0.6
     HalfHeight: 1
     IsActive: 1
   jPunchHitBoxLocal:

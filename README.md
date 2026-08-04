@@ -38,7 +38,7 @@ GC-2（Editor）: `DebugHudView.Update` 約17.2 KB → 約3.2 KB / frame。Devel
 ブランチ `unity` 上で、**段階1〜15まで完了**しています。
 内容反映済み基準コミット（コードpush済みHEAD）: **`ab6b938`**（Add cross-move ground clash debug assist）。
 過去履歴の例: `0a4886e`（P1 Back／JPunchAfterDelay）、`446f053`（P2 Debug StandGuard）、`f9e56d3`（Assist予約安全Docs）、`988f36f` / `03bfd72`（AirKick Assist・Air双方未適用）、`6be8bb4` / `96f8148`（地上攻撃変換・Delay・異技Clash）、`6bc5f03` / `5bd3627`（Clash整理＋基本P2鏡写し）。
-今回の未コミット範囲: Hurt／Push Box の Facing 対応と Push 実判定の World Push Box 中心基準化（C# 3ファイル）と本Docs反映。
+今回の未コミット範囲: Hurt／Push Box の Facing 対応・Push World中心化（C# 3ファイル）と、FightDebugScene 正式 Box 値（CenterX=`0.10`／HalfWidth=`0.60`）の本Docs反映。
 （異種Clash Assist・P1 Back／JPunchAfterDelay／P2 Debug StandGuard・Assist実装・Air双方未適用・Assist予約安全は push済み。）
 段階14全体（14A+14B）・段階15（J Punch 攻撃データ化）: **完了・push 済み**（SO 化は見送り）。
 GC-1 / GC-2（補助改善・正式 Stage ではない）: **完了・push 済み**。
@@ -51,8 +51,8 @@ Training Reset 共通 release gate（全操作 release まで入力抑制）: **
 
 | 区分 | 内容 |
 |---|---|
-| **実装済み** | 60Hz SimulationTick、Pause/Step、HUD、HitStop、入力、左右移動、Facing、Participant / AttackState / HitState、Push Box（**World Push 中心基準・未コミットC#**）、Box可視化、Hit×Hurt判定、J Punch、Ground Kick、**Air Kick最小検証版**、1攻撃1Hit、横ノックバック、HP/Damage、KO、Training Reset、Visual Sequence、ジャンプ基盤、**Hit候補収集→分類→適用**、**Ground Clash（同技・異技とも技種不問。P1 JP×P2 GK／P1 GK×P2 JPともPlay実測）**、**P2鏡写しDebug**、**P2 AirKick検証アシスト**、**P2 Debug StandGuard**（`446f053`）、**P1 Gameplay Back 最小立ちガード**／**JPunchAfterDelay**（`0a4886e`）、**異種Clash単発 Assist**（`ab6b938`）、**Hurt／Push CenterX Facing反転**（未コミットC#・Play確認済み） |
-| **暫定** | J Punch `4/3/8`、Ground Kick `9/4/13`、Air Kick `5/5/10`。Active中だけHit Boxを出す。J PunchはAF8〜10、Ground KickはAF14〜19まで振り切りVisualを残し、後半はIdleへ戻すが内部Recoveryは継続。Air Kickは空中K・1ジャンプ1回・着地即終了。Startup／Activeは専用Flying Kick、RecoveryはJumpFall表示。Hurt／Push Boxの**Scene既定**はCenterX `0`、HalfWidth `0.75`（左右対称）。非対称候補（Hurt +0.10／Push +0.05・HalfWidth 0.65）はPlay中検証のみで**Scene未採用**。Airを含む双方候補は結果未適用（正式Air Clashではない。Play実測済み）。Chip0／JPunch GuardStun7／GroundKick9（しゃがみ・Just Guardではない） |
+| **実装済み** | 60Hz SimulationTick、Pause/Step、HUD、HitStop、入力、左右移動、Facing、Participant / AttackState / HitState、Push Box（**World Push 中心基準・未コミットC#**）、Box可視化、Hit×Hurt判定、J Punch、Ground Kick、**Air Kick最小検証版**、1攻撃1Hit、横ノックバック、HP/Damage、KO、Training Reset、Visual Sequence、ジャンプ基盤、**Hit候補収集→分類→適用**、**Ground Clash（同技・異技とも技種不問。P1 JP×P2 GK／P1 GK×P2 JPともPlay実測）**、**P2鏡写しDebug**、**P2 AirKick検証アシスト**、**P2 Debug StandGuard**（`446f053`）、**P1 Gameplay Back 最小立ちガード**／**JPunchAfterDelay**（`0a4886e`）、**異種Clash単発 Assist**（`ab6b938`）、**Hurt／Push CenterX Facing反転**（未コミットC#）、**Hurt／Push Scene正式値 CenterX=`0.10`／HalfWidth=`0.60`**（P1/P2同値・保存済み） |
+| **暫定** | J Punch `4/3/8`、Ground Kick `9/4/13`、Air Kick `5/5/10`。Active中だけHit Boxを出す。J PunchはAF8〜10、Ground KickはAF14〜19まで振り切りVisualを残し、後半はIdleへ戻すが内部Recoveryは継続。Air Kickは空中K・1ジャンプ1回・着地即終了。Startup／Activeは専用Flying Kick、RecoveryはJumpFall表示。Hurt／Push は前寄り非対称（正式 Scene: CenterX `0.10`、HalfWidth `0.60`。正面端 `+0.70`／背面端 `-0.50`、Facing Left で反転）。旧対称値 `0`/`0.75` および検証候補 Push `0.05`/`0.65`・Hurt `0.10`/`0.75` は履歴。Airを含む双方候補は結果未適用（正式Air Clashではない。Play実測済み）。Chip0／JPunch GuardStun7／GroundKick9（しゃがみ・Just Guardではない） |
 | **未実装（方針確定含む）** | 対戦モード進行、HPバー、**しゃがみガード／Just Guard／正式Chip Damage／正式な空中攻撃ガード**、Animator、正式Character Data SO、複数Hit/Hurt Box、コンボ・Cancel、Counter Hit、Attack Priority、**Air Hit / Air Knockback・縦Knockback・Air Clash・正式Trade**、本番P2 AI。Air Kickは空中攻撃の最小検証であり、Air Hit基盤完成ではない |
 
 詳細・次工程は **`docs/unity_implementation_status.md`** を正とする。
@@ -127,14 +127,14 @@ Git 管理外: `Game/Library`、`Temp`、`Logs`、`UserSettings`、`obj` など
 2. ClashRecoil専用Sprite／演出の追加（現在は専用色＋Idle fallback）
 3. Animator + Animation Clip
 4. Air Hit / Air Knockback（**空中被弾**専用。実装済みAir Kickとは別）
-5. Hurt／Push の前後非対称値を Scene 既定として採用するかの判断（Facing反転＋World Push中心化のC#は未コミット実装済み。Scene既定はまだ CenterX `0`／HalfWidth `0.75`）
-6. Guard（最小立ちガードは暫定実装済み。しゃがみ／Just／正式Chipは未実装）
-7. Character Data ScriptableObject 化（ジャンプ設定の正式データ化含む）
-8. ジャンプ数値の調整（現状の実測値を踏まえたチューニング）
-9. Development Build Profiler 確認（Editor 上の毎 Frame new / LINQ なしはコード確認済み）
-10. 対戦モード用 Scene / Controller / HUD（FightDebugScene とは分離）
-11. 既存残課題: KB壁停止、壁バウンド、壁やられ、Corner、HPバー、複数攻撃・バッファ・Cancel、攻撃データ SO 化（必要時）
-12. 2P入力/AI時の実操作確認（KO中移動・攻撃禁止、P1被Hit・左方向KB など）
+5. Guard（最小立ちガードは暫定実装済み。しゃがみ／Just／正式Chipは未実装）
+6. Character Data ScriptableObject 化（ジャンプ設定の正式データ化含む）
+7. ジャンプ数値の調整（現状の実測値を踏まえたチューニング）
+8. Development Build Profiler 確認（Editor 上の毎 Frame new / LINQ なしはコード確認済み）
+9. 対戦モード用 Scene / Controller / HUD（FightDebugScene とは分離）
+10. 既存残課題: KB壁停止、壁バウンド、壁やられ、Corner、HPバー、複数攻撃・バッファ・Cancel、攻撃データ SO 化（必要時）
+11. 2P入力/AI時の実操作確認（KO中移動・攻撃禁止、P1被Hit・左方向KB など）
+12. Hurt／Push 正式値 `0.10`/`0.60` での追加回帰（Guard／Clash／KB中Push 等）
 
 **混同禁止**: J Punch / Ground Kickは地上専用、Air Kickは空中K専用。空中Jは採用しない。Air KickとAir Hit / Air Knockbackは別機能。
 
@@ -220,11 +220,13 @@ Unity_FightingGameTrial
 - Mode=`P1JPunchP2GroundKickClash`: P2 GroundKick先行 → 5CF後にP1 JPunch。通常入力経路・単発
 - **Play確認（距離1.50）**: 開始差5CF、双方Active／Pending同一CF → Ground Clash（Damage0・HitCount非加算・Normal Hitなし）
 
-## Hurt／Push Box Facing対応と Push World中心化（2026-08-04・未コミットC#・Docs反映中）
+## Hurt／Push Box Facing対応と Push World中心化（2026-08-04・未コミットC#＋Scene正式値）
 
 - Hurt／Push の local `CenterX` を Facing に応じて反転（Hit と同型）。可視化と実判定は同じ `EvaluateWorldHurtBox` / `EvaluateWorldPushBox` が正本
 - Push 実判定は Participant `LogicalX` だけの中心ではなく、**World Push Box 中心**＋HalfWidth 基準
-- FightDebugScene の**Scene既定**はまだ CenterX `0`／HalfWidth `0.75`（左右対称）。非対称候補値は検証中で**正式採用前**
+- FightDebugScene **正式 Scene 値**（P1/P2同値・保存済み）: CenterX=`0.10`、HalfWidth=`0.60`（Push／Hurtとも。Push HalfWidth 正本は `Push Box Half Width`）
+- 右向き: 左辺=`-0.50`／右辺=`+0.70`。左向き: 左辺=`-0.70`／右辺=`+0.50`（正面端維持・背面内側）
+- 旧対称 `0`/`0.75`、検証候補 Push `0.05`/`0.65`・Hurt `0.10`/`0.75` は履歴
 - 処理順（Push→Facing→Hit）は変更なし。Pushは前CF末 Facing、Hitは当CF更新後 Facing（既知制約）
 
 詳細・Play確認は `CHANGELOG.md` 先頭節と `docs/unity_implementation_status.md`。

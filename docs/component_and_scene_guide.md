@@ -334,9 +334,9 @@ Help 用 TMP は Inspector 項目なし（Awake で生成）。
 | Knockback Initial Speed | 0.18 | 同上（互換用） |
 | Knockback Deceleration | 0.015 | 同上（互換用） |
 | Max Hit Points | 100 | HP 最大の暫定正本（攻撃データではない） |
-| Push Box Half Width | 0.75（Scene）／コード既定0.5 | **HalfWidth の正本**。`EvaluateWorldPushBox`／Push Resolver が使用。可視化用 `pushBoxLocal.HalfWidth` もこれに同期 |
-| Push Box Local | CenterX=`0` CenterY=`1` HalfWidth=`0.75` HalfHeight=`1`（Scene） | Facing **Right 基準**の local。CenterX は World 評価時に Facing Left なら符号反転 |
-| Hurt Box Local | CenterX=`0` CenterY=`1` HalfWidth=`0.75` HalfHeight=`1`（Scene） | 同上。可視化と被弾判定の正本は `EvaluateWorldHurtBox` |
+| Push Box Half Width | 0.60（Scene）／コード既定0.5 | **HalfWidth の正本**。`EvaluateWorldPushBox`／Push Resolver が使用。可視化用 `pushBoxLocal.HalfWidth` もこれに同期 |
+| Push Box Local | CenterX=`0.10` CenterY=`1` HalfWidth=`0.60` HalfHeight=`1`（Scene） | Facing **Right 基準**の local。CenterX は World 評価時に Facing Left なら符号反転 |
+| Hurt Box Local | CenterX=`0.10` CenterY=`1` HalfWidth=`0.60` HalfHeight=`1`（Scene） | 同上。可視化と被弾判定の正本は `EvaluateWorldHurtBox`。現時点は Push と同値だが別設定可能 |
 | Box Origin / AttackState / HitState 等 | コード既定／Scene | AttackState/HitState は実行時状態の入れ物 |
 
 HitStun / ClashRecoil / KO 表示色はコード側 SerializeField。`ClashRecoil`の黄色系既定色はScene YAMLへ保存せず、コード初期値のままEditor動作確認済み。専用Sequence未設定時はIdleへfallbackする。
@@ -1505,36 +1505,41 @@ Inspector設定例（Scene保存不要）:
 
 **未実装**: しゃがみガード／Just Guard／正式Chip／正式な空中攻撃ガード／正式P2操作・AI／Development Build。
 
-## 18.10 Hurt／Push Box Facing・World Push中心（2026-08-04・未コミットC#）
+## 18.10 Hurt／Push Box Facing・World Push中心・Scene正式値（2026-08-04）
 
 ### Inspector（`DebugFighterParticipant`）
 
-| 項目 | Scene既定（FightDebug） | 意味 |
+| 項目 | Scene正式値（FightDebug・P1/P2同値・保存済み） | 意味 |
 |---|---|---|
-| `Push Box Half Width` | `0.75` | HalfWidth の**正本**。Resolver／`EvaluateWorldPushBox` が使用 |
-| `Push Box Local` → CenterX | `0` | Facing **Right 基準** local。Left では符号反転して World へ |
-| `Hurt Box Local` → CenterX | `0` | 同上。被弾判定も `EvaluateWorldHurtBox` |
-| HalfWidth（local） | Push は Half Width に同期／Hurt=`0.75` | HalfWidth 自体は Facing で反転しない |
+| `Push Box Half Width` | `0.60` | HalfWidth の**正本**。Resolver／`EvaluateWorldPushBox` が使用 |
+| `Push Box Local` → CenterX | `0.10` | Facing **Right 基準** local。Left では符号反転して World へ |
+| `Push Box Local` → HalfWidth | `0.60`（上位 Half Width から同期） | Local 側を直接いじるのではなく、`Push Box Half Width` を正本にする |
+| `Hurt Box Local` → CenterX | `0.10` | 同上。被弾判定も `EvaluateWorldHurtBox` |
+| `Hurt Box Local` → HalfWidth | `0.60` | HalfWidth 自体は Facing で反転しない。現時点は Push と同値だが別設定可能 |
+
+端（LogicalX からの相対）:
+
+| Facing | 左辺 | 右辺 |
+|---|---|---|
+| Right | `-0.50` | `+0.70` |
+| Left | `-0.70` | `+0.50` |
+
+目的: 正面端を `+0.70` に維持し、背中側だけ内側へ寄せる。Facing 反転で前後関係も反転する。
 
 可視化は `DebugFighterBoxView` が `EvaluateWorldPushBox` / `EvaluateWorldHurtBox` / `EvaluateWorldHitBox` を呼ぶ。**`DebugPushBoxLine` / `DebugHurtBoxLine` の LineRenderer を直接編集しない**（枠位置の正本ではない）。
 
-### Play中の一時検証（案A・Scene保存しない）
+### 履歴（正式ではない）
 
-1. Play 開始後、P1／P2 **両方**の Participant で次を設定する（片方だけだと押し合いが不対称になる）
-   - Hurt CenterX=`0.10`、HalfWidth=`0.75`
-   - Push CenterX=`0.05`、HalfWidth=`0.65`（＝ Push Box Half Width も `0.65`）
-2. 正面対向・飛び越し後 Facing・壁際・左向き JPunch Hit を確認
-3. Play 終了で値は Scene 既定（CenterX=`0`／HalfWidth=`0.75`）へ戻る。**Save しない**
-
-### 確認済み（一時値）
-
-- 正面で枠が相手側へ前寄り、`min=1.30`（0.65+0.65）、壁際再配分、飛び越し後の Facing／枠反転、左向き JPunch Normal Hit
-- Scene差分なし（既定 0／0.75 維持）
+| 区分 | CenterX | HalfWidth | 備考 |
+|---|---|---|---|
+| 旧 Scene 対称既定 | `0` | `0.75` | 置き換え前 |
+| 検証候補（案A系） | Push `0.05`／Hurt `0.10` | Push `0.65`／Hurt `0.75` | Play中一時検証。当時 min=`1.30` |
+| **正式 Scene** | `0.10` | `0.60` | Push／Hurtとも。min=`1.20` |
 
 ### 未確定
 
-- 案Aを Scene 既定として正式採用するか
 - Push前 Facing／Hit後 Facing の1CF差を将来変更するか
+- 正式値での Guard／Clash／KB中Push 等の追加回帰
 
 ## 19. Air Kick最小検証版とRecovery Visual
 

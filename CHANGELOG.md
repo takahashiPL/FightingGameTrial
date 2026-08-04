@@ -1,25 +1,28 @@
 # CHANGELOG
 
-## 未コミット: Hurt／Push Box Facing対応と Push World中心化（2026-08-04）
+## 未コミット: Hurt／Push Box Facing対応・World中心化・Scene正式値（2026-08-04）
 
 前提（push済み）: 異種Clash Assist `ab6b938` / P1 Back・JPunchAfterDelay `0a4886e` / P2 Debug StandGuard `446f053`。
 
-### 実装（C#のみ・Scene未変更）
+### 実装（C#）
 - **Changed** `EvaluateWorldHurtBox` / `EvaluateWorldPushBox`: local `CenterX` を Facing に応じて反転（Hit Box と同型。Facing Right=`LogicalX+local`／Left=`LogicalX-local`）
 - **Changed** `DebugFighterPushResolver`: overlap／左右／必要距離を Participant `LogicalX` 中心ではなく `EvaluateWorldPushBox()` の World 中心＋HalfWidth 基準へ
 - World 中心の移動 delta を同じ量だけ `TryMoveLogicalXBy` へ適用。Stage端 Clamp・壁際再配分は維持
 - **Changed** `SimulationSession`: HUD／空中 Push skip 時の `lastPushCenterDistance` を World Push 中心距離へ統一
 - CombatFrame 内の処理順（移動→KB→Push→Facing→Action→Hit→Visual）は**変更なし**（既知制約として維持）
-- FightDebugScene の既定値は未変更（Hurt／Push CenterX=0、HalfWidth=0.75）
 
-### Play確認（Scene保存なし・Play中Inspector一時値）
-- 一時値（案A・P1/P2両方）: Hurt CenterX=`0.10` HalfWidth=`0.75`／Push CenterX=`0.05` HalfWidth=`0.65`
-- 正面対向: 枠が相手側へ前寄り。`Push correct ... dist 1.25->1.30 min=1.30`。壁際再配分 `afterDist=1.300 min=1.300`
-- 飛び越し後左右入れ替わり: Facing・前寄り CenterX が反転。World Push で `dist ... ->1.30 min=1.30`
-- 左向き JPunch（入れ替わり後）: Pending→Normal Hit Damage=10・HitStop／KB／HitCount=1。非0 Hurt CenterX の Facing 反転が実判定で使用されることを確認
-- Training Reset・正面接触・すり抜けなし・Console Error／新規 Warning なし
-- Play終了後、P1/P2とも CenterX=0／HalfWidth=0.75 へ戻り、Scene差分なしを確認
-- **未確認／未実施**: Guard／Ground Clash の追加回帰、KB中・HitStun中密着Push詳細、Air Push skipログ実測、入れ替わり厳密1CFのFacing差観察、案AのScene既定採用判断
+### Scene正式採用値（FightDebugScene・P1/P2同値・保存済み）
+- **旧既定（置き換え前）**: Hurt／Push CenterX=`0`、HalfWidth=`0.75`（左右対称）
+- **正式値**: CenterX=`0.10`、HalfWidth=`0.60`（Push／Hurtとも。Push の HalfWidth 正本は `Push Box Half Width`）
+- 目的: 正面端を `+0.70` に維持し、背中側だけ内側へ（Right: 左辺=`-0.50`／右辺=`+0.70`。Left: 左辺=`-0.70`／右辺=`+0.50`）
+- Push と Hurt は別設定可能だが、現時点の正式値は同一
+- 検証過程の候補（正式ではない）: Push `0.05`/`0.65`、Hurt `0.10`/`0.75`（案A 等）
+
+### Play確認（検証過程・当時は Scene 未保存の一時値）
+- 当時一時値: Hurt `0.10`/`0.75`／Push `0.05`/`0.65`（P1/P2両方）
+- 正面対向・飛び越し後 Facing 反転・壁際再配分・左向き JPunch Normal Hit・すり抜けなし・Error／新規 Warning なし
+- 当時ログ例: `min=1.30`（0.65+0.65）。正式 HalfWidth=`0.60` 採用後の最小距離は **1.20**
+- **未確認／未実施**: Guard／Ground Clash の追加回帰、KB中・HitStun中密着Push詳細、Air Push skipログ実測、入れ替わり厳密1CFのFacing差観察、正式値 `0.10`/`0.60` での再Play網羅
 
 ## P1 JPunch × P2 GroundKick 異種Clash Assist（push済み `ab6b938`）
 
@@ -100,7 +103,7 @@
 - P1/P2のSpriteRenderer初期表示とIdle／Walk／Jump／Punch／Ground Kickを正式GUIDへ統一。Scene内正式GUID参照76件、不明internalID 0件
 - `DebugFighterVisual.airKickSequence`を追加し、`FighterRebuilt_AirKick_00`〜`05`を1CF/枚、Loop OFF、Hold Last Frame ONで接続。RecoveryはJumpFallを維持
 - Unity Import、コンパイル、Missing Sprite／参照例外なしを確認。IdleとAir Kick専用Flying Kick表示を確認済み
-- Hurt／Push BoxはCenterX 0、HalfWidth 0.75の左右対称暫定値。Facing対応と前後非対称化はPush Resolverを含む後工程へ保留（**当時の記録**。現行の Facing反転＋World Push中心化は未コミットC#／本CHANGELOG先頭節）
+- Hurt／Push BoxはCenterX 0、HalfWidth 0.75の左右対称暫定値。Facing対応と前後非対称化はPush Resolverを含む後工程へ保留（**当時の記録**。現行は Facing反転＋World Push中心化＋Scene正式値 CenterX=`0.10`／HalfWidth=`0.60`）
 
 ## Air Kick最小検証版・通常技暫定調整（`f19cc22` 系〜専用Sequence `5bcc3fa`・push済み）
 
