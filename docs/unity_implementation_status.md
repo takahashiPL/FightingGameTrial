@@ -2,9 +2,9 @@
 
 最終更新: 2026-08-04
 対象ブランチ: `unity`
-内容反映済み基準コミット（コードpush済みHEAD）: **`0a4886e`**（Add P1 back guard and repeating P2 JPunch assist）
-今回の未コミット範囲: `P1JPunchP2GroundKickClash`（P1 JPunch × P2 GroundKick 異種Clash単発 Assist）と本Docs反映
-push済み到達点の例: `0a4886e`（P1 Back／JPunchAfterDelay）、`446f053`（P2 Debug StandGuard）、`f9e56d3`（Assist予約安全Docs）、`03bfd72` / `988f36f`（AirKick Assist・Air双方未適用）、`96f8148` / `6be8bb4`（地上攻撃変換・Delay・異技Clash）、`5bd3627` / `6bc5f03`（Clash整理＋基本P2鏡写し）
+内容反映済み基準コミット（コードpush済みHEAD）: **`ab6b938`**（Add cross-move ground clash debug assist）
+今回の未コミット範囲: Hurt／Push Box Facing対応と Push World Push Box 中心基準化（C# 3ファイル）と本Docs反映
+push済み到達点の例: `ab6b938`（異種Clash Assist）、`0a4886e`（P1 Back／JPunchAfterDelay）、`446f053`（P2 Debug StandGuard）、`f9e56d3`（Assist予約安全Docs）、`03bfd72` / `988f36f`（AirKick Assist・Air双方未適用）、`96f8148` / `6be8bb4`（地上攻撃変換・Delay・異技Clash）、`5bd3627` / `6bc5f03`（Clash整理＋基本P2鏡写し）
 過去履歴の例（現在の基準ではない）: `1b47fc6`（HUD font atlas）、`69c9385`（Document clash recoil state separation）
 段階14全体（14A+14B）・段階15（攻撃データ化）: **完了・push 済み**
 GC-1 / GC-2（補助改善・正式 Stage ではない）: **完了・push 済み**
@@ -17,11 +17,13 @@ Ground Kick + shared hit resolution groundwork: **実装・Editor確認済み・
 Ground Clash recoil separation: **実装・Editor確認済み・push済み**（`ClashRecoil`専用状態・黄色系表示・通常HitCount非加算。正式 Stage 番号なし）
 Air Kick最小検証版・攻撃フレーム調整・専用Sequence: **実装済み・Play確認済み・push済み・暫定**（`f19cc22` 系〜 `5bcc3fa`）
 Clash判定整理＋基本P2鏡写し（`debugMirrorP1InputToP2`）: **実装・Docs反映済み・push済み**（`5bd3627` / `6bc5f03`）
-P2鏡写し攻撃変換・CombatFrame遅延・異技Clash実測: **実装・Docs反映済み・push済み**（`96f8148` / `6be8bb4`）。**P1 JPunch → P2 GroundKick** は未コミット Assist でPlay実測済み
+P2鏡写し攻撃変換・CombatFrame遅延・異技Clash実測: **実装・Docs反映済み・push済み**（`96f8148` / `6be8bb4`）
+P1 JPunch × P2 GroundKick 異種Clash Assist: **実装・Play実測・Docs反映済み・push済み**（`ab6b938`）
 P2 AirKick検証アシスト・Air双方未適用実測: **実装・Docs反映済み・push済み**（`03bfd72` / `988f36f`）
 P2 AirKick Assist予約安全確認: **Play実測・Docs反映済み・push済み**（Docs `f9e56d3`）
 P2 Debug 最小立ちガード: **実装・Play実測・Docs反映済み・push済み**（`446f053`）
 P1 Gameplay Back／JPunchAfterDelay: **実装・Play実測・Docs反映済み・push済み**（`0a4886e`）
+Hurt／Push CenterX Facing反転＋Push World中心化: **実装・Play確認済み・未コミットC#**（Scene既定値は未変更。非対称値は正式採用前）
 Debug HUD font glyph atlas: **push済み・過去履歴**（`1b47fc6`。現在の基準ではない）
 正式な次工程番号: **未定義**（新 Stage 番号は作らない）
 
@@ -478,14 +480,25 @@ ScriptableObject 化、Inspector 編集、Character 別攻撃データ、複数�
 - 発生差により片側Normal Hitになる場合あり（Delay4/6で実測）。Counter Hit／Attack Priorityなし
 - Airを含む双方候補: 結果未適用（正式Air Clashではない）。双方AirKick同士はPlay実測済み。異種Air双方は未確認
 - 片側候補: P1 Back または P2 Debug StandGuard成立時は Guard。それ以外は Normal Hit
-- P2: 既定はNeutral。基本鏡写し・攻撃変換／地上Delay・AirKick Assist／Assist予約安全・P2 Debug StandGuard・JPunchAfterDelayはpush済みの検証専用補助。`P1JPunchP2GroundKickClash`は未コミットの検証専用補助
+- P2: 既定はNeutral。基本鏡写し・攻撃変換／地上Delay・AirKick Assist／Assist予約安全・P2 Debug StandGuard・JPunchAfterDelay・`P1JPunchP2GroundKickClash`はpush済みの検証専用補助
 - キャラ差し替え・複数 Hurt/Hit Box: 未実装
 
 ---
 
-## 3. Facing / Push（維持）
+## 3. Facing / Push（維持＋World中心化）
 
 Facing 分離・壁際 Push 再配分は実装済み。Push は HP / KO / KB 速度に触れない。攻撃データも持たない。
+
+### 3.1 Hurt／Push CenterX Facing対応と Push World中心化（2026-08-04・未コミットC#）
+
+| 区分 | 内容 |
+|---|---|
+| **実装済み（未コミット）** | `EvaluateWorldHurtBox` / `EvaluateWorldPushBox` で local CenterX を Facing 反転（Hit と同型）。`DebugFighterPushResolver` が World Push 中心＋HalfWidth で overlap／左右／分離。`TryMoveLogicalXBy` へ同量 delta。Clamp・壁際再配分維持。HUD `lastPushCenterDistance` を World 中心距離へ統一 |
+| **Play確認済み** | Play中一時値（案A）Hurt CenterX=`+0.10` HalfWidth=`0.75`／Push CenterX=`+0.05` HalfWidth=`0.65`（P1/P2両方・Scene未保存）。正面対向・左右入れ替わり・飛び越し後 Facing／枠反転・min=`1.30`・壁際再配分・左向き JPunch Normal Hit・Training Reset・すり抜けなし・Error／新規 Warning なし。Play終了後 Scene 値は 0／0.75 へ復帰 |
+| **Scene既定（維持）** | Hurt／Push CenterX=`0`、HalfWidth=`0.75`。通常起動は CenterX=0 のため従来挙動とほぼ同じ |
+| **未確定** | 案Aを Scene 既定として正式採用するか。Push前 Facing／Hit後 Facing の1CF差を将来変更するか（現状は順序変更なし＝既知制約）。Guard／Ground Clash／KB中・HitStun中密着Push／Air skipログ／入れ替わり厳密1CFの追加回帰 |
+
+**既知制約（実装順・変更なし）**: 入力移動 → Knockback → **Push** → **Facing更新** → Action → **Hit** → Visual。Push は前 CF 末 Facing、Hit は当 CF 更新後 Facing。左右入れ替わり CF では1CFずれる可能性あり。Facing を Push 前へ移す変更は未実施。
 
 ---
 
@@ -493,12 +506,13 @@ Facing 分離・壁際 Push 再配分は実装済み。Push は HP / KO / KB 速
 
 Push / Hurt / Hit 可視化（11A）と Hit×Hurt 重なり判定（11B）は完了。
 段階15: local Hit Box 定義は攻撃データ、world 変換・Facing 反転は Participant、重なりは PunchHitResolver。
+**現行（未コミットC#）**: Hurt／Push も local CenterX を Facing 反転し、可視化と実判定で同じ `EvaluateWorld*` を正本とする。Push 実判定も `EvaluateWorldPushBox` の World 中心を使う（LogicalX だけの中心は使わない）。
 
 ---
 
 ## 5. 推奨工程順（見直し後）
 
-2026-07-31時点でSprite Sheet正式採用は完了。次の独立した保留タスクとして、**Hurt／Push BoxのFacing対応と前後非対称化**を追加する。現状はP1/P2ともCenterX `0`、HalfWidth `0.75`（全幅1.50）の左右対称暫定値である。Hurt/PushのCenterX反転だけを先行させず、`DebugFighterPushResolver`がWorld Push Box中心を使うよう揃え、表示と押し合い判定を一致させてから前方／背面幅を調整する。
+2026-07-31時点でSprite Sheet正式採用は完了。**当時の保留**だった「Hurt／Push BoxのFacing対応と Push Resolver の World 中心揃え」は、2026-08-04に **C#実装・Play確認済み（未コミット）** となった（§3.1）。Scene既定の非対称値採用と追加回帰は**未確定**。現状の Scene 既定は引き続き P1/P2とも CenterX `0`、HalfWidth `0.75`（全幅1.50）。
 
 | 段階 | 内容 | 区分 |
 |---|---|---|
@@ -510,10 +524,11 @@ Push / Hurt / Hit 可視化（11A）と Hit×Hurt 重なり判定（11B）は完
 
 その後の候補（順不同・未着手。**新工程番号は作らない**。正式な次 Stage も未定義）:
 
+- **Hurt／Push 非対称値の Scene 既定採用判断**（Facing反転＋World Push中心化のC#は未コミット実装済み。案Aは検証値）
 - ClashRecoil専用Sprite／演出の追加、Punch 3 枚以上への素材改善
 - Animator + Animation Clip
 - Air Hit / Air Knockback（**空中被弾**。空中攻撃ではない）
-- Guard
+- Guard（最小立ちガードは暫定実装済み。しゃがみ／Just／正式Chipは未実装）
 - 将来の空中攻撃（仕様未定・空中パンチは対象外）
 - Character Data ScriptableObject 化（ジャンプ設定含む）
 - Jump 数値調整、Development Build Profiler
@@ -641,7 +656,7 @@ Round / Guard / 複数攻撃などの**機能 Stage とは別枠**。番号「GC
 
 ### P2鏡写し攻撃変換・CombatFrame遅延・異技Clash実測（push済み `96f8148` / Docs `6be8bb4`）
 
-- `DebugP2MirrorAttackMode`（コード既定 SameAsP1）: SameAsP1 / SwapPunchAndKick / NoAttack（push済み）。`JPunchAfterDelay`（push済み `0a4886e`）。`P1JPunchP2GroundKickClash`（未コミット）。双方接地時のみ攻撃変換（専用ModeはP1攻撃非鏡写し）。Start技の直接呼び出しなし
+- `DebugP2MirrorAttackMode`（コード既定 SameAsP1）: SameAsP1 / SwapPunchAndKick / NoAttack（push済み）。`JPunchAfterDelay`（push済み `0a4886e`）。`P1JPunchP2GroundKickClash`（push済み `ab6b938`）。双方接地時のみ攻撃変換（専用ModeはP1攻撃非鏡写し）。Start技の直接呼び出しなし
 - `debugP2MirrorAttackDelayFrames`（**0〜120**・既定0）: Attack/Kick押下開始だけCombatFrame予約／発火。60Hzで60CF≒1秒・120CF≒2秒。左右・Up・Downは遅延しない。検証専用（本番AI反応時間ではない）。SameAsP1／Swapの選択範囲のみ広がる（処理内容は変更なし）
 - OFF／NoAttack／Training Reset等で遅延予約を破棄。**Mirror OFFおよびTraining Resetによる予約破棄はPlay確認済み**（Swap・Delay15。発火予定CF通過でfiredなし／P2 JPunch開始なし）
 
@@ -664,7 +679,7 @@ Attack started（SimulationTick／CombatFrame／S/A/R／mirrorDelay／mode）、
 **未確認（継続）**:
 
 - 将来のP2 Movement Mode拡張、Force Crouch／Crouch Guard 等
-- Hurt／Push BoxのFacing対応と前後非対称化
+- Hurt／Push 非対称値の Scene 既定採用、および Facing 順序（Push前へ移すか）の将来判断（**Facing反転＋World Push中心化自体は未コミット実装・Play確認済み**。§3.1）
 
 #### 将来のP2検証設定案
 
@@ -672,7 +687,7 @@ Attack started（SimulationTick／CombatFrame／S/A/R／mirrorDelay／mode）、
 - P2 Stance／Guard Mode: **Normal / StandGuard は push済みで最小実装済み**（`DebugP2StanceGuardMode`・`446f053`）。Force Stand / Force Crouch / Crouch Guard は未実装
 - Down入力の扱いはしゃがみ実装時に再検討
 
-### P1 JPunch × P2 GroundKick 異種Clash Assist（`P1JPunchP2GroundKickClash`・2026-08-04・未コミット・Play実測あり）
+### P1 JPunch × P2 GroundKick 異種Clash Assist（`P1JPunchP2GroundKickClash`・2026-08-04・push済み `ab6b938`・Play実測あり）
 
 検証専用。正式P2操作・本番AIではない。Scene既定ModeはNoAttackのまま（Play中Inspector変更はScene保存ではない）。位置／HitBox／HurtBox／PushBoxは変更しない。
 

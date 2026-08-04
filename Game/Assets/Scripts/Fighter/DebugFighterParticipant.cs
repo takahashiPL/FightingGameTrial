@@ -17,9 +17,10 @@ namespace FightingGameTrial.Fighter
     /// - 自分専用の DebugFighterHitState（被 Hit / HitStun / ノックバック速度）を所有する（段階12A / 13A）
     /// - Participant 共通の最大HP・現在HPを所有する（段階14A）
     /// - Participant 共通の KO 状態を所有する（段階14B。HitState には持たせない）
-    /// - 横方向 Push Box 半幅を持つ（段階10B-3。重なり解消の計算に使う）
-    /// - Push / Hurt Box のローカル定義を持ち、World Box を計算する（段階11A）
+    /// - 横方向 Push Box 半幅を持つ（段階10B-3。重なり解消の HalfWidth 正本）
+    /// - Push / Hurt Box のローカル定義を持ち、Facing を反映した World Box を計算する
     /// - J Punch Hit Box の World 変換・Facing 反転を行う（local 正本は攻撃データ・段階15）
+    /// - Push 実判定も EvaluateWorldPushBox の World 中心を正本とする（LogicalX だけの中心は使わない）
     ///
     /// やらないこと:
     /// - 攻撃データの正本を持たない（DebugAttackData.JPunch。段階15）
@@ -179,7 +180,8 @@ namespace FightingGameTrial.Fighter
         [Header("Push Box（段階10B-3・判定用半幅）")]
         [Tooltip(
             "横方向 Push Box の半幅（ワールド単位）です。"
-            + " Push Resolver が使う正本。2人の中心間に必要な最小距離 = 双方の半幅の合計。"
+            + " EvaluateWorldPushBox / Push Resolver が使う HalfWidth 正本。"
+            + " 2人の World 中心間に必要な最小距離 = 双方の半幅の合計。"
             + " 可視化用ローカル定義の HalfWidth もこの値に合わせます。"
         )]
         [SerializeField]
@@ -203,18 +205,19 @@ namespace FightingGameTrial.Fighter
         [SerializeField]
         private bool deriveBoxOriginLocalYFromSprite = true;
 
-        [Header("Box ローカル定義（段階11A・可視化用。判定未使用）")]
+        [Header("Box ローカル定義（Facing Right 基準。可視化・実判定共通）")]
         [Tooltip(
-            "Push Box のローカル定義です。"
+            "Push Box のローカル定義です（Facing Right 基準）。"
             + " HalfWidth は pushBoxHalfWidth が正本（Resolver と一致させる）。"
+            + " CenterX は EvaluateWorldPushBox で Facing に応じて反転する。"
             + " Center は論理接地位置（足元）からの相対です。"
         )]
         [SerializeField]
         private DebugBox2D pushBoxLocal = new DebugBox2D(0f, 1f, 0.5f, 1f, true);
 
         [Tooltip(
-            "Hurt Box のローカル定義です。常時存在（可視化は常時）。"
-            + " 現段階では被弾判定には使いません。"
+            "Hurt Box のローカル定義です（Facing Right 基準）。常時存在。"
+            + " 可視化と被弾判定の正本は EvaluateWorldHurtBox（Facing で CenterX 反転）。"
         )]
         [SerializeField]
         private DebugBox2D hurtBoxLocal = new DebugBox2D(0f, 1f, 0.45f, 1f, true);
@@ -690,16 +693,17 @@ namespace FightingGameTrial.Fighter
         }
 
         /// <summary>
-        /// Push Box の World 座標を返します（段階11A）。
+        /// Push Box の World 座標を返します。
         ///
         /// 変換の流れ:
-        /// 1. 原点 X = Motor.LogicalX（位置の正本）
+        /// 1. 原点 X = Motor.LogicalX（足元位置の正本）
         /// 2. 原点 Y = 論理接地 Y（Transform.position.y + boxOriginLocalY）
-        /// 3. WorldCenter = 原点 + LocalCenter
-        /// 4. HalfWidth は pushBoxHalfWidth（Resolver と同じ値）
+        /// 3. local CenterX を Facing に応じて反転（Facing Right 基準の定義）
+        /// 4. WorldCenter = 原点 + 反転後 LocalCenter
+        /// 5. HalfWidth は pushBoxHalfWidth（Resolver と同じ値）
         ///
-        /// Facing では左右反転しない（体幹の押し合い箱のため）。
-        /// 現段階では可視化専用。Push Resolver は従来どおり半幅だけを使う。
+        /// 可視化と Push Resolver の双方がこの結果を正本とする。
+        /// Facing が同じなら WorldCenter 移動量 = LogicalX 移動量。
         /// </summary>
         public DebugBox2D EvaluateWorldPushBox()
         {
@@ -710,6 +714,12 @@ namespace FightingGameTrial.Fighter
             float originY;
             GetBoxOrigin(out originX, out originY);
 
+            float localCenterX = pushBoxLocal.CenterX;
+            if (motor != null && motor.FacingRight == false)
+            {
+                localCenterX = -localCenterX;
+            }
+
             float halfWidth = PushBoxHalfWidth;
             float halfHeight = pushBoxLocal.HalfHeight;
             if (halfHeight < 0f)
@@ -718,7 +728,7 @@ namespace FightingGameTrial.Fighter
             }
 
             world.Set(
-                originX + pushBoxLocal.CenterX,
+                originX + localCenterX,
                 originY + pushBoxLocal.CenterY,
                 halfWidth,
                 halfHeight,
@@ -728,8 +738,9 @@ namespace FightingGameTrial.Fighter
         }
 
         /// <summary>
-        /// Hurt Box の World 座標を返します（段階11A）。
-        /// 常時有効。Facing 反転なし。被弾判定にはまだ使わない。
+        /// Hurt Box の World 座標を返します。
+        /// 常時有効。可視化と被弾判定の正本。
+        /// local CenterX は Facing Right 基準で、Facing Left なら符号反転する（Hit Box と同型）。
         /// </summary>
         public DebugBox2D EvaluateWorldHurtBox()
         {
@@ -739,6 +750,12 @@ namespace FightingGameTrial.Fighter
             float originX;
             float originY;
             GetBoxOrigin(out originX, out originY);
+
+            float localCenterX = hurtBoxLocal.CenterX;
+            if (motor != null && motor.FacingRight == false)
+            {
+                localCenterX = -localCenterX;
+            }
 
             float halfWidth = hurtBoxLocal.HalfWidth;
             float halfHeight = hurtBoxLocal.HalfHeight;
@@ -753,7 +770,7 @@ namespace FightingGameTrial.Fighter
             }
 
             world.Set(
-                originX + hurtBoxLocal.CenterX,
+                originX + localCenterX,
                 originY + hurtBoxLocal.CenterY,
                 halfWidth,
                 halfHeight,

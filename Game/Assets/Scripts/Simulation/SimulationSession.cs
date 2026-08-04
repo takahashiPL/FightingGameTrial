@@ -11,12 +11,14 @@ namespace FightingGameTrial.Simulation
     ///
     /// 段階10B-3:
     /// - 両体移動のあと、Facing 更新の前に Participant 共通 Push Box で重なりを解消する
+    /// - Push は EvaluateWorldPushBox の World 中心距離を正本とする（LogicalX だけの中心は使わない）
     /// - Facing は Push 補正後の最終位置を基準に更新する
     /// - P1 専用停止ではなく、DebugFighterPushResolver で双方へ等分補正する
     ///
     /// 段階11B:
     /// - Jパンチ Hit は距離ではなく Hit Box × Hurt Box の重なりで判定する
     /// - 可視化と同じ EvaluateWorldHitBox / EvaluateWorldHurtBox を実判定でも使う
+    /// - Hurt / Push の local CenterX は Facing に応じて反転する（Hit と同型）
     /// - 旧 attackRange 距離判定は使用しない
     ///
     /// 段階15:
@@ -410,7 +412,7 @@ namespace FightingGameTrial.Simulation
         }
 
         /// <summary>
-        /// HUD 用: 直近の Push 中心間距離（補正後の絶対値）。
+        /// HUD 用: 直近の World Push Box 中心間距離（補正後の絶対値）。
         /// </summary>
         public float LastPushCenterDistance
         {
@@ -2693,13 +2695,14 @@ namespace FightingGameTrial.Simulation
         /// 両 Participant の横方向 Push Box 重なりを解消します（段階10B-3 / 13B-1）。
         ///
         /// 何をするか:
-        /// - DebugFighterPushResolver に等分分離と壁際再配分を依頼する
-        /// - HUD 用に中心距離・重なり有無を記録する
+        /// - DebugFighterPushResolver に World Push Box 中心基準の等分分離と壁際再配分を依頼する
+        /// - HUD 用に World 中心距離・重なり有無を記録する
         /// - 補正開始／壁際再配分の立ち上がりだけ1行ログを出す（常時大量ログは出さない）
         ///
         /// なぜこの順か:
         /// Facing と Hit は最終位置を使うため、移動の直後・Facing の直前で行う。
         /// Push は KnockbackVelocityX を変更しない（位置のみ）。
+        /// Push 時点の Facing は前 CF 最終値（Facing 更新は本処理の後）。
         ///
         /// logOnCorrect: Combat tick 中のみ true。Start 時の初期離しでは false。
         /// </summary>
@@ -2723,7 +2726,8 @@ namespace FightingGameTrial.Simulation
             if (ShouldSkipPushForAerialSeparation(participantP1.Motor, participantP2.Motor))
             {
                 float airDist = Mathf.Abs(
-                    participantP2.Motor.LogicalX - participantP1.Motor.LogicalX
+                    participantP2.EvaluateWorldPushBox().CenterX
+                    - participantP1.EvaluateWorldPushBox().CenterX
                 );
                 lastPushCenterDistance = airDist;
                 lastPushWasOverlapping = false;
@@ -2752,10 +2756,13 @@ namespace FightingGameTrial.Simulation
 
             lastPushWasOverlapping = wasOverlapping;
 
-            // HUD には補正後の中心距離を出す（接触中はほぼ最小距離になる）。
+            // HUD には補正後の World Push 中心距離を出す（接触中はほぼ最小距離になる）。
             float afterP1X = participantP1.Motor.LogicalX;
             float afterP2X = participantP2.Motor.LogicalX;
-            lastPushCenterDistance = Mathf.Abs(afterP2X - afterP1X);
+            lastPushCenterDistance = Mathf.Abs(
+                participantP2.EvaluateWorldPushBox().CenterX
+                - participantP1.EvaluateWorldPushBox().CenterX
+            );
 
             // 補正開始の立ち上がりだけ1行ログ（押し続け中の毎フレーム出力はしない）。
             if (didCorrect && logOnCorrect && previousPushDidCorrect == false)

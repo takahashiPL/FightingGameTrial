@@ -6,13 +6,15 @@ namespace FightingGameTrial.Fighter
     /// 2体の Participant 間の横方向 Push Box 重なりを解消します（段階10B-3 / 13B-1）。
     ///
     /// 何をするか:
-    /// - 各 Participant の PushBoxHalfWidth から最小中心距離を求める
-    /// - 移動後の中心距離がそれを下回ったら、左右へ等分に押し分ける
+    /// - 各 Participant の EvaluateWorldPushBox から World 中心と半幅を取る
+    /// - World 中心間距離が半幅合計を下回ったら、左右へ等分に押し分ける
     /// - Motor 既存の minX/maxX で片方が止まった分は、もう片方へ未消化量を移す（段階13B-1）
-    /// - 実移動量は Motor.TryMoveLogicalXBy の戻り値を正本にする
+    /// - World 中心の移動量と同じ delta を Motor.TryMoveLogicalXBy へ適用する
+    ///   （同一 Facing 中は worldCenter = LogicalX + signedLocalCenterX のため）
     ///
     /// なぜ必要か:
     /// - P1/P2 が重なったり通り抜けたりしないようにする
+    /// - 可視化の Push Box と実押し合いを一致させる（CenterX 非0・Facing 反転対応）
     /// - Rigidbody 衝突に依存せず、60Hz SimulationTick 内で再現可能にする
     /// - P1 専用分岐ではなく、Participant 同士の共通処理にする
     /// - ステージ端で片方が動けなくても、可能な限り必要距離を確保する
@@ -41,8 +43,8 @@ namespace FightingGameTrial.Fighter
         /// 2 Participant の横方向 Push Box 重なりを解消します。
         ///
         /// 戻り値: 補正を行ったら true。
-        /// out centerDistance: 補正前の中心間距離（絶対値）。
-        /// out requiredMinDistance: halfWidth 合計。
+        /// out centerDistance: 補正前の World Push 中心間距離（絶対値）。
+        /// out requiredMinDistance: World Push 半幅合計。
         /// out wasOverlapping: 補正前に最小距離を下回っていたか。
         /// out didWallRedistribute: 半分適用後に未解消があり再配分を試みたか（段階13B-1）。
         /// out wallLog: 壁際再配分ログ用の1行（不要なら空文字）。
@@ -74,12 +76,14 @@ namespace FightingGameTrial.Fighter
                 return false;
             }
 
-            requiredMinDistance =
-                participantA.PushBoxHalfWidth + participantB.PushBoxHalfWidth;
+            DebugBox2D worldA = participantA.EvaluateWorldPushBox();
+            DebugBox2D worldB = participantB.EvaluateWorldPushBox();
 
-            float xA = motorA.LogicalX;
-            float xB = motorB.LogicalX;
-            float signedDelta = xB - xA;
+            requiredMinDistance = worldA.HalfWidth + worldB.HalfWidth;
+
+            float worldCenterA = worldA.CenterX;
+            float worldCenterB = worldB.CenterX;
+            float signedDelta = worldCenterB - worldCenterA;
             centerDistance = Mathf.Abs(signedDelta);
 
             // 最小距離以上なら重なりなし。補正不要。
@@ -91,28 +95,32 @@ namespace FightingGameTrial.Fighter
 
             wasOverlapping = true;
 
-            // 左右の役割は「今の X」だけで決める（P1/P2 名では分岐しない）。
-            // 同 X のときは participantA を左扱い（呼び出し側が毎tick同じ順なら安定）。
+            // 左右の役割は「今の World Push 中心 X」だけで決める（P1/P2 名では分岐しない）。
+            // 同中心のときは participantA を左扱い（呼び出し側が毎tick同じ順なら安定）。
             DebugFighterParticipant leftParticipant;
             DebugFighterParticipant rightParticipant;
+            float leftWorldX0;
+            float rightWorldX0;
 
             if (signedDelta >= 0f)
             {
                 leftParticipant = participantA;
                 rightParticipant = participantB;
+                leftWorldX0 = worldCenterA;
+                rightWorldX0 = worldCenterB;
             }
             else
             {
                 leftParticipant = participantB;
                 rightParticipant = participantA;
+                leftWorldX0 = worldCenterB;
+                rightWorldX0 = worldCenterA;
             }
 
             DebugFighterMotor leftMotor = leftParticipant.Motor;
             DebugFighterMotor rightMotor = rightParticipant.Motor;
-            float leftX0 = leftMotor.LogicalX;
-            float rightX0 = rightMotor.LogicalX;
 
-            float separationNeeded = requiredMinDistance - (rightX0 - leftX0);
+            float separationNeeded = requiredMinDistance - (rightWorldX0 - leftWorldX0);
             if (separationNeeded <= OverlapEpsilon)
             {
                 return false;
@@ -121,10 +129,11 @@ namespace FightingGameTrial.Fighter
             float halfSeparation = separationNeeded * 0.5f;
 
             // ------------------------------------------------------------
-            // 1) 通常: 左右へ半分ずつ要求（中央付近ではこれだけで必要距離に戻る）
-            // 2) 実移動量は Motor.TryMoveLogicalXBy（minX/maxX Clamp 後）
-            // 3) 未消化分を反対側へ再配分（段階13B-1）
-            // 4) 反対側にも余地がなければ、動ける範囲で停止
+            // 1) 通常: World 中心を左右へ半分ずつ離す要求
+            // 2) 同一 Facing 中は ΔworldCenter = ΔLogicalX なので TryMoveLogicalXBy へ同量
+            // 3) 実移動量は Motor.TryMoveLogicalXBy（minX/maxX Clamp 後）
+            // 4) 未消化分を反対側へ再配分（段階13B-1）
+            // 5) 反対側にも余地がなければ、動ける範囲で停止
             //
             // KnockbackVelocityX は触らない（位置だけ動かす）。
             // ------------------------------------------------------------
@@ -192,7 +201,8 @@ namespace FightingGameTrial.Fighter
             if (didWallRedistribute)
             {
                 float afterDist = Mathf.Abs(
-                    rightMotor.LogicalX - leftMotor.LogicalX
+                    rightParticipant.EvaluateWorldPushBox().CenterX
+                    - leftParticipant.EvaluateWorldPushBox().CenterX
                 );
 
                 wallLog =

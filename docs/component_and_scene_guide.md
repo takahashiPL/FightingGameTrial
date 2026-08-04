@@ -334,8 +334,10 @@ Help 用 TMP は Inspector 項目なし（Awake で生成）。
 | Knockback Initial Speed | 0.18 | 同上（互換用） |
 | Knockback Deceleration | 0.015 | 同上（互換用） |
 | Max Hit Points | 100 | HP 最大の暫定正本（攻撃データではない） |
-| Push Box Half Width | 0.5 | Push 用 |
-| Box Origin / Boxes / AttackState / HitState 等 | コード既定 | AttackState/HitState は実行時状態の入れ物 |
+| Push Box Half Width | 0.75（Scene）／コード既定0.5 | **HalfWidth の正本**。`EvaluateWorldPushBox`／Push Resolver が使用。可視化用 `pushBoxLocal.HalfWidth` もこれに同期 |
+| Push Box Local | CenterX=`0` CenterY=`1` HalfWidth=`0.75` HalfHeight=`1`（Scene） | Facing **Right 基準**の local。CenterX は World 評価時に Facing Left なら符号反転 |
+| Hurt Box Local | CenterX=`0` CenterY=`1` HalfWidth=`0.75` HalfHeight=`1`（Scene） | 同上。可視化と被弾判定の正本は `EvaluateWorldHurtBox` |
+| Box Origin / AttackState / HitState 等 | コード既定／Scene | AttackState/HitState は実行時状態の入れ物 |
 
 HitStun / ClashRecoil / KO 表示色はコード側 SerializeField。`ClashRecoil`の黄色系既定色はScene YAMLへ保存せず、コード初期値のままEditor動作確認済み。専用Sequence未設定時はIdleへfallbackする。
 
@@ -469,7 +471,7 @@ Keyboard (J)
 | P2 StandGuard（push済み） | `debugP2StanceGuardMode`（Normal／StandGuard・既定Normal）。片側候補のGuard分岐。検証専用。ログ `via=DebugStandGuard` |
 | P1 Back Guard（push済み） | P1 Gameplay Back のみの最小立ちガード。正式入力経路。ログ `via=Back` |
 | JPunchAfterDelay（push済み） | P2 solo JPunch繰り返し。方向Neutral固定。Guard検証専用。Mirror Replayではない |
-| P1JPunchP2GroundKickClash（未コミット） | 単発。P2 GK先行→5CF後P1 JP。異種Clash検証専用。距離は自動調整しない |
+| P1JPunchP2GroundKickClash（`ab6b938`） | 単発。P2 GK先行→5CF後P1 JP。異種Clash検証専用。距離は自動調整しない |
 | Dummy 専用分岐ではない | P2 用の別戦闘ロジッククラスはない。移動・Jump・攻撃開始はP1と同じ通常経路 |
 | opponent 相互参照 | Scene で交差接続 |
 | Facing / Push | 両者に同じ Session 経路が適用される |
@@ -1371,7 +1373,7 @@ P1 CurrentInput
 
 **確認済み（P1 Back／JPunchAfterDelay・push済み `0a4886e`）**: P2がDelayごと繰り返しJPunch（60／90）。P1 Backで`via=Back`・GuardStun=7・`GuardStun ended slot=P1`。Neutral／Forward／Left+Right／Down+BackはNormal Hit（詳細は§18.8）。
 
-**確認済み（P1JPunchP2GroundKickClash・未コミット）**: 距離1.50でP2 GK CF17218→P1 JP CF17223、双方Active／Pending／Ground Clash CF17227。Damage0・HitCount非加算・Normal Hitなし（詳細は§18.8）。
+**確認済み（P1JPunchP2GroundKickClash・`ab6b938`）**: 距離1.50でP2 GK CF17218→P1 JP CF17223、双方Active／Pending／Ground Clash CF17227。Damage0・HitCount非加算・Normal Hitなし（詳細は§18.8）。
 
 **未確認**: AssistのKO等単独破棄・Delay 1〜14境界・Play再開始後の再警告（§18.6）。しゃがみガード／Just Guard／正式Chip／正式な空中攻撃ガード／正式P2操作・AI／Development Build。### 18.2 Ground Kickの確認値
 
@@ -1490,7 +1492,7 @@ Assist ON・Delay0・近距離Neutral Jump・空中P1 K。CF1352 reserved/fired 
 - Delay 0〜120は攻撃終了後から。Mirror OFF／Mode離脱／Resetで停止
 - **Play確認**: Delay=60／90で繰り返し。攻撃重複なし。Console赤エラーなし
 
-#### P1JPunchP2GroundKickClash（検証専用・単発・未コミット）
+#### P1JPunchP2GroundKickClash（検証専用・単発・push済み `ab6b938`）
 
 Inspector設定例（Scene保存不要）:
 
@@ -1502,6 +1504,37 @@ Inspector設定例（Scene保存不要）:
 - **Play確認（距離1.50）**: P2 GK CF17218 → P1 JP CF17223。双方 Active／Pending／Ground Clash CF17227。Damage0・HitCount非加算・Normal Hitなし・Assist単発
 
 **未実装**: しゃがみガード／Just Guard／正式Chip／正式な空中攻撃ガード／正式P2操作・AI／Development Build。
+
+## 18.10 Hurt／Push Box Facing・World Push中心（2026-08-04・未コミットC#）
+
+### Inspector（`DebugFighterParticipant`）
+
+| 項目 | Scene既定（FightDebug） | 意味 |
+|---|---|---|
+| `Push Box Half Width` | `0.75` | HalfWidth の**正本**。Resolver／`EvaluateWorldPushBox` が使用 |
+| `Push Box Local` → CenterX | `0` | Facing **Right 基準** local。Left では符号反転して World へ |
+| `Hurt Box Local` → CenterX | `0` | 同上。被弾判定も `EvaluateWorldHurtBox` |
+| HalfWidth（local） | Push は Half Width に同期／Hurt=`0.75` | HalfWidth 自体は Facing で反転しない |
+
+可視化は `DebugFighterBoxView` が `EvaluateWorldPushBox` / `EvaluateWorldHurtBox` / `EvaluateWorldHitBox` を呼ぶ。**`DebugPushBoxLine` / `DebugHurtBoxLine` の LineRenderer を直接編集しない**（枠位置の正本ではない）。
+
+### Play中の一時検証（案A・Scene保存しない）
+
+1. Play 開始後、P1／P2 **両方**の Participant で次を設定する（片方だけだと押し合いが不対称になる）
+   - Hurt CenterX=`0.10`、HalfWidth=`0.75`
+   - Push CenterX=`0.05`、HalfWidth=`0.65`（＝ Push Box Half Width も `0.65`）
+2. 正面対向・飛び越し後 Facing・壁際・左向き JPunch Hit を確認
+3. Play 終了で値は Scene 既定（CenterX=`0`／HalfWidth=`0.75`）へ戻る。**Save しない**
+
+### 確認済み（一時値）
+
+- 正面で枠が相手側へ前寄り、`min=1.30`（0.65+0.65）、壁際再配分、飛び越し後の Facing／枠反転、左向き JPunch Normal Hit
+- Scene差分なし（既定 0／0.75 維持）
+
+### 未確定
+
+- 案Aを Scene 既定として正式採用するか
+- Push前 Facing／Hit後 Facing の1CF差を将来変更するか
 
 ## 19. Air Kick最小検証版とRecovery Visual
 

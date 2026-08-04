@@ -86,6 +86,21 @@ GuardStunの自然終了は減算で0到達すれば状態が外れる。終了�
 
 ---
 
+## 3.2 Hurt／Push Box と Push 中心（2026-08-04）
+
+表示だけ local CenterX をずらすと、枠と押し合い／被弾が一致しない。可視化と実判定で同じ `EvaluateWorldPushBox` / `EvaluateWorldHurtBox` を正本にする。
+
+- Facing 反転は **CenterX の符号だけ**でよい。HalfWidth／HalfHeight／CenterY は反転不要
+- `worldCenterX = LogicalX + signedLocalCenterX`（Right なら `+local`、Left なら `-local`）
+- 同一 Facing 中は `ΔworldCenterX = ΔLogicalX`。Push Resolver は World 中心で overlap を求め、同じ delta を `TryMoveLogicalXBy` へ渡す
+- Stage 端 Clamp で片方が動けない分は、反対側へ再配分する（必要距離を可能な範囲で確保するため）
+- HUD／ログの Push 距離は **World Push 中心距離**と LogicalX 距離を混同しない（現行 HUD は World 中心）
+- CenterX=`0` のときは Facing 反転や World／Logical の差が見えず、不具合が潜伏する
+- 非0値は Play 中だけ Inspector で入れ、Scene を保存しない検証が安全（案A: Hurt `+0.10`／Push `+0.05`・HalfWidth `0.65`）。飛び越し後の Facing 反転も確認する
+- 現行処理順では Push は Facing 更新前、Hit は Facing 更新後（1CF差の既知制約）。順序変更は挙動影響が大きいため別タスクに分離した
+
+---
+
 ## 4. エンジン非依存
 
 - 論理ボタンは A / B / X / 方向として扱う

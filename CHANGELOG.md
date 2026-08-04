@@ -1,8 +1,29 @@
 # CHANGELOG
 
-## 未コミット: P1 JPunch × P2 GroundKick 異種Clash Assist（2026-08-04）
+## 未コミット: Hurt／Push Box Facing対応と Push World中心化（2026-08-04）
 
-前提（push済み・今回の未コミットではない）: P1 Back／JPunchAfterDelay `0a4886e` / P2 Debug StandGuard `446f053`。
+前提（push済み）: 異種Clash Assist `ab6b938` / P1 Back・JPunchAfterDelay `0a4886e` / P2 Debug StandGuard `446f053`。
+
+### 実装（C#のみ・Scene未変更）
+- **Changed** `EvaluateWorldHurtBox` / `EvaluateWorldPushBox`: local `CenterX` を Facing に応じて反転（Hit Box と同型。Facing Right=`LogicalX+local`／Left=`LogicalX-local`）
+- **Changed** `DebugFighterPushResolver`: overlap／左右／必要距離を Participant `LogicalX` 中心ではなく `EvaluateWorldPushBox()` の World 中心＋HalfWidth 基準へ
+- World 中心の移動 delta を同じ量だけ `TryMoveLogicalXBy` へ適用。Stage端 Clamp・壁際再配分は維持
+- **Changed** `SimulationSession`: HUD／空中 Push skip 時の `lastPushCenterDistance` を World Push 中心距離へ統一
+- CombatFrame 内の処理順（移動→KB→Push→Facing→Action→Hit→Visual）は**変更なし**（既知制約として維持）
+- FightDebugScene の既定値は未変更（Hurt／Push CenterX=0、HalfWidth=0.75）
+
+### Play確認（Scene保存なし・Play中Inspector一時値）
+- 一時値（案A・P1/P2両方）: Hurt CenterX=`0.10` HalfWidth=`0.75`／Push CenterX=`0.05` HalfWidth=`0.65`
+- 正面対向: 枠が相手側へ前寄り。`Push correct ... dist 1.25->1.30 min=1.30`。壁際再配分 `afterDist=1.300 min=1.300`
+- 飛び越し後左右入れ替わり: Facing・前寄り CenterX が反転。World Push で `dist ... ->1.30 min=1.30`
+- 左向き JPunch（入れ替わり後）: Pending→Normal Hit Damage=10・HitStop／KB／HitCount=1。非0 Hurt CenterX の Facing 反転が実判定で使用されることを確認
+- Training Reset・正面接触・すり抜けなし・Console Error／新規 Warning なし
+- Play終了後、P1/P2とも CenterX=0／HalfWidth=0.75 へ戻り、Scene差分なしを確認
+- **未確認／未実施**: Guard／Ground Clash の追加回帰、KB中・HitStun中密着Push詳細、Air Push skipログ実測、入れ替わり厳密1CFのFacing差観察、案AのScene既定採用判断
+
+## P1 JPunch × P2 GroundKick 異種Clash Assist（push済み `ab6b938`）
+
+前提（push済み）: P1 Back／JPunchAfterDelay `0a4886e` / P2 Debug StandGuard `446f053`。
 
 ### 実装
 - **Added** `DebugP2MirrorAttackMode.P1JPunchP2GroundKickClash`（=4）: 異種地上技Clashの**単発**検証専用 Assist（正式Gameplay／AIではない）
@@ -68,7 +89,7 @@
 - `debugP2MirrorAttackDelayFrames`（当時0〜15、既定0。後に0〜120へ拡張・未コミット）: P2 Attack/Kick押下開始だけをCombatFrame予約／発火。検証専用（本番AI反応時間ではない）
 - **Play実測（SwapPunchAndKick・P1 K・近距離）**: Delay4=P2 JPunch先勝ち、Delay5=異技Ground Clash（**P1 GroundKick → P2 JPunch** / Damage0）、Delay6=P1 GroundKick先勝ち
 - **確認済み**: 攻撃変換モード、CombatFrame遅延、検証ログ、**P1 GroundKick → P2 JPunch**（Delay5）、Delay 4/5/6境界、NoAttack時Normal Hit、**Mirror OFFおよびTraining Resetによる地上Delay予約破棄**（Delay15・Swap・発火予定CF通過でfiredなし／P2 JPunch開始なし）
-- **逆向き（P1 JPunch → P2 GroundKick）**: 後続の未コミット Assist `P1JPunchP2GroundKickClash` でPlay実測済み（本節時点では未確認だった）
+- **逆向き（P1 JPunch → P2 GroundKick）**: 本節時点では未確認だった。後続 Assist `P1JPunchP2GroundKickClash`（push済み `ab6b938`）でPlay実測済み
 - 注: Assist Delay（`debugP2AirKickDelayFrames`）は別系統。地上Delayと混同しない
 
 ## Fighter Sprite Sheet再構築版の正式採用（`5bcc3fa` / Docs `d98a99d`・push済み）
@@ -79,7 +100,7 @@
 - P1/P2のSpriteRenderer初期表示とIdle／Walk／Jump／Punch／Ground Kickを正式GUIDへ統一。Scene内正式GUID参照76件、不明internalID 0件
 - `DebugFighterVisual.airKickSequence`を追加し、`FighterRebuilt_AirKick_00`〜`05`を1CF/枚、Loop OFF、Hold Last Frame ONで接続。RecoveryはJumpFallを維持
 - Unity Import、コンパイル、Missing Sprite／参照例外なしを確認。IdleとAir Kick専用Flying Kick表示を確認済み
-- Hurt／Push BoxはCenterX 0、HalfWidth 0.75の左右対称暫定値。Facing対応と前後非対称化はPush Resolverを含む後工程へ保留
+- Hurt／Push BoxはCenterX 0、HalfWidth 0.75の左右対称暫定値。Facing対応と前後非対称化はPush Resolverを含む後工程へ保留（**当時の記録**。現行の Facing反転＋World Push中心化は未コミットC#／本CHANGELOG先頭節）
 
 ## Air Kick最小検証版・通常技暫定調整（`f19cc22` 系〜専用Sequence `5bcc3fa`・push済み）
 

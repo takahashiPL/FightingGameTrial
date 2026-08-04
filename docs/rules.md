@@ -154,6 +154,9 @@ Unity / UE などのエンジンAPIではなく、**60Hz論理シミュレーシ
 Unity デバッグ実装では、Facing と移動入力の分離・相手向き合いは**実装済み**である（段階10A）。
 横方向 Push Box／すり抜け防止も**実装済み**である（段階10B-3）。
 処理順は 入力移動 → ノックバック移動・減速 → Push 補正 → Facing → ActionFrame → Hit → Visual → HitStun消費。接触後の押し分けは双方等分補正を基本とし、ステージ端で実移動が足りない分は反対側へ再配分する（段階13B-1）。
+Push 接触は **World Push Box**（`EvaluateWorldPushBox`）同士の重なりを解消する（2026-08-04・未コミットC#。LogicalX だけの中心は使わない）。
+Hurt／Push の local CenterX は Facing に応じて前後を反転できる構造である（Hit と同型。Scene既定の非対称数値は**未確定・検証中**）。
+**実装上の既知制約**: Push は Facing 更新前（前 CF 末 Facing）、Hit は Facing 更新後。この1CF差の順序変更は未実施（正式ルールではなく実装制約）。
 Push / Hurt / Hit Box の **Game ビュー可視化**も**実装済み**である（段階11A）。
 Jパンチ Hit は **Hit Box × Hurt Box の重なり判定**である（段階11B。距離判定は削除済み）。
 被 Hit 後は共有 **HitStop（6F）** のあと、被弾側 **HitStun（12 Combat Frame）** と横ノックバックが続く（段階12A / 13A。数値の正本は段階15の攻撃データ）。
@@ -628,7 +631,7 @@ Session が状態を決定し、`DebugFighterVisual` が `FighterSpriteSequence`
 
 2026-07-31更新: Air Kickの攻撃ルールとS/A/R `5/5/10`は変更せず、表示だけをGround Kick流用から専用`airKickSequence`へ分離した。Startup／Activeは`FighterRebuilt_AirKick_00`〜`05`、RecoveryはJumpFallを使う。専用画像接続済みである一方、Air Hit／Air Knockback／縦Knockback／Air Clash／正式Tradeは未実装のままである。
 
-BoxはP1/P2ともHurt／Push CenterX `0`、HalfWidth `0.75`の左右対称暫定値。Facing対応のCenterX反転と前後非対称化は未実装であり、Push Resolverの判定中心も同時にWorld Push Box中心へ揃えるまで値だけを前寄せしない。
+Boxの**Scene既定**はP1/P2ともHurt／Push CenterX `0`、HalfWidth `0.75`の左右対称暫定値（未変更）。Facing対応の CenterX 反転と Push Resolver の World Push Box 中心化は **C#実装・Play確認済み（未コミット）**。非対称候補（例: Hurt CenterX `+0.10`／Push CenterX `+0.05`・HalfWidth `0.65`）は Play 中検証値であり、**正式ルール・Scene既定としては未確定**。
 
 - `K`押下エッジを一か所で処理し、CombatFrame開始時点で接地中ならGround Kick、すでに空中ならAir Kick
 - 地上Up+KはGround Kick、J+KはJ Punch優先。空中Jは攻撃を開始しない
