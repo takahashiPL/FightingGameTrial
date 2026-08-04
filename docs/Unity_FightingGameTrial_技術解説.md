@@ -10,17 +10,7 @@
 
 この文書は、`Unity_FightingGameTrial` の成果物に同梱し、第三者が実装内容、設計判断、確認済み範囲、未実装範囲を把握するための技術要約です。
 
-操作方法は、同梱の `Unity_FightingGameTrial_あそびかた.md` を参照してください。
-
-詳細な仕様・実装履歴は、リポジトリ内の次の文書を正本とします。
-
-| 資料 | 役割 |
-|---|---|
-| `docs/rules.md` | ゲーム仕様と60Hz論理シミュレーションの正本 |
-| `docs/unity_implementation_status.md` | 実装済み／暫定／未実装／確認状況 |
-| `docs/component_and_scene_guide.md` | Scene、Component、Inspector、処理経路の教材 |
-| `docs/learning_and_readability.md` | 可読性・学習用コード方針 |
-| `CHANGELOG.md` | 実装履歴と変更理由 |
+配布物では、操作方法は同梱の `Unity_FightingGameTrial_あそびかた.md`、技術的な構成と確認範囲は本書で自己完結して読める想定です。
 
 ---
 
@@ -545,10 +535,10 @@ P2は本番入力やAIではなく、検証を再現しやすくするAssistを�
 
 ---
 
-## 22. 開発用Docsについて
+## 22. 配布物について
 
-配布物には、この技術解説とあそびかたを同梱します。
+配布物には、Unity Build 本体と、同梱の `Unity_FightingGameTrial_あそびかた.md`／本書（技術解説）を含めます。
 
-より詳細な処理順、Inspector設定、検証ログ、失敗例、設計理由は、リポジトリ内の開発用Docsを参照してください。
+操作方法はあそびかた、技術的な構成・確認済み範囲・未実装範囲は本書で把握できる想定です。
 
-この2文書は第三者が全体像を理解するための要約であり、仕様変更時は `docs/rules.md` と `docs/unity_implementation_status.md` を先に更新し、その内容を本書へ同期する方針です。
+開発用リポジトリには、より詳細な処理順・Inspector設定・検証ログ・失敗例・設計理由などの追加資料が存在する場合があります。それらは**配布物には含まれません**。
