@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## J Punch パンチ3コマ素材反映・Sprite Rect更新（`3b92914`・push済み）
+
+- 2026-08-05、`unity` / `origin/unity` へ push 済み
+- J Punch用パンチ3コマを正式`Fighter_SpriteSheet.png`へ反映
+- `FighterRebuilt_Punch_00`〜`02`のSprite Rectを新素材に合わせて更新
+- 正式GUID・Sprite名・internalIDは維持（参照差し替えなし）
+- ゲームルール／フレーム値の変更なし（素材とSprite Rectの改善）
+- Editor確認: 通常表示、P1/P2、左右反転、画像切れなし
+
 ## 未コミット: P2 TEST MODE UI（Build向け検証入口・2026-08-04）
 
 前提: Hurt／Push Facing・World中心・Scene正式値 `0.10`/`0.60` を含む現行作業ツリー。

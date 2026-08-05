@@ -1,16 +1,17 @@
 # Unity 実装状況・次工程（段階1〜15到達後）
 
-最終更新: 2026-08-04
+最終更新: 2026-08-05
 対象ブランチ: `unity`
-内容反映済み基準コミット（コードpush済みHEAD）: **`ab6b938`**（Add cross-move ground clash debug assist）
+内容反映済み基準コミット（コードpush済みHEAD）: **`3b92914`**（J Punch 3コマ素材／Sprite Rect更新）
 今回の未コミット範囲: Hurt／Push Facing・World中心・Scene正式値 `0.10`/`0.60`、**P2 TEST MODE UI**（Build向け検証入口）と本Docs反映
-push済み到達点の例: `ab6b938`（異種Clash Assist）、`0a4886e`（P1 Back／JPunchAfterDelay）、`446f053`（P2 Debug StandGuard）、`f9e56d3`（Assist予約安全Docs）、`03bfd72` / `988f36f`（AirKick Assist・Air双方未適用）、`96f8148` / `6be8bb4`（地上攻撃変換・Delay・異技Clash）、`5bd3627` / `6bc5f03`（Clash整理＋基本P2鏡写し）
+push済み到達点の例: `3b92914`（J Punch 3コマ素材／Rect）、`ab6b938`（異種Clash Assist）、`0a4886e`（P1 Back／JPunchAfterDelay）、`446f053`（P2 Debug StandGuard）、`f9e56d3`（Assist予約安全Docs）、`03bfd72` / `988f36f`（AirKick Assist・Air双方未適用）、`96f8148` / `6be8bb4`（地上攻撃変換・Delay・異技Clash）、`5bd3627` / `6bc5f03`（Clash整理＋基本P2鏡写し）
 過去履歴の例（現在の基準ではない）: `1b47fc6`（HUD font atlas）、`69c9385`（Document clash recoil state separation）
 段階14全体（14A+14B）・段階15（攻撃データ化）: **完了・push 済み**
 GC-1 / GC-2（補助改善・正式 Stage ではない）: **完了・push 済み**
 Training Reset 位置・向き復帰: **実装・Editor 確認済み**（正式 Stage 番号なし）
 Visual Sequence + Sprite Sheet 移行: **実装・Editor 確認済み・push済み**（正式 Stage 番号なし）
 PixelLab再構築版Sprite Sheet正式採用: **実装・Editor確認済み・push済み**（`5bcc3fa` / Docs `d98a99d`）
+J Punch用パンチ3コマ素材反映・Sprite Rect更新: **実装・Editor確認済み・push済み**（`3b92914`。S/A/R・Damage等のゲーム値は変更なし）
 ジャンプ基盤・Jump Visual・計測ログ: **実装・Editor 確認済み**（正式 Stage 番号なし）
 Training Reset 共通 release gate: **実装・Editor 確認済み**（正式 Stage 番号なし）
 Ground Kick + shared hit resolution groundwork: **実装・Editor確認済み・push済み**（正式 Stage 番号なし）
@@ -141,7 +142,7 @@ HitStun / ClashRecoil / KO は専用 State。専用 Sequence 未設定時は Idl
 | Idle | 8（`Fighter_Idle_00` … `_07`） | **接続済み・確認 OK** |
 | Walk | 8（`Fighter_Walk_00` … `_07`） | **接続済み・確認 OK**（WalkF / WalkB 共有） |
 | Jump | 8（`Fighter_Jump_00` … `_07`） | **接続済み・確認 OK** |
-| Punch | 2（`Fighter_Punch_00` / `_01`） | **接続済み・確認 OK**（Recovery 専用コマなし・暫定） |
+| Punch | 3（`FighterRebuilt_Punch_00`〜`02`） | **接続済み・確認 OK**（2026-08-05 素材／Rect更新・`3b92914`） |
 | Kick | 5（`Fighter_Kick_00` … `_04`） | **Ground Kickへ接続済み・確認 OK** |
 
 | State | Sequence 割当 |
@@ -153,11 +154,11 @@ HitStun / ClashRecoil / KO は専用 State。専用 Sequence 未設定時は Idl
 | JumpApex | `Fighter_Jump_03` |
 | JumpFall | `Fighter_Jump_04` / `_05`（`loop=false`, `holdLastFrame=true`） |
 | Landing | `Fighter_Jump_06` / `_07` |
-| Attack | `Fighter_Punch_00` / `_01` |
+| Attack | `FighterRebuilt_Punch_00`〜`02` |
 
-共通 Rect サイズ: Idle 102×116 / Walk 96×115 / Jump 120×105 / Punch 110×113 / Kick 108×117。
+共通 Rect サイズ: Idle 102×116 / Walk 96×115 / Jump 120×105 / Kick 108×117。Punch Rect は2026-08-05更新（詳細は`docs/sprite_art_status.md`）。
 
-Characters フォルダは正本 PNG + `.meta` の 1 組のみ。
+Characters フォルダは正本 PNG + `.meta` の 1 組のみ。GUID・Sprite名・internalID維持。
 
 **評価**
 
@@ -166,13 +167,14 @@ Characters フォルダは正本 PNG + `.meta` の 1 組のみ。
 | PixelLab 正本シート統合 | **完了** |
 | 41 sub-sprite切り出し・正式採用 | **完了** |
 | Idle / Walk / Jump / Punch Sequence | **Editor 確認済み** |
+| Punch 3コマ素材／Rect更新（`3b92914`） | **完了**（通常表示・P1/P2・左右反転・画像切れなし。S/A/R等のゲーム値は変更なし） |
 | Kick 素材 | **切り出し済み** |
 | Ground Kick Gameplay | **接続済み・Editor確認済み** |
 | P1/P2・P2 Tint | **確認済み** |
 | Missing Sprite | **なし（Editor 確認済み）** |
 | Gameplay ロジック変更 | **なし** |
 
-**次回改善候補**: ClashRecoil専用Sprite／演出、Punch 3 枚以上、必要なら攻撃素材再制作。Animator 導入は別候補。
+**次回改善候補**: ClashRecoil専用Sprite／演出、必要なら攻撃素材再制作。Animator 導入は別候補。
 
 詳細は教材 §17.8・§17.9、`docs/rules.md` §15.5・§15.6、`docs/sprite_art_status.md`。
 
@@ -468,7 +470,6 @@ ScriptableObject 化、Inspector 編集、Character 別攻撃データ、複数�
 - 複数攻撃、弱/中/強、技コマンド、コンボ、Cancel、Counter Hit
 - 自然な歩行素材の再制作（現状 Walk 8 コマは動作確認済み）
 - **ClashRecoil専用Sprite／演出の追加**（状態・専用色・通常HitCount非加算は実装済み。`debugMirrorP1InputToP2` のScene保存値はOFF）
-- Punch 3 枚以上への素材改善
 - Character Data ScriptableObject（ジャンプ設定の正式データ化含む）
 - Jump 数値調整、Development Build Profiler
 - 本番P2 AI（現在は鏡写しDebug入力ソースのみ。差し替え入口は用意）
@@ -538,7 +539,7 @@ FightDebugScene 正式値: CenterX=`0.10`／HalfWidth=`0.60`（§3.1）。
 その後の候補（順不同・未着手。**新工程番号は作らない**。正式な次 Stage も未定義）:
 
 - Hurt／Push 正式値 `0.10`/`0.60` での追加回帰（Guard／Clash／KB中Push 等）
-- ClashRecoil専用Sprite／演出の追加、Punch 3 枚以上への素材改善
+- ClashRecoil専用Sprite／演出の追加
 - Animator + Animation Clip
 - Air Hit / Air Knockback（**空中被弾**。空中攻撃ではない）
 - Guard（最小立ちガードは暫定実装済み。しゃがみ／Just／正式Chipは未実装）
@@ -612,9 +613,9 @@ Round / Guard / 複数攻撃などの**機能 Stage とは別枠**。番号「GC
 - 段階1〜**15**まで到達。工程表の段階14（HP/Damage/KO）と段階15（攻撃データ化）は完了
 - Visual Sequence + Sprite Sheet 移行・ジャンプ基盤・計測ログ・Training Reset release gate は実装・Editor 確認済み。正式 Stage 番号なし
 - `FightDebugScene` は**練習・検証モード**。戦闘コア共通、KO 後処理はモード側（§1.1）
-- Visual: Sequence再生＋`Fighter_SpriteSheet` **41 sub-sprite**（PPU 39、Idle/Walk/Jump/Punch/Ground Kick/Air Kick接続済み）。Animator未使用
+- Visual: Sequence再生＋`Fighter_SpriteSheet` **41 sub-sprite**（PPU 39、Idle/Walk/Jump/Punch 3コマ/Ground Kick/Air Kick接続済み。Punch Rectは`3b92914`で更新）。Animator未使用
 - 飛び越し後 Facing 反転・左向き Walk / Jump / J Punch は Editor 確認済み。J Punch は地上専用（ジャンプ中開始不可）。Air Hit / Air Knockback・ClashRecoil専用Sprite／演出・Dev Build Profiler は未実装／未確認
-- 正式な次 Stage 番号は未定義。候補は順不同（ClashRecoil専用Sprite／演出、Punch / Ground Kick / Air Kick素材改善、Animator、Air Hit/KB、Guard、Character Data SO、対戦モード分離など。Air Kick最小検証版は実装済みだが正式仕様は未確定）
+- 正式な次 Stage 番号は未定義。候補は順不同（ClashRecoil専用Sprite／演出、Ground Kick / Air Kick素材改善、Animator、Air Hit/KB、Guard、Character Data SO、対戦モード分離など。Air Kick最小検証版は実装済みだが正式仕様は未確定）
 
 ## 6. Ground Kick + 共通 Hit 解決基盤（2026-07-30）
 
