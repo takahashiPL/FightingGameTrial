@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## Windows向け検証Build（`b464eef` / tag `windows-build-20260805`・push済み）
+
+- 2026-08-05、`unity` / `origin/unity` へ push 済み。tag `windows-build-20260805` を作成・push済み
+- GitHub Release「Windows Build 2026-08-05」を公開。asset `windows-build-20260805.zip`（実行ファイル＋同梱Docs）
+- FightDebugScene を Build Index 0 として起動。SampleScene は Build 対象外へ変更
+- Windows Build上で HUD、P1/P2、P2 TEST MODE UI の**表示**を確認
+- 正式製品版ではない。検証・学習用Build
+- 操作や全機能の完全検証は未実施
+
 ## J Punch パンチ3コマ素材反映・Sprite Rect更新（`3b92914`・push済み）
 
 - 2026-08-05、`unity` / `origin/unity` へ push 済み
@@ -9,9 +18,9 @@
 - ゲームルール／フレーム値の変更なし（素材とSprite Rectの改善）
 - Editor確認: 通常表示、P1/P2、左右反転、画像切れなし
 
-## 未コミット: P2 TEST MODE UI（Build向け検証入口・2026-08-04）
+## P2 TEST MODE UI（Build向け検証入口・`b9d8494`・push済み）
 
-前提: Hurt／Push Facing・World中心・Scene正式値 `0.10`/`0.60` を含む現行作業ツリー。
+前提: Hurt／Push Facing・World中心・Scene正式値 `0.10`/`0.60`。2026-08-04実装、`b9d8494` で push 済み（tag `windows-build-20260805`＝`b464eef` より前）。
 
 ### 実装
 - **Added** 画面右上 `P2 TEST MODE` UI（`DebugP2TestModeView`）。既存 `DebugCanvas`＋EventSystemを再利用。実行時生成
@@ -24,7 +33,7 @@
 ### Play確認（Editor）
 - 右上表示、全項目、▼常時、各モード、Delay切替、Inspector Delay同期、RESET後に直前モードへ戻りDelay維持、Error／Warning 0件
 - Clash Assistは距離不足でMissし得る（接触距離が必要）
-- **未確認**: Windows Build実機操作
+- **Build表示確認**: HUD／P1/P2／P2 TEST MODE UI（`b464eef`／Release／tag `windows-build-20260805`）。**未確認**: Build上の操作・全機能の網羅検証
 
 ## 未コミット: Hurt／Push Box Facing対応・World中心化・Scene正式値（2026-08-04）
 

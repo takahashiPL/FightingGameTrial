@@ -2,9 +2,9 @@
 
 最終更新: 2026-08-05
 対象ブランチ: `unity`
-内容反映済み基準コミット（コードpush済みHEAD）: **`3b92914`**（J Punch 3コマ素材／Sprite Rect更新）
-今回の未コミット範囲: Hurt／Push Facing・World中心・Scene正式値 `0.10`/`0.60`、**P2 TEST MODE UI**（Build向け検証入口）と本Docs反映
-push済み到達点の例: `3b92914`（J Punch 3コマ素材／Rect）、`ab6b938`（異種Clash Assist）、`0a4886e`（P1 Back／JPunchAfterDelay）、`446f053`（P2 Debug StandGuard）、`f9e56d3`（Assist予約安全Docs）、`03bfd72` / `988f36f`（AirKick Assist・Air双方未適用）、`96f8148` / `6be8bb4`（地上攻撃変換・Delay・異技Clash）、`5bd3627` / `6bc5f03`（Clash整理＋基本P2鏡写し）
+内容反映済み基準コミット（コードpush済みHEAD）: **`b464eef`**（Windows向け検証Build設定）
+今回の未コミット範囲: 今回のRelease確認Docs反映
+push済み到達点の例: `b464eef`（Windows検証Build／tag `windows-build-20260805`）、`b9d8494`（P2 TEST MODE UI）、`3b92914`（J Punch 3コマ素材／Rect）、`ab6b938`（異種Clash Assist）、`0a4886e`（P1 Back／JPunchAfterDelay）、`446f053`（P2 Debug StandGuard）、`f9e56d3`（Assist予約安全Docs）、`03bfd72` / `988f36f`（AirKick Assist・Air双方未適用）、`96f8148` / `6be8bb4`（地上攻撃変換・Delay・異技Clash）、`5bd3627` / `6bc5f03`（Clash整理＋基本P2鏡写し）
 過去履歴の例（現在の基準ではない）: `1b47fc6`（HUD font atlas）、`69c9385`（Document clash recoil state separation）
 段階14全体（14A+14B）・段階15（攻撃データ化）: **完了・push 済み**
 GC-1 / GC-2（補助改善・正式 Stage ではない）: **完了・push 済み**
@@ -12,6 +12,7 @@ Training Reset 位置・向き復帰: **実装・Editor 確認済み**（正式 
 Visual Sequence + Sprite Sheet 移行: **実装・Editor 確認済み・push済み**（正式 Stage 番号なし）
 PixelLab再構築版Sprite Sheet正式採用: **実装・Editor確認済み・push済み**（`5bcc3fa` / Docs `d98a99d`）
 J Punch用パンチ3コマ素材反映・Sprite Rect更新: **実装・Editor確認済み・push済み**（`3b92914`。S/A/R・Damage等のゲーム値は変更なし）
+Windows向け検証・学習用Build: **作成・Release公開済み**（`b464eef` / tag `windows-build-20260805`。正式製品版ではない。詳細はCHANGELOG）
 ジャンプ基盤・Jump Visual・計測ログ: **実装・Editor 確認済み**（正式 Stage 番号なし）
 Training Reset 共通 release gate: **実装・Editor 確認済み**（正式 Stage 番号なし）
 Ground Kick + shared hit resolution groundwork: **実装・Editor確認済み・push済み**（正式 Stage 番号なし）
@@ -26,7 +27,7 @@ P2 Debug 最小立ちガード: **実装・Play実測・Docs反映済み・push�
 P1 Gameplay Back／JPunchAfterDelay: **実装・Play実測・Docs反映済み・push済み**（`0a4886e`）
 Hurt／Push CenterX Facing反転＋Push World中心化: **実装・Play確認済み・未コミットC#**
 Hurt／Push Scene正式値 CenterX=`0.10`／HalfWidth=`0.60`: **FightDebugScene保存済み**（P1/P2同値）
-P2 TEST MODE UI: **実装・Editor Play確認済み・未コミット**（Windows Build実機は未確認。本番AIではない）
+P2 TEST MODE UI: **実装・Editor Play確認済み・push済み**（`b9d8494`。Windows Build**表示**確認済み。操作・全機能網羅は未確認。本番AIではない・検証専用）
 Debug HUD font glyph atlas: **push済み・過去履歴**（`1b47fc6`。現在の基準ではない）
 正式な次工程番号: **未定義**（新 Stage 番号は作らない）
 
@@ -483,7 +484,7 @@ ScriptableObject 化、Inspector 編集、Character 別攻撃データ、複数�
 - 発生差により片側Normal Hitになる場合あり（Delay4/6で実測）。Counter Hit／Attack Priorityなし
 - Airを含む双方候補: 結果未適用（正式Air Clashではない）。双方AirKick同士はPlay実測済み。異種Air双方は未確認
 - 片側候補: P1 Back または P2 Debug StandGuard成立時は Guard。それ以外は Normal Hit
-- P2: 既定はNeutral。基本鏡写し・攻撃変換／地上Delay・AirKick Assist／Assist予約安全・P2 Debug StandGuard・JPunchAfterDelay・`P1JPunchP2GroundKickClash`はpush済みの検証専用補助。**P2 TEST MODE UI**でBuild／Game画面からも切替可能（未コミット・本番AIではない）
+- P2: 既定はNeutral。基本鏡写し・攻撃変換／地上Delay・AirKick Assist／Assist予約安全・P2 Debug StandGuard・JPunchAfterDelay・`P1JPunchP2GroundKickClash`はpush済みの検証専用補助。**P2 TEST MODE UI**（`b9d8494`）でBuild／Game画面からも切替可能（Windows Build表示確認済み。操作・全機能網羅は未確認。本番AIではない）
 - キャラ差し替え・複数 Hurt/Hit Box: 未実装
 
 ---
@@ -504,14 +505,15 @@ Facing 分離・壁際 Push 再配分は実装済み。Push は HP / KO / KB 速
 
 **既知制約（実装順・変更なし）**: 入力移動 → Knockback → **Push** → **Facing更新** → Action → **Hit** → Visual。Push は前 CF 末 Facing、Hit は当 CF 更新後 Facing。左右入れ替わり CF では1CFずれる可能性あり。Facing を Push 前へ移す変更は未実施。
 
-### 3.2 P2 TEST MODE UI（2026-08-04・未コミット）
+### 3.2 P2 TEST MODE UI（2026-08-04・push済み `b9d8494`）
 
 | 区分 | 内容 |
 |---|---|
-| **実装済み** | `DebugP2TestMode`／`DebugP2TestModeView`／`ApplyP2TestMode`／`ResetTrainingFromUI`／Delay Getter・Setter。実行時UI生成。既存EventSystem再利用。UIMask等Built-in Skin依存なし |
+| **実装済み（push済み）** | `DebugP2TestMode`／`DebugP2TestModeView`／`ApplyP2TestMode`／`ResetTrainingFromUI`／Delay Getter・Setter。実行時UI生成。既存EventSystem再利用。UIMask等Built-in Skin依存なし。コミット `b9d8494`（`b464eef`／tag `windows-build-20260805` より前） |
 | **Play確認済み（Editor）** | 右上表示、全Dropdown、▼常時、各モード、Delay切替、Inspector同期、RESET一時コマンド（直前モード復帰・Delay維持）、Error/Warning 0 |
-| **未確認** | Windows Build実機操作 |
-| **補足** | JP vs GK Clashは距離不足でMissし得る。本番AIではない。旧「Inspectorでのみ切替」は、UI追加により**Inspectorも引き続き有効だが必須ではない**へ更新 |
+| **Build表示確認** | Windows検証・学習用Build（`b464eef`／tag `windows-build-20260805`）で HUD／P1/P2／P2 TEST MODE UI の表示を確認。FightDebugScene を Build Index 0、SampleScene は対象外。正式製品版ではない（Release詳細はCHANGELOG） |
+| **未確認** | Build上の操作・全機能の網羅検証 |
+| **補足** | JP vs GK Clashは距離不足でMissし得る。本番P2 AIではなく検証専用。旧「Inspectorでのみ切替」は、UI追加により**Inspectorも引き続き有効だが必須ではない**へ更新。機能実装完了とBuild完全検証完了は別 |
 
 ---
 
@@ -613,6 +615,7 @@ Round / Guard / 複数攻撃などの**機能 Stage とは別枠**。番号「GC
 - 段階1〜**15**まで到達。工程表の段階14（HP/Damage/KO）と段階15（攻撃データ化）は完了
 - Visual Sequence + Sprite Sheet 移行・ジャンプ基盤・計測ログ・Training Reset release gate は実装・Editor 確認済み。正式 Stage 番号なし
 - `FightDebugScene` は**練習・検証モード**。戦闘コア共通、KO 後処理はモード側（§1.1）
+- Windows向け検証・学習用Build: **表示確認済み**（HUD／P1/P2／P2 TEST MODE UI。`b464eef`）。操作・全機能網羅は未確認。正式製品版ではない（§3.2／CHANGELOG）
 - Visual: Sequence再生＋`Fighter_SpriteSheet` **41 sub-sprite**（PPU 39、Idle/Walk/Jump/Punch 3コマ/Ground Kick/Air Kick接続済み。Punch Rectは`3b92914`で更新）。Animator未使用
 - 飛び越し後 Facing 反転・左向き Walk / Jump / J Punch は Editor 確認済み。J Punch は地上専用（ジャンプ中開始不可）。Air Hit / Air Knockback・ClashRecoil専用Sprite／演出・Dev Build Profiler は未実装／未確認
 - 正式な次 Stage 番号は未定義。候補は順不同（ClashRecoil専用Sprite／演出、Ground Kick / Air Kick素材改善、Animator、Air Hit/KB、Guard、Character Data SO、対戦モード分離など。Air Kick最小検証版は実装済みだが正式仕様は未確定）
